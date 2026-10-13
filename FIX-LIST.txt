@@ -1,0 +1,136 @@
+3DJames - fix list
+==================
+
+To fix:
+[ ] Size (Scale) arrows: closer, but still not placed/turned exactly like 3D Builder at every angle. Jon will show
+    more side-by-side views; match them one angle at a time. (Move arrows are right: don't touch them.)
+[ ] General rule: match 3D Builder's look and feel as closely as possible without removing any tools.
+[ ] Later, maybe: remove features from imported shapes (fill in a hole, delete a fillet). Needs a bigger geometry engine build.
+[ ] Later: STEP to 3DJames converter. Read a STEP file and rebuild it as editable steps (blocks, cylinders, holes, fillets, chamfers). Works best on simple printed/machined parts; anything it cannot recognize stays as an imported solid.
+[~] (started) Turn the "Thread" drop-down on the Insert tab into a "Parts" menu with sections that fly out to the side:
+      - Hardware: [done: screws, nuts, washers, bearings, pins, rods, magnets, standoffs, holes] still to do: wood and
+        sheet-metal screws, rivets, T-nuts
+      - Aluminum extrusion and profiles: 2020 / 2040 / 3030 / 4040 at any length, corner bracket, T-nut, square tube,
+        round tube, I-beam, C-channel, angle iron
+      - Electronics: mounting-hole patterns (Raspberry Pi, Arduino), fan mounts (40 / 80 / 120 mm)
+      - Joints: hinge, dovetail, peg and socket, ball joint, universal joint, keyway, boss and rib
+      - Organizing: Gridfinity bins and baseplates, pegboard and IKEA Skadis hooks, drawer dividers,
+        box with lid (sliding, snap-on, hinged)
+      - Filament and printer: PTFE push-fit hole (PC4-M10), filament guide, spool holder axle, spool bearing mount
+      - Motion: bearing pockets (608, 6000 series, LM8UU), GT2 pulley, shaft collar, V-slot wheel mount
+      - Wall mounting: keyhole slot, screw tab, French cleat
+      - Cables: cable clip, zip-tie anchor, cable-chain link, desk grommet
+      - Knobs and handles: knurled knob, thumbscrew head, drawer pull
+      - Feet: rubber foot pocket, leveling foot
+      - Print helpers: print-in-place hinge, snap-fit clip, tolerance test piece
+      - Gears: spur, helical, bevel, rack, worm (tooth count and size editable)
+    Every part keeps its sizes editable afterwards, like the shapes.
+[ ] Later: sketch tool (draw a 2D outline with lines, arcs and exact sizes), then extrude, revolve, loft and sweep it.
+[ ] Installable web app: host 3DJames at a web address so Edge/Chrome can install it (Start menu, own taskbar
+    icon, works offline) and double-clicking a .3dj file opens it. Models never leave the PC.
+    (Tauri desktop wrapper only if this falls short.)
+
+Long-term goals (not now):
+
+[ ] iPad: touch controls (pinch zoom, two-finger slide, one-finger turn), Add to Home Screen from Safari.
+From Jon's "fix list.rtf":
+
+Done:
+ROUND 5 (in progress)
+[x] Parts menu reorganized and filled with ready-made maker parts (standard sizes, plain solids so they're fast):
+    - Screws and bolts > Socket head / Button head / Countersunk / Hex head bolt / Set screw > M2..M10 > length
+      (ISO 4762 / 7380 / 10642 / 4017 / 4026 head sizes)
+    - Nuts and washers > Hex nut / Nylon lock nut / Thin nut (ISO 4032 / DIN 985 / ISO 4035) > size; Washer > size
+    - Bearings > Ball (608, 623-626, 688, 6800, 6000-6002, 6200-6202) / Flanged (F623-F608, F688) / Linear (LM6-12UU)
+    - Pins, rods and magnets > Dowel pins 2-8 mm, smooth rods 3-12 mm, round magnets 3x2 to 20x3
+    - Standoffs > Hex standoffs M2-M4 (female-female, male-female), printed standoff
+    - Holes and pockets, Custom threads, Aluminum extrusion, My parts
+    Every number stays editable in Properties; changing Type or Size fills in the standard numbers.
+[x] Arrow colors like 3D Builder: every arrow and every X/Y/Z box underline is blue; the axis you last used (dragged
+    its arrow, or clicked its box at the bottom) turns green, on the object and under its box.
+[x] Move handles now match 3D Builder: three slim arrows, one per direction: up/down above the object, left/right beside it,
+    front/back just outside its front edge. Each turns green when it's the last used / its box is clicked.
+[x] Help tab > About / Licenses: every open-source part 3DJames uses, with its license text. Same texts in the
+    "licenses" folder. README.txt rewritten. Share\3DJames.zip: ready to send to someone.
+[x] My parts are now .3dj files in a folder: "3D Objects\3DJames Parts" (you pick 3D Objects once; 3DJames makes the
+    folder). Every copy of 3DJames shares them, you can see/back up/share them in File Explorer, and any .3dj you drop
+    in there shows up in Parts > My parts. Parts saved before move into the folder automatically.
+[x] Ruler (View tab): with an object selected, shows the gap to the nearest object on each side and the height above
+    whatever is under it. Click a number and type the gap you want; the object moves to make it so.
+[x] .3dj project files: now the normal way to save. A zip with the project, every imported file as it came in, and a
+    preview picture. .json and 3MF projects still open. (The Claude skill now writes .3dj too.)
+[x] Your own button pictures: the "icons" folder next to 3DJames.html. Copy a file from icons\originals into icons,
+    edit it (or draw a PNG in Paint with the same name), restart 3DJames. README.txt in there lists what each file is.
+[x] Removed the Customize tab again (History > Variables does the same job).
+[x] View tab: Solid / Wireframe / See-through / X-ray drop-down, and a Flat view button (no perspective).
+[x] Align (Object tab), rebuilt the TinkerCAD way: pick objects, click Align, dots appear around them. Hover a dot to
+    see where things would go, click it to do it. The first object you picked stays put (it says "stays put"); click
+    another picked object to line up with that one instead. Stays open for more lining up; Esc when done.
+[x] Removed the Hole button (Object tab) and the Hole checkbox in Properties. Subtract does that job now. Ready-made hole
+    parts (screw holes, nut traps, insert holes, threaded holes) still come in as holes.
+[x] Repeat duplicate: Ctrl+D, move the copy, Ctrl+D again and each new copy repeats that move.
+[x] Workplane (Insert tab, off by default): click it, click a flat face, and new shapes stand on that face at its
+    angle. Click Workplane again to go back to the floor.
+[x] Heat-set insert pocket (Object tab > Faces > Heat-set insert pocket on a face): click a face and an M3 insert pocket
+    (4 mm wide, 6 mm deep) is cut in its middle; change the size and move it in Properties. (Clicking an existing hole: later.)
+[x] Parts > Hardware now also has: Screw hole (plain / countersunk / counterbored, ISO 273 clearance), Nut trap (ISO 4032 + 0.2 mm),
+    Heat-set insert hole, Washer (ISO 7089), Standoff. Pick a size (M2-M12) and every number fills in. Holes come in gray:
+    place them, select, and Subtract.
+[x] Lay flat (Object tab > Faces > Lay flat on a face): click the face that should sit on the bed; the object turns and sets down.
+[x] Printer plates by name in View > Printer area: Bambu X1/P1/A1 256, A1 mini / Prusa MINI 180, Ender 3 / K1 220, K1 Max 300,
+    Prusa MK4 250 x 210, Prusa XL 360, Voron 350.
+[x] Ribbon fits the window: tighter spacing; Hollow / Shape on a face / Push/pull grouped under "Faces", Group/Ungroup
+    under "Group"; on narrower windows it gets tighter, then shows icons only (names on hover). No scroll bar.
+[x] Objects snap flush with zero gap: dragging (or using the arrows) brings faces flush against nearby objects, lines up
+    their edges, and sets objects down on the floor or on top of other objects. Snapping to objects wins over the grid.
+[x] Colors: the Windows Paint palette (20 colors, two rows like Paint) on the Paint tab and in Properties. New shapes
+    use the nearest Paint color (cube and sphere green, cylinder turquoise, cone orange, hexagon gold, tube red, ...).
+[x] Subtract like 3D Builder: select just the cutting object, click Subtract, and it is cut out of every object it passes
+    through (each gets its own copy of the cutter, so each cut stays editable). Several selected still works the old way.
+[x] History links: under a cut or merge, the name of the object that shaped it is a link. Click it to select that object,
+    or, if it was used up, to show it as a see-through ghost and open its settings.
+[x] Resizing works like 3D Builder: stretch any object in X, Y or Z on its own. Cylinders, spheres, cones etc. become ovals
+    instead of averaging; several selected objects all resize together; combined objects stretch too (unevenly
+    stretched combined solids become meshes; plain shapes stay exact solids).
+[x] My parts: "Save to My parts" in Properties (or Parts > My parts > Save selected object) keeps the object with every
+    step that made it, its variables and any imported files. Parts > My parts adds it to any project. Manage My parts... removes them.
+[x] Fixed: imported files in different projects could share an internal name, so an old backup could reopen with the
+    wrong file. Every imported file now gets a name of its own.
+[x] Parts menu on the Insert tab with sections that open to the side. Hardware holds Bolt, Nut, Threaded hole and Threaded rod, unchanged.
+[x] Aluminum extrusion, exact profiles: T-slot 2020 and 2040 (standard European 2020: 6.2 mm opening, 1.8 mm lip,
+    11 mm channel, 4.2 mm center hole) and V-slot 2020, 2040, 4040 (OpenBuilds V-Slot cross-section). Length and
+    profile editable afterwards. Still to come: 3030 and 40-series T-slot, once exact drawings are checked.
+
+ROUND 4
+[x] Push/pull (Object tab): click a flat face, type how far. Positive adds material, negative removes it (make a part longer, a hole deeper). Works on imported STEP parts too.
+[x] STEP files with several parts can come in as separate objects (you get asked; over 200 parts it suggests one object). Parts stay in place relative to each other.
+[x] Open window shows .json projects in the normal list.
+[x] Open/Save/Insert windows start in the last folder you used. File menu > Projects folder... sets the starting folder when there is no last one.
+[x] Side panel keeps its scroll position when you click things.
+[x] History shows how the selected object was made, as a tree, with the shapes cut out of it or merged into it listed under each step. Click a step to edit it right there; used-up shapes show as see-through orange ghosts. "All steps" switch keeps the full list.
+[x] App icon: shows in the window and taskbar. "Make desktop shortcut.cmd" puts a 3DJames shortcut with the icon on the desktop (then right-click > Pin to taskbar).
+[x] Code cleanup: the big app.js split into sensible parts, BuildPlate leftovers gone, one place for saving work in progress, old file-passing code and dead handle code removed, single build script, automatic tests (35) that check every tool.
+
+ROUND 3
+[x] Big STEP files said "too big, try a simpler file". Limit raised from 40 MB to 400 MB, and big models load much faster (a 54 MB test file with 4900 parts loads in about 14 s). Imported files are kept out of the undo history so they do not slow anything down.
+
+EARLIER
+[x] Double-click an object flies in close and centers it, like 3D Builder (angle stays the same). Round 3: before, it only centered without moving in.
+[x] Scale arrows on the frame edges: green top/bottom, blue left/right, corner dots
+[x] Group / Ungroup (Object tab, Ctrl+G / Ctrl+Shift+G), separate from Merge
+[x] Rotate arrows drawn along their rings, bending the right way
+[x] Real Save (same file, same format) and Save As (Windows dialog: 3MF with history, JSON, STL, STEP)
+[x] Background backups, last 25 versions, File menu > Backups; no 5 MB limit
+[x] Open / Insert STEP, 3MF, OBJ, STL and project files (STEP comes in as a true solid)
+[x] Split rebuilt like 3D Builder: green plane, move and tilt at any angle, Keep top/bottom/both bar
+[x] '... problems' is clickable and lists each broken step with Edit / Turn off / Delete
+[x] Ctrl+Z / Ctrl+Y now work even right after typing in a number box
+[x] Default shape colors matched to 3D Builder, plus a soft floor reflection
+[x] 3D Builder style rotate handles (ball outline, thin rings, three curved arrows)
+[x] Right-drag slides the view (angle stays the same); left-drag on empty space turns it
+[x] Type exact sizes in the bottom bar
+[x] Endless floor with mm rulers (no build plate)
+[x] 3D Builder style tabs, bottom bar, handles and outline
+[x] Duplicate goes to your right, lined up with the original
+[x] Left/right move arrow always visible
+[x] Renamed to 3DJames
