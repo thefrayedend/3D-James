@@ -1,6 +1,8 @@
 3DJames - open-source parts and their licenses
 ==============================================
 
+3DJames itself is licensed under the GNU GPL version 3 or later (3DJames-GPL-3.0.txt).
+
 3DJames is built on these open-source projects. Each one's license text is in this folder,
 and the same list is inside the app: Help tab > About / Licenses.
 

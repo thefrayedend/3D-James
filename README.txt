@@ -1,4 +1,5 @@
 3DJames - a parametric 3D modeler for 3D printing
+Version 0.9.0
 =================================================
 
 Everything runs on your computer. No install, no account, no internet needed.
@@ -20,6 +21,10 @@ SAVING
   Backups are made automatically: File menu (top-left) > Backups.
   The "Projects" folder is a good home for your projects.
 
+HELP
+  Click the Help tab: a picture guide to every tool (search box at the top left).
+  Extra picture guides are in the Help folder.
+
 THE BASICS
   Insert tab: shapes (cube, cylinder, ...), Text, and Parts (hardware like screw holes, nut traps,
   heat-set insert holes, aluminum extrusion, and your own saved parts).
@@ -38,13 +43,11 @@ MY PARTS
   (C:\Users\<you>\3D Objects); 3DJames keeps your parts there in a "3DJames Parts" folder as .3dj files.
   Insert them into any project from Insert > Parts > My parts.
 
-THE APP CODE
-  The "source" folder holds the 3DJames code, in case of changes later
-  (build: python3 build.py, tests: python3 tests/run.py). Don't send it along when you share 3DJames.
-
 YOUR OWN BUTTON PICTURES
   See icons\README.txt.
 
 LICENSES
+  3DJames itself is free software under the GNU GPL, version 3 or later (see LICENSE.txt).
+  You may use, share and change it; copies you share must stay under the GPL, with their source code.
   3DJames is built on open-source projects (OpenCascade, three.js, Manifold and more).
   See Help tab > About / Licenses, or the "licenses" folder.
