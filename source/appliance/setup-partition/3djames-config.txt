@@ -1,0 +1,44 @@
+# =====================================================================
+#  3DJames box - settings
+# =====================================================================
+#
+#  1. Type your home Wi-Fi name and password after the = signs below.
+#     (Using an Ethernet cable instead? Then you can skip this.)
+#  2. Save this file (in Notepad: File > Save).
+#  3. Eject the SD card, put it in the board and plug in the power.
+#  4. Wait 2 minutes, then open  http://3djames.local:8080  to set it up.
+#
+#  Upper and lower case matter. Don't add spaces around the = sign.
+#  Lines starting with # are only notes - the box ignores them.
+# ---------------------------------------------------------------------
+
+wifi_name=
+wifi_password=
+
+# Two-letter country code, so Wi-Fi uses the right channels (US, CA, GB, DE, AU, ...)
+wifi_country=US
+
+
+# =====================================================================
+#  Everything below is OPTIONAL. You can leave it as it is.
+# =====================================================================
+
+# Make the admin account right away (instead of on the admin page).
+# Name: lower-case letters and numbers. Password: at least 6 characters.
+admin_name=
+admin_password=
+
+# Set to yes if your Wi-Fi network is hidden (does not show up in lists).
+wifi_hidden=no
+
+# Name of the box on your network. The app is then at http://<name>.local
+# Change it only if you have more than one 3DJames box.
+hostname=3djames
+
+# Your time zone, e.g. America/New_York, Europe/London
+timezone=
+
+# For advanced users: remote login (SSH) as user "tdjadmin".
+# Set ssh=yes and choose a password of at least 6 characters.
+ssh=no
+ssh_password=

@@ -1,0 +1,87 @@
+[
+ {
+  "name": "OpenCascade Technology (OCCT)",
+  "what": "The geometry engine: exact solids, fillets, STEP files",
+  "by": "Open Cascade SAS",
+  "license": "LGPL 2.1",
+  "file": "opencascade-LGPL-2.1.txt",
+  "url": "https://dev.opencascade.org",
+  "ver": "via replicad-opencascadejs 1.1.0"
+ },
+ {
+  "name": "replicad",
+  "what": "Friendly layer over OpenCascade",
+  "by": "QuaroTech Sàrl",
+  "license": "MIT",
+  "file": "replicad.txt",
+  "url": "https://replicad.xyz",
+  "ver": "1.1.0"
+ },
+ {
+  "name": "opentype.js",
+  "what": "Reads fonts for the Text shape (inside replicad)",
+  "by": "Frederik De Bleser",
+  "license": "MIT",
+  "file": "opentype.js.txt",
+  "url": "https://opentype.js.org"
+ },
+ {
+  "name": "Flatbush",
+  "what": "Fast spatial index (inside replicad)",
+  "by": "Vladimir Agafonkin",
+  "license": "ISC",
+  "file": "flatbush.txt",
+  "url": "https://github.com/mourner/flatbush"
+ },
+ {
+  "name": "Manifold",
+  "what": "Fast mesh merging (threads, STL)",
+  "by": "The Manifold Authors",
+  "license": "Apache 2.0",
+  "file": "manifold-Apache-2.0.txt",
+  "url": "https://github.com/elalish/manifold",
+  "ver": "3.5.4"
+ },
+ {
+  "name": "three.js",
+  "what": "Draws the 3D view",
+  "by": "three.js authors",
+  "license": "MIT",
+  "file": "three.js.txt",
+  "url": "https://threejs.org",
+  "ver": "0.186.1"
+ },
+ {
+  "name": "Lucide",
+  "what": "Button icons",
+  "by": "Lucide Icons and Contributors",
+  "license": "ISC",
+  "file": "lucide.txt",
+  "url": "https://lucide.dev",
+  "ver": "1.55.0"
+ },
+ {
+  "name": "DejaVu Sans Bold",
+  "what": "Font for the Text shape (Sans)",
+  "by": "Bitstream, Inc.; Tavmjong Bah; DejaVu authors",
+  "license": "Bitstream Vera / Arev licenses (free)",
+  "file": "dejavu-fonts.txt",
+  "url": "https://dejavu-fonts.github.io"
+ },
+ {
+  "name": "Poppins Bold",
+  "what": "Font for the Text shape (Geometric)",
+  "by": "The Poppins Project Authors",
+  "license": "SIL Open Font License 1.1",
+  "file": "poppins-OFL-1.1.txt",
+  "url": "https://github.com/itfoundry/Poppins"
+ },
+ {
+  "name": "bd_vslot",
+  "what": "V-slot extrusion profile dimensions",
+  "by": "James Keal",
+  "license": "MIT",
+  "file": "bd-vslot.txt",
+  "url": "https://github.com/keeeal/bd-vslot"
+ }
+]

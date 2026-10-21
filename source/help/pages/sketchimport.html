@@ -1,0 +1,23 @@
+<h1>Import a DXF or SVG drawing</h1>
+<p>Use a drawing made in another program as a sketch: a laser-cut file, a part outline from a supplier, a logo, a plate drawn in a 2D CAD program. Its lines, arcs and circles become normal sketch lines you can change, add rules to and make solid.</p>
+<h2>How</h2>
+<p>On the board: <b>Import</b> in the top bar (in a narrow window just its icon, a tray with an arrow). To start a new sketch with it: <b>Insert</b> &gt; <b>Sketch</b> &gt; <b>From a DXF / SVG file…</b>. Pick the file; a window says what was found and asks where to put it:</p>
+<ul>
+<li><b>Put it in the middle</b>: the middle of the drawing goes on the center of the sketch.</li>
+<li><b>Keep its position</b>: the drawing's own 0,0 goes on the center of the sketch.</li>
+</ul>
+<figure><img src="tools-8.jpg" alt="The Import a drawing window listing what is in bracket.dxf, with the buttons Keep its position and Put it in the middle; the Import button in the top bar is marked"><figcaption>Importing a DXF: it says how many lines, outlines and circles there are and how big the drawing is.</figcaption></figure>
+<p>Then carry on as with any sketch: fix what needs fixing, click <b>Done</b> and <a data-help-topic="solid">make it solid</a>.</p>
+<figure><img src="tools-9.jpg" alt="The imported drawing on the sketch board: a plate with a round end, a hole, and a second closed outline"><figcaption>On the board: lines whose ends meet have joined into closed outlines, ready for Done.</figcaption></figure>
+<h2>What comes in</h2>
+<ul>
+<li><b>DXF</b>: lines, arcs, circles and polylines stay lines, arcs and circles (exact). Ellipses and splines become many short straight sides. Blocks are placed where they are used. Text, hatching and dimensions are left out (the window says how many). The size comes from the file's units (millimetres when it says none).</li>
+<li><b>SVG</b>: paths, rectangles, circles, ellipses, lines and polygons, filled or not. Circles and circle arcs stay exact; other curves become short straight sides. The size comes from the SVG's width in mm or inches; a size in pixels counts 96 pixels to the inch.</li>
+</ul>
+<h2>Good to know</h2>
+<ul>
+<li>Lines whose ends meet join into closed outlines. Lines whose ends don't quite meet stay unfinished (orange ends): use <b>Join close ends</b> on the right, or draw the missing piece (see <a data-help-topic="sketchlines">Unfinished lines</a>).</li>
+<li>Wrong size? Check the units in the program you drew it in, or measure it with Measure. Use ASCII DXF (not binary), up to 30 MB; SVG up to 10 MB.</li>
+<li>Lots of short pieces (from splines and other curves) make a drawing slow to change. Simplify very detailed drawings first.</li>
+<li><b>Ctrl+Z</b> takes the whole import back out. Importing a filled logo onto the face of a solid is done with <a data-help-topic="edges">Emboss</a> instead.</li>
+</ul>

@@ -1,0 +1,15 @@
+[Unit]
+Description=3DJames box first start (grow the SD card partition, new SSH keys)
+DefaultDependencies=no
+After=local-fs.target
+Before=3djames-config.service 3djames.service
+ConditionPathExists=!/var/lib/3djames-sys/firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/3djames-helper firstboot
+RemainAfterExit=yes
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target

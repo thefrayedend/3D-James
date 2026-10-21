@@ -1,0 +1,35 @@
+<h1>Sketch from a photo</h1>
+<p>Turn a photo of a part into a sketch: a broken bracket to reprint, a gasket, a template, the shape of something your print must fit around. 3DJames sizes the photo in millimetres from something in it you know the size of, straightens it if it was taken at an angle, and then either puts it under the sketch board to trace over, or finds the outline for you.</p>
+<p>Start: <b>Insert</b> tab &gt; <b>Sketch</b> &gt; <b>From a photo…</b> and pick the photo (JPEG or PNG; on a tablet you can take one with the camera).</p>
+<h2>1. What do you know the size of?</h2>
+<ul>
+<li><b>Sheet of paper</b> (most of the time): put the part on a sheet of printer paper and photograph both. Pick the paper size (A4, Letter, A3, Legal) and click the paper's <b>4 corners</b>, in any order. The photo is straightened too, so it can be taken at an angle.</li>
+<li><b>A rectangle I measured</b>, for parts too big for paper: anything rectangular you know the size of, in the same photo. A cutting mat, a floor tile, the printer bed, a square of tape on the floor you measured. Type its width and height, then click its 4 corners. The part may stick out past the rectangle: the whole photo is straightened and sized.</li>
+<li><b>A line I measured</b>: two points you know the distance between (a ruler in the photo, two holes you measured). Type the distance and click the two ends. This only sizes the photo, it can't straighten it: take the photo from straight above.</li>
+</ul>
+<figure><img src="photo-1.jpg" alt="The Photo to sketch window: a photo of a bracket on A4 paper taken at an angle, the paper's four corners clicked and numbered, and on the right the choices Sheet of paper, A rectangle I measured, A line I measured"><figcaption>An L bracket on A4 paper, photographed at an angle. Pick what you know the size of (1), click its corners (2), then choose how to go on.</figcaption></figure>
+<p>A magnifier follows the pointer while you place points. Drag a point to move it; <b>Start over</b> removes them. If the result looks stretched, go back and click <b>Swap long / short side</b> (the long side of the paper was taken the wrong way).</p>
+<figure><img src="photo-4.jpg" alt="No paper: a long dark bar on a floor with a measured tape rectangle under it; the four corners of the rectangle clicked and 400 by 300 typed in"><figcaption>No paper: a 450 mm part on the floor, sized from a 400 × 300 mm square of tape. The part is bigger than the rectangle; that's fine.</figcaption></figure>
+<h2>2. Then: trace it, or let 3DJames find the outline</h2>
+<ul>
+<li><b>Trace it myself</b>: the sketch board opens with the photo underneath, faded, at its real size. Draw over it with Line, Arc, Circle and the other tools, with exact sizes and rules as always. Works with any photo.</li>
+<li><b>Find the outline</b>: for a part on a plain background that stands out from it (a dark part on white paper is ideal, evenly lit, without strong shadows). 3DJames finds the edge and shows it in red. Round holes become real circles and curved edges become arcs, so the result has few corners. Two sliders adjust it: <b>Light / dark split</b> (if part of the part, or of its shadow, is missed or included) and <b>Follow the edge within</b> (how closely the outline follows the edge: bigger means fewer corners).</li>
+</ul>
+<figure><img src="photo-2.jpg" alt="Find the outline: the straightened photo with the L bracket's outline and its two holes drawn in red, and the sliders on the right"><figcaption>The photo straightened, with the outline found (red). Then <b>Open in the sketch</b>.</figcaption></figure>
+<figure><img src="photo-3.jpg" alt="The sketch board with the L bracket outline (120 by 160 mm, two round holes) over the faded photo, and the Photo box on the right"><figcaption>On the board: a normal sketch (here 120 × 160 mm with 16 and 12 mm holes) over the faded photo. Fix anything with the usual tools, then Done.</figcaption></figure>
+<h2>The photo on the board</h2>
+<p>The <b>Photo</b> box on the right (in the sketch board):</p>
+<ul>
+<li><b>Show</b> slider: how strongly the photo shows. <b>Hide photo</b> / <b>Show photo</b>.</li>
+<li><b>Move photo</b>: drag the photo to line it up with your drawing. Click the button again to stop.</li>
+<li><b>Size again</b>: click two points on the photo you know the distance between, and type the distance. The photo is sized around the first point.</li>
+<li><b>Remove photo</b> takes it out of the sketch. Undo (Ctrl+Z) brings back any of these.</li>
+</ul>
+<p>The photo stays with the sketch: it is saved inside your project, and <b>Edit sketch</b> shows it again. It never becomes part of the solid, and it isn't in STL or STEP exports.</p>
+<h2>Good to know</h2>
+<ul>
+<li>Accuracy depends on the photo: for parts on paper, expect about ±1 mm. Use a phone's normal (1×) camera, fill the frame with the paper, and keep the part flat on it.</li>
+<li>Only what touches the paper is measured exactly: tall parts look bigger from above than their footprint (their top is closer to the camera). Photograph the side you want to copy, lying flat.</li>
+<li>Thin features (under about 1 mm) and shiny or white-on-white parts are hard to find automatically: trace those yourself.</li>
+<li>The outline found is a closed outline you can change like any other: delete a side, bend it, add rules and sizes.</li>
+</ul>

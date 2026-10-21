@@ -1,0 +1,14 @@
+# build output and installed packages (made again by npm install / python build.py)
+/source/node_modules/
+/source/dist/
+/source/local/
+__pycache__/
+*.pyc
+# your own things that stay on your computer
+/Projects/
+/Share/
+/single/
+/appliance-repo/
+/next.txt
+*.mp4
+*.stl

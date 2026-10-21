@@ -1,0 +1,65 @@
+{
+  "v": 1,
+  "name": "Tutorial - Raised nameplate",
+  "vars": [],
+  "bodies": {
+    "b1": {
+      "name": "Raised nameplate",
+      "color": "#22B14C",
+      "hole": false
+    }
+  },
+  "features": [
+    {
+      "id": "f1",
+      "type": "shape",
+      "body": "b1",
+      "kind": "box",
+      "p": {
+        "w": 80,
+        "d": 30,
+        "h": 4
+      },
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "name": "Nameplate base"
+    },
+    {
+      "id": "f2",
+      "type": "emboss",
+      "body": "b1",
+      "face": {
+        "nc": [
+          0.5,
+          0.5,
+          1
+        ],
+        "d": [
+          0,
+          0,
+          1
+        ]
+      },
+      "source": "text",
+      "text": "MAKER",
+      "font": "sans",
+      "size": 8,
+      "depth": 1,
+      "angle": 0,
+      "u": 0,
+      "v": 0,
+      "mode": "add",
+      "name": "Raised MAKER text"
+    }
+  ],
+  "seq": 100,
+  "counters": {}
+}

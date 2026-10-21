@@ -1,0 +1,25 @@
+<h1>History, variables and versions</h1>
+<p>Everything you do is kept as a list of steps, so a design is never "finished": go back to any step and change it, and everything after it follows. Variables let one number drive many sizes, and versions keep named milestones inside your project.</p>
+
+<h2>History</h2>
+<p>Open the <b>History</b> tab of the side panel (or <b>View</b> &gt; <b>History</b>). Pick an object and choose <b>This object</b> to see how it was made, including the shapes cut out of it or merged into it; <b>All steps</b> lists every step in the project.</p>
+<ul>
+<li>Click a step to open its settings, change them, and the model rebuilds.</li>
+<li>Give a step a name, so you find it again (<b>Step name</b>).</li>
+<li><b>Turn off</b> a step to see the model without it; its settings are kept. Turning off an operation can change faces or edges used by later steps.</li>
+<li><b>Earlier</b> / <b>Later</b> move a step in the list, when the steps that depend on it allow it. The step shows what it depends on.</li>
+<li><b>Delete step</b>: when later steps depend on it, you choose to delete only this step or it and the steps that depend on it. Both can be undone.</li>
+<li>A step that can't be built shows at the top of the list with <b>Edit</b>, <b>Turn off</b> and <b>Delete step</b>, so you can fix it.</li>
+</ul>
+<figure><img src="tools-emboss.jpg" alt="An emboss step open in History, with its name, its dependencies, Earlier and Later above its settings"><figcaption>A step open in History: name, dependencies, Earlier / Later, then its own settings.</figcaption></figure>
+
+<h2>Variables</h2>
+<figure><img src="history-vars.jpg" alt="The History tab with This object picked, the step Box 1, and below it the Variables section with wall = 3"><figcaption>History for the picked object, and <b>Variables</b> below it: here <b>wall = 3</b>.</figcaption></figure>
+<p>At the bottom of the History tab, under <b>Variables</b>, click <b>+</b> to add one. Name a number once, like <b>wall = 2</b>, then type <b>wall</b> (or <b>wall*2</b>, <b>wall+0.4</b>) into any size box in Properties. Change the variable, and every size that uses it changes. A variable can use the ones above it in the list (<b>inner = outer - 2*wall</b>). A red box means the formula can't be worked out.</p>
+
+<h2>Versions inside a project</h2>
+<figure><img src="tools-file-menu.jpg" alt="File menu with Save as new version, Select version and Export"><figcaption>The File menu (☰) at the top left has named versions and Export.</figcaption></figure>
+<p><b>☰</b> &gt; <b>Save as new version…</b> keeps a named snapshot (with a note, if you like) and saves the project. Ordinary <b>Save</b> just updates your working model; it doesn't make a new version each time. The first time, an earlier saved model that differs is kept as "Previously saved".</p>
+<p><b>☰</b> &gt; <b>Select version…</b> lists the snapshots. <b>Restore</b> brings one back as the working model (the list is kept); <b>Delete version</b> removes one. Both can be undone; save the project to keep the change.</p>
+<figure><img src="tools-versions.jpg" alt="Select version list showing a named snapshot, notes, Restore and Delete version"><figcaption>Restore makes a version the working model again. Delete version removes a milestone.</figcaption></figure>
+<p>Versions are kept in .3dj files, and in editable 3MF and JSON saves. Up to 200 versions per project and 400 MB per file: delete old versions if needed. They are separate from the automatic <a data-help-topic="files">Backups</a>.</p>

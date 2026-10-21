@@ -1,0 +1,47 @@
+<h1>3DJames box (server)</h1>
+<p>A <b>3DJames box</b> is a small computer (an Orange Pi Zero 4) on your home network that serves 3DJames to everyone in the house: PCs, Macs, tablets and phones. Each person signs in and gets their own folders for their designs. The box keeps the files, on its SD card or on your NAS. It is the same 3DJames app: only Open and Save are different.</p>
+<h2>Using it</h2>
+<ol>
+<li>Open <b>http://3djames.local</b> in Edge, Chrome or Safari (or the address the person who set it up gave you).</li>
+<li>Sign in with your name and password.</li>
+<li>Draw as usual. <b>Open</b> and <b>Save as</b> show your folders on the box.</li>
+</ol>
+<figure><img src="box-signin.jpg" alt="The 3DJames sign-in page with a name and password box"><figcaption>Sign in. 3DJames opens right after.</figcaption></figure>
+<figure><img src="box-open.jpg" alt="The Open window of a 3DJames box: My files and Shared on the left, the files on the right, and buttons New folder and From this device"><figcaption>Open and Save show <b>My files</b> (only you see them), and <b>Shared</b> if your account may use the shared folder. <b>From this device…</b> opens a file from the computer or tablet you are using; in Save, <b>Download to this device</b> saves a copy there.</figcaption></figure>
+<ul>
+<li><b>Save</b> (Ctrl+S) saves back to the box. Your <b>My parts</b> are kept on the box too (in "3DJames Parts" in your folder), so they follow you to any computer.</li>
+<li><b>Someone else has it open:</b> when another person opens the same file, you both get a note. If they saved it after you opened it and you then save, 3DJames asks first: <b>Save a copy</b> (keeps both) or <b>Replace their version</b>.</li>
+<li><b>Sign out:</b> File menu (☰) &gt; Sign out. Backups (File &gt; Backups) are kept per person, so people sharing a tablet never see each other's work.</li>
+<li>Export (STL, STEP, 3MF) can go to your folders on the box or be downloaded to your device.</li>
+</ul>
+<h2>Setting up a box (for the admin)</h2>
+<ol>
+<li>Write the 3DJames box image to a micro-SD card (balenaEtcher or Raspberry Pi Imager). On a PC the card shows a small <b>3DJAMES</b> drive: fill in your Wi-Fi in <b>3djames-config.txt</b> (or use a network cable). <b>READ-ME-FIRST.txt</b> there has the details.</li>
+<li>Put the card in the board and plug in the power. After about 2 minutes open the admin page: <b>http://3djames.local:8080</b></li>
+<li>Make the admin account (that's you).</li>
+<li><b>App</b> tab: upload <b>3DJames.html</b> (the same file you open on a PC).</li>
+<li><b>Users</b> tab: add the people who will use it. Each gets a sign-in name, a password, and folders.</li>
+</ol>
+<figure><img src="box-setup.jpg" alt="The admin page's first screen: Welcome to your 3DJames box, with boxes for the sign-in name, your name and the password"><figcaption>The first time: make the admin account.</figcaption></figure>
+<figure><img src="box-users.jpg" alt="The admin page's Users tab: Jon (admin) and Sarah, each with My files on the box and the shared folder"><figcaption>The Users tab: who can sign in, and their folders.</figcaption></figure>
+<h2>Where the files are kept</h2>
+<p>On the <b>Storage</b> tab: <b>This box</b> (its SD card) is always there. Add a <b>NAS share</b> to keep everyone's designs on your NAS (so they are backed up with everything else), or a folder on a USB drive plugged into the box. Then, on the Users tab, pick for each person where their folders are.</p>
+<figure><img src="box-nas.jpg" alt="Adding a NAS share: name, NAS address, share name, NAS user name and password"><figcaption>Adding a NAS share. On the NAS, make a share (for example "3djames") and a NAS user just for the box, with read and write access. Everyone's folders go inside it; 3DJames keeps people out of each other's folders.</figcaption></figure>
+<ul>
+<li>Windows/SMB shares work with nearly every NAS (Synology, QNAP, TrueNAS, a Windows PC). NFS works too.</li>
+<li>If the NAS is off for a while, the box connects again by itself when it is back. Folders on it can't be used meanwhile.</li>
+<li><b>Shared folder</b> tab: switch on a folder everyone you allow can use (tick "May use the shared folder" for each person). It can be read-only.</li>
+</ul>
+<h2>Updating 3DJames on the box</h2>
+<ul>
+<li><b>App</b> tab &gt; choose the new 3DJames.html &gt; <b>Upload and install</b>. Everyone gets it the next time they open or reload 3DJames. No new SD card. <b>Go back to</b> returns to the version before.</li>
+<li>Or switch on the <b>Update folder</b> there (with a password) and copy the new 3DJames.html to <b>\\3djames\3DJames-update</b> from any Windows PC (sign in as <b>threedjames</b>). It is installed within a few seconds; LAST-UPDATE.txt in that folder says how it went.</li>
+</ul>
+<figure><img src="box-app.jpg" alt="The admin page's App tab: the installed version, a file box to upload a new 3DJames.html, and the Update folder switch"><figcaption>The App tab.</figcaption></figure>
+<h2>Good to know</h2>
+<ul>
+<li>The box only hands out 3DJames and keeps the files: the modelling itself runs on each person's computer or tablet, so the box never slows down.</li>
+<li>It uses plain http, made for a home network. Don't open it to the internet.</li>
+<li>No Wi-Fi details, or wrong ones? The box makes its own Wi-Fi called <b>3DJames-Setup-…</b> (password 3djames123). Connect to it and open <b>http://10.42.0.1:8080</b> to pick your Wi-Fi (Network &amp; box tab).</li>
+<li>Can't find the box? Its address is in <b>MY-3DJAMES-ADDRESS.txt</b> on the card's 3DJAMES drive (once it has been online), or in your router's list of devices.</li>
+</ul>

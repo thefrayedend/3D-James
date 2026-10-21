@@ -1,0 +1,56 @@
+3DJames box - quick start
+=========================
+
+What you need
+-------------
+* This SD card (already prepared - you're reading it!)
+* An Orange Pi Zero 4 and a USB-C power supply (5V / 3A or better)
+* Your home network (a cable to the router, or Wi-Fi)
+
+Step 1 - Wi-Fi  (skip if you plug the board into your router with a cable)
+-------------------------------------------------------------------------
+Open  3djames-config.txt  on this drive (double-click it, it opens in Notepad).
+Fill in:
+    wifi_name=YourWiFiName
+    wifi_password=YourWiFiPassword
+Save the file. Eject the SD card safely.
+
+Step 2 - Start the box
+----------------------
+Put the SD card into the board and plug in the power.
+The first start takes about 2 minutes (it sets itself up). Later starts are faster.
+
+Step 3 - Set it up (admin page)
+-------------------------------
+On a computer, phone or tablet on the same network, open:
+
+    http://3djames.local:8080
+
+Make your admin account, then upload the 3DJames app (App tab: the 3DJames.html
+file). Add the people who will use it (Users tab), and if you like, connect your
+NAS (Storage tab) so everyone's designs are saved there.
+
+Step 4 - Use 3DJames
+--------------------
+Everyone opens:
+
+    http://3djames.local
+
+signs in, and draws. Open and Save show their own folders (and the shared one).
+
+Doesn't open?
+ * Wait one more minute and try again.
+ * Look in your router's app for a device called "3djames" and open its address,
+   e.g. http://192.168.1.57 (and :8080 for the admin page).
+ * Put the SD card back in your computer: the file MY-3DJAMES-ADDRESS.txt on it
+   shows the box's address (it appears once the box was online).
+ * Wi-Fi details wrong? The box then makes its own Wi-Fi network called
+   "3DJames-Setup-XXXX" (password: 3djames123). Connect to it and open
+   http://10.42.0.1:8080 - make the admin account if you haven't, then
+   Network & box > Wi-Fi to pick your home Wi-Fi.
+
+Updating 3DJames later
+----------------------
+Admin page > App > upload the new 3DJames.html. That's all: no new SD card.
+Or switch on the Update folder there and copy the new file to
+\\3djames\3DJames-update from any Windows PC.

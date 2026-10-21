@@ -1,0 +1,45 @@
+{
+  "name": "3djames",
+  "version": "0.17.1",
+  "description": "3DJames: a local, 3D Builder-style parametric 3D modeler",
+  "scripts": {
+    "build": "python build.py",
+    "test": "python tests/run.py",
+    "test:reliability": "python tests/reliability.py",
+    "lint": "eslint src",
+    "test:features": "python tests/features.py",
+    "test:ui": "python tests/ui_features.py",
+    "test:planes": "python tests/planes.py",
+    "test:plane-ui": "python tests/plane_ui.py",
+    "test:help": "python tests/help.py",
+    "test:sketch-redraw": "python tests/sketch_redraw.py",
+    "test:sketch-lines": "python tests/sketch_lines.py",
+    "test:sketch-tools": "python tests/sketch_tools.py",
+    "test:touch": "python tests/touch.py",
+    "test:photo": "python tests/photo.py",
+    "test:server": "python tests/server.py",
+    "server": "python server/3djames_server.py --data testdata --app-port 8090 --admin-port 8091 --bundled-app local/3DJames.html",
+    "publish-appliance": "python tools/publish_appliance.py",
+    "ship": "python tools/ship.py",
+    "test:doubleclick": "python tests/doubleclick.py",
+    "test:copies": "python tests/copies.py",
+    "test:tutorials": "python tests/tutorials.py",
+    "test:examples": "python help/build_examples.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "lucide": "^1.55.0",
+    "manifold-3d": "^3.5.4",
+    "replicad": "^1.1.0",
+    "replicad-opencascadejs": "^1.1.0",
+    "three": "^0.186.1"
+  },
+  "type": "module",
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "esbuild": "^0.28.2"
+  },
+  "private": true
+}

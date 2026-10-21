@@ -1,0 +1,51 @@
+<h1>More sketch tools</h1>
+<p>Tools on the sketch board for the jobs that come up again and again: cutting away the parts of lines you don't need, slots and nut holes, walls, rows of holes, and construction lines. (Drawings made in another program: <a data-help-topic="sketchimport">Import a DXF or SVG drawing</a>.) Everything they make is an ordinary outline: change it afterwards like anything else you drew. <b>Ctrl+Z</b> undoes each of them.</p>
+
+<h2>Trim (T): cut away pieces of lines</h2>
+<p>Draw shapes over each other, then take out the pieces you don't want. Pick <b>Trim</b> in the top bar and move the pointer over a line: the piece up to the nearest lines that cross it turns <b>red</b>. Click and it is gone.</p>
+<figure><img src="tools-1.jpg" alt="Two overlapping rectangles and a circle on the sketch board, the Trim tool on, and a piece of a side between two crossings drawn in red under the pointer"><figcaption>Two rectangles and a circle drawn over each other. With Trim, the piece under the pointer shows red before you click.</figcaption></figure>
+<figure><img src="tools-2.jpg" alt="The result after trimming: one stepped outline with a round notch where the circle was"><figcaption>After trimming the pieces inside and around: one outline. The part of the circle that was kept is now a round notch.</figcaption></figure>
+<ul>
+<li>Pieces of outlines, unfinished lines, circles and helper lines can all be trimmed. A line that nothing crosses is taken out whole.</li>
+<li>To take out whole sides instead, pick them and use <b>Delete segment</b> (see <a data-help-topic="sketchlines">Change part of a finished outline</a>).</li>
+<li>When you trim a side of a closed outline, the outline opens (orange ends). Trim the matching pieces of the shape it overlaps and the loose ends meet: they join into <b>one</b> closed outline again.</li>
+<li>Rules on a side you trim are removed (its length has changed). Rules on the other sides stay.</li>
+<li>For simple overlaps, <b>Merge touching outlines</b> (right side) does it in one click. Trim is for when you want to choose which pieces stay.</li>
+</ul>
+
+<h2>Slot (O) and Polygon (P)</h2>
+<figure><img src="tools-3.jpg" alt="A plate with a slot and a hexagon drawn in it, and a second slot being drawn"><figcaption>A slot for a bolt to slide in, and a hexagon 17 mm across flats for an M10 nut.</figcaption></figure>
+<ul>
+<li><b>Slot</b>: click the center of one round end, then the center of the other, then how wide it is. Or type: after the first click, type the length from center to center and Enter, then the width and Enter (or both at once: <b>30,8</b> + Enter). The slot keeps its shape when you drag its corners: its sides stay parallel and run smoothly into the round ends.</li>
+<li><b>Polygon</b>: click the center, then a corner (the polygon turns in 15° steps). Or type the size <b>across flats</b> and Enter: a flat side goes at the bottom. A hexagon nut that is 17 mm across flats fits a 17 mm wrench; make the hole a little bigger (17.4) for a printed nut trap. While Polygon is on, the box on the right sets how many sides (3 to 64; 6 to start).</li>
+</ul>
+
+<h2>Offset: walls and clearances</h2>
+<p>A copy of an outline that is bigger or smaller by the same distance all round. Pick the outline (Select, click inside it; Shift+click more shapes), then <b>Offset…</b> on the right under <b>Picked shape</b>.</p>
+<figure><img src="tools-4.jpg" alt="The Offset window: distance 2 mm, Inside (smaller) picked, corners Sharp, keep the original"><figcaption>Offset by 2 mm, inside. Outside makes room around a part (a lid that fits over a box, a pocket for a part).</figcaption></figure>
+<figure><img src="tools-5.jpg" alt="The rounded rectangle with a second, smaller rounded rectangle 2 mm inside it"><figcaption>The outline and its offset: pushed up, it becomes a 2 mm wall (the inner outline is a hole).</figcaption></figure>
+<ul>
+<li><b>Corners</b>: <b>Sharp</b> keeps corners as corners. <b>Round</b> makes the corners that point outward into arcs, so the copy is the same distance away everywhere (best for clearance).</li>
+<li><b>Keep it</b> keeps the original (for a wall); <b>Replace it</b> leaves only the copy.</li>
+<li>Closed outlines and circles only (not unfinished lines or helper lines). An inward offset bigger than the shape leaves nothing; you will be told.</li>
+</ul>
+
+<h2>Pattern: rows and circles of copies</h2>
+<p>Pick a shape (Shift+click more), then <b>Pattern…</b> on the right. Type <b>how many in all</b> (counting the original). This copies shapes inside the drawing; to repeat a whole object, use <a data-help-topic="copies">Pattern on the Object tab</a>.</p>
+<ul>
+<li><b>In a row</b>: the step between copies left-right and up-down, in mm. For a grid, make a row, pick the whole row and make a row of that going the other way.</li>
+<li><b>In a circle</b>: copies turn around the <b>center of the sketch</b> (where the red and green lines cross). 360 spreads them evenly all the way round; a smaller angle spreads them from the original up to that angle. Draw the part around the center of the sketch to use this.</li>
+</ul>
+<figure><img src="tools-6.jpg" alt="A flange with one bolt hole picked and the Pattern window set to In a circle, 6 in all, 360 degrees"><figcaption>One bolt hole picked; 6 in all, in a circle, 360°.</figcaption></figure>
+<figure><img src="tools-7.jpg" alt="The flange with six bolt holes evenly spaced around it"><figcaption>Six evenly spaced holes. The copies are separate circles: change or delete any of them.</figcaption></figure>
+
+<h2>Helper line or drawn line</h2>
+<ul>
+<li>Pick a straight side (Select) and click <b>Make helper line</b> on the right: it becomes a dotted helper line that never becomes solid. The outline opens where it was. For a whole shape, pick it and click <b>Make helper lines</b> (straight sides only: helper lines can't be curved).</li>
+<li>Pick a helper line and click <b>Make it a drawn line</b>: it becomes part of the drawing and joins lines whose ends meet it. Handy to draw construction lines first, then turn the ones you want into the outline.</li>
+</ul>
+
+<h2>Level and upright, kept</h2>
+<p>A line you draw nearly level (within 2°) goes exactly level, and keeps a <b>Flat</b> rule (—), so it stays level when you change the drawing later. Nearly straight up and down: exactly upright, with an <b>Upright</b> rule (|). Rectangles get both, so dragging a corner keeps them rectangles. The same goes for helper lines.</p>
+<figure><img src="tools-10.jpg" alt="An L-shaped line with Flat and Upright badges on its sides, and a new line being drawn from its end, nearly level, with the words Level: stays level at the pointer"><figcaption>The pointer says <b>Level</b> or <b>Upright</b> when it straightens a line.</figcaption></figure>
+<p>Want a line at a small angle? Hold <b>Ctrl</b> while clicking (no snapping at all), or turn <b>Level &amp; upright</b> off on the right under <b>Snap to</b>. Remove a rule you don't want by clicking its badge. More about rules: <a data-help-topic="sketchrules">Sketch rules</a>.</p>

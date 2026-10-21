@@ -1,10 +1,21 @@
 3DJames - fix list
 ==================
 
+TO TALK ABOUT (ideas only - do NOT build any of these until Jon clearly says so)
+[?] "Hole" button like Tinkercad: one obvious button that turns any shape into a hole that cuts when grouped.
+    Jon isn't sure how it works yet. NEVER start on this unless Jon makes clear he means it.
+
 To fix:
 [ ] Size (Scale) arrows: closer, but still not placed/turned exactly like 3D Builder at every angle. Jon will show
     more side-by-side views; match them one angle at a time. (Move arrows are right: don't touch them.)
 [ ] General rule: match 3D Builder's look and feel as closely as possible without removing any tools.
+[ ] General rule: HELP COMES FIRST. Every change that needs explaining gets its Help page (with pictures) updated
+    in the same version. A great app is pointless if only Jon knows how to use it.
+[x] Rectangles get Flat/Upright rules on their own when drawn, so they stay square (0.17.0).
+[x] AI skill (3djames-project) updated (0.14.0): sketches (outlines, arcs, holes, spin around, loft, sweep, helper
+    lines, unfinished lines) and a checker for them. Kept in source\skill; tools\ship.py zips it to Share. Upload
+    Share\3djames-project-skill.zip at claude.ai > Settings > Capabilities > Skills to replace the old one.
+    Still to add: sketch rules (Flat, Parallel...) if they turn out to be useful in generated projects.
 [ ] Later, maybe: remove features from imported shapes (fill in a hole, delete a fillet). Needs a bigger geometry engine build.
 [ ] Later: STEP to 3DJames converter. Read a STEP file and rebuild it as editable steps (blocks, cylinders, holes, fillets, chamfers). Works best on simple printed/machined parts; anything it cannot recognize stays as an imported solid.
 [~] (started) Turn the "Thread" drop-down on the Insert tab into a "Parts" menu with sections that fly out to the side:
@@ -25,18 +36,244 @@ To fix:
       - Print helpers: print-in-place hinge, snap-fit clip, tolerance test piece
       - Gears: spur, helical, bevel, rack, worm (tooth count and size editable)
     Every part keeps its sizes editable afterwards, like the shapes.
-[ ] Later: sketch tool (draw a 2D outline with lines, arcs and exact sizes), then extrude, revolve, loft and sweep it.
+
+BEFORE A PUBLIC BETA (strangers testing it):
+[ ] Web link: put 3DJames on a free website (GitHub Pages) so people just click a link, nothing to unzip.
+[ ] Send feedback button: opens an email/form, and offers to attach the project so the problem can be seen.
+[ ] Slicer check: exported STL/3MF open cleanly in Snapmaker's slicer, Bambu Studio, PrusaSlicer and Cura.
+[ ] Test on other computers: a slow laptop, Chrome as well as Edge, a Mac if anyone has one.
+[ ] Inches option (show and type sizes in inches; files still stay in mm inside).
+[ ] First-time tour: 4-5 short pop-up tips the first time the app opens (can be turned off).
+[ ] Clearly marked "beta" with the version number, and a "what's new" list.
+
+[ ] User-submitted parts library (later, after the beta). Decided: every submitted part must be under
+    CC BY-SA 4.0 (anyone can use, change and sell prints; changed versions shared must stay CC BY-SA and give
+    credit). Submitters must own what they send (no copied brand logos or other people's designs); every part is
+    checked before it goes in. The app itself stays GPL 3.0 or later.
+[ ] Built-in lessons (idea from Tinkercad): short step-by-step projects inside the app, like "make a phone stand",
+    that show you what to click as you go. Goes together with the Help documentation.
+[ ] Starter projects gallery (idea from Tinkercad): a few ready-made example projects to open and change.
+[~] Help documentation (started in 0.9.0: Help tab picture guide, now 10 pages with Sketch rules). Still to do: more pictures, a page
+    for every tool (shapes, moving/sizing, combine, fillet, parts,
+    sketch, measure, helper lines, rules, spin around, cut, sketch on a face, saving/exporting), made from real
+    screenshots with red circles/arrows like Help\Spin-around-help.png. Open it from the Help tab inside the app.
+    The pictures and the scripts that make them are kept in source\help so they can be redone when the app changes.
+    Started: Spin around guide (Help folder).
+[ ] Later (long term): Docker container with a small web server, so any computer on your home network can open
+    3DJames by going to a name like cad.local. Easy part: the app is one file, so serving it is simple. Harder parts:
+    the cad.local name (mDNS), saving projects on the server so every computer sees them, and a secure (https) link
+    so browsers allow installing it as an app.
 [ ] Installable web app: host 3DJames at a web address so Edge/Chrome can install it (Start menu, own taskbar
     icon, works offline) and double-clicking a .3dj file opens it. Models never leave the PC.
     (Tauri desktop wrapper only if this falls short.)
 
 Long-term goals (not now):
 
-[ ] iPad: touch controls (pinch zoom, two-finger slide, one-finger turn), Add to Home Screen from Safari.
+[x] iPad: touch controls (done in 0.15.0). Still to try: Add to Home Screen from Safari (needs https).
 From Jon's "fix list.rtf":
 
 Done:
+VERSION 0.17.1 (Oct 20, 2026)
+[x] Help reorganised: 28 topics in 7 fold-out chapters (Start here, Tutorials, Shapes and objects, Sketching,
+    View measure and files, Tablets and the 3DJames box, Reference). Each page says where it sits
+    ("Sketching - 3 of 9"), Next / Back follow the reading order, pages link to each other.
+    Split up: the long sketch page (board / unfinished lines), solid / several sketches, import DXF-SVG,
+    and the mixed "Emboss, Measure, History and Versions" page (each part now where it belongs).
+    New topics for what was missing: Pick, arrange and color (Align, Center, Group, Paint, Objects list),
+    Mirror copies and patterns (Object tab Pattern), The view and settings (View tab), Measure and Ruler,
+    History, variables and versions (Variables were not documented), a first-part walkthrough in
+    Getting started, flat faces and the Workplane. New pictures; Spin around pictures retaken.
+    Page order lives in help/pages/contents.json.
+
+VERSION 0.17.0 (Oct 20, 2026)
+[x] Sketch tools (ideas from SolidCraft, kept simple; Help: More sketch tools):
+    - Trim (T): click a piece of a line to cut it away up to the lines that cross it (shows red first). Overlapping
+      shapes trim into one outline; circles and helper lines trim too.
+    - Slot (O): two centers + width (or type length, width); stays a slot when dragged.
+    - Polygon (P): center + corner, or type the size across flats (flat side at the bottom); 3 to 64 sides.
+    - Offset: a copy bigger or smaller by a distance (walls, clearances); sharp or round corners; keep or replace.
+    - Pattern: copies in a row (step x / y) or in a circle around the center of the sketch.
+    - Make helper line / Make it a drawn line: switch straight sides between helper lines and the drawing.
+    - Level & upright: lines drawn within 2 degrees of level / upright go exactly so and keep a Flat / Upright rule;
+      rectangles keep 2 Flat + 2 Upright rules. Off under Snap to; Ctrl places freely.
+    - Import DXF / SVG (Import on the board, or Insert > Sketch > From a DXF / SVG file): lines, arcs, circles,
+      polylines with bulges, ellipses, splines, blocks; SVG paths and shapes. Lines whose ends meet join into outlines.
+    Undo and Fit in the sketch top bar are icon-only now, so the bar fits on one row.
+
+VERSION 0.16.0 (Oct 20, 2026)
+[x] Sketch from a photo (Insert > Sketch > From a photo): size the photo from a sheet of paper (A4 / Letter / A3 /
+    Legal, 4 corners: also straightens a photo taken at an angle), from any rectangle you measured (parts too big for
+    paper: a mat, a tile, tape on the floor, the bed), or from a line you measured. Then trace it yourself (the photo
+    lies under the sketch board, real size, faded) or Find the outline (holes become circles, curves become arcs,
+    a few clean corners). The photo is kept in the sketch and saved in the project; Move / Size again / Hide / Remove.
+
+VERSION 0.15.0 (Oct 20, 2026)
+[x] Tablets and Apple Pencil: touch mode switches on by itself with a finger or pen (bigger buttons, on-screen
+    keys Pick more / Straight / Reach / Free / 123) and off with a mouse; View > Touch to force it. 3D view: tap picks,
+    hold-then-drag moves, swipe and pinch move the camera, double tap flies in. Sketch: touch-slide-lift places a
+    point, two fingers slide and zoom. Pencil works like the mouse; the palm is ignored while it is used.
+    The mouse is unchanged (every test suite still passes).
+[x] 3DJames box (server for the Orange Pi Zero 4): sign-in at http://3djames.local, admin page on port 8080 (users,
+    storage places: the SD card, a USB folder or a NAS over SMB/NFS, a shared folder, app updates by upload or the
+    \\3djames\3DJames-update network folder, Wi-Fi, name, restart, server updates). Plain http. Same 3DJames.html:
+    when it is opened from a box, Open/Save use the box's folders (source\src\drive: local.js and server.js).
+    Conflict check ("someone else saved it"), "someone else has it open" note, My parts and backups per person.
+[x] SD card image builder (source\appliance, from the FlashForge Bridge one) + GitHub workflow; tools\publish_appliance.py
+    puts it in the 3djames-pi repository. The app is not in that public repository: upload it on the admin page.
+[x] Help: new pages "Tablets and Apple Pencil" and "3DJames box (server)" with 10 new pictures.
+
+VERSION 0.14.0 (Oct 19, 2026)
+[x] Sketch: Line and Arc no longer have to go back to the start. Enter / Esc / double-click stops the line where it
+    is (an "unfinished line" with orange loose ends); click a loose end later to carry on. Switching tools keeps it.
+[x] Sketch: lines whose ends meet join into one line, and close into ONE outline when the last ends meet (also lines
+    from two different sketches edited together). Rules on the lines move along with the joins.
+[x] Sketch: Done with unfinished lines asks: Close with straight lines / Finish without them (kept in the sketch,
+    not solid) / Keep drawing. Undo while drawing takes back one point.
+[x] Sketch: Delete segment opens an outline into an unfinished line (rules kept); sides that aren't next to each
+    other can be taken out too; deleting a side in the middle of an unfinished line splits it.
+[x] Sketch: loose ends grab a point within 2 mm; hold Alt and they reach 10 mm (dashed circles show it; distance
+    under Snap to). Pulling back away from an end lets go. Ctrl places a point with no snapping at all. Dragging a
+    loose end near another joins them. "Join close ends" (10 mm) fixes near-misses.
+[x] Properties: Edit sketch is always there for an object made from a sketch (and for sketches merged into it or
+    cut out of it), not only after opening the step in History.
+[x] Engine time limit raised from 2 to 10 minutes (one setting, ENGINE_TIMEOUT_MS), and the status bar shows how long
+    a build has been running ("Building... 1 min 20 s").
+[x] Clean-up: the Help tab's two hidden buttons removed (Help covers that row; it has its own Licenses button),
+    leftover Hole-button code removed, Ruler has its own picture (it looked the same as Measure), the sketch rules
+    solver moved to its own file (sketchsolve.js), one shared "is this solid?" check for sketch loops.
+[x] tools/ship.py fixed (it pointed at a folder that no longer existed): it now copies the build to 3DJames.html
+    and single\, updates README's version and remakes Share\3DJames.zip.
+[x] Help: Sketch page rewritten for open lines and joining, 7 new/retaken pictures; Mouse and keys updated;
+    README brought up to date (it still said 0.9.0).
+
+VERSION 0.11.0 (Oct 14, 2026)
+[x] Sketch mode: the sketch board fills the whole window (tabs, tool row and side panel tucked away until Done/Cancel).
+[x] Big round objects look round: the on-screen mesh follows curves within about 0.12 mm (it was up to ~0.8 mm on
+    a 320 mm part, which looked like a stop sign). Exported STL/3MF is finer too (within 0.05 mm).
+[x] Help: Sketch page explains Sketch mode; sketch pictures retaken.
+
+VERSION 0.10.0 (Oct 14, 2026)
+[x] Sketch: the starting point (first point clicked) is locked: rules move other points, never it, so the drawing
+    can't wander off (past the green line). Unlock it in the Rules list or by clicking its anchor badge.
+[x] Sketch: Rules row under the drawing tools (like FreeCAD's constraint buttons): Flat, Upright, Parallel, Square,
+    Same size, Touch, Join, Mirror pair, Angle, Size, Freeze. Pick things (Shift+click for more), then click a rule,
+    or click the rule first and then the things. Buttons that don't fit go pale; hover for plain-word help.
+[x] Sketch: new rules: angle (from level or between two lines), line touching a circle, circles touching,
+    same-size circles/arcs, mirror pair across green/red/any line, freeze a whole shape, locked circle diameter.
+[x] Sketch: every rule shows a badge on the drawing (hover: what it is, click: remove it).
+[x] Sketch: green = fully locked. A note says how many more sizes/rules until "Fully locked".
+[x] Sketch: sizes can be locked or "just showing" (lock / eye button in the Rules list).
+[x] Sketch: right side tidied into folding sections (Rules, Whole sketch, Live mirror, Snap to, Shapes).
+[x] Help: new page "Sketch rules" with 4 marked-up pictures; Sketch page and its picture updated.
+
+VERSION 0.9.1 (Oct 14, 2026)
+[x] Help > Sketch page: new part "Dotted outlines on the board" (what the gray dotted lines and the orange dot are).
+
+VERSION 0.9.0 (Oct 14, 2026)
+[x] Sketch > Done > Loft: from the first outline (bottom) to the second (top) over the height (square to round,
+    funnels, vases). Properties: swap bottom/top, straight sides.
+[x] Sketch > Done > Sweep: carries the outline along a path drawn with helper lines joined end to end (handles,
+    pipes, rails). Bent helper lines make curved paths.
+[x] Sketch: Live mirror (right side): Off / across the green line / across the red line. Everything you draw gets
+    its mirror image; half an outline from the line and back becomes the whole symmetric outline.
+[x] Snaps when dragging objects in 3D: lines up with other objects' edges and middles (dotted purple guide),
+    and drops onto the middle of holes and round edges (screw over a hole). Hold Alt to move freely.
+[x] Help tab: a picture guide (Getting started, Shapes, Combine, Edges and faces, Parts, Sketch, Make it solid,
+    Saving, Mouse and keys) with a search box. Fills the window below the tabs; any other tab closes it.
+    Pages are in source\help\pages, pictures in source\help\img (easy to add to).
+
+VERSION 0.8.6 (Oct 14, 2026)
+[x] 3DJames itself is now licensed under the GNU GPL, version 3 or later (Jon's choice): free to use, share and
+    change; copies people share must stay GPL with their source code. LICENSE.txt is in the 3DJames folder,
+    the share zip and Help > About / Licenses.
+
+VERSION 0.8.5 (Oct 14, 2026)
+[x] New button in the sketch (nothing picked, "Whole sketch"): "Right of green line". Slides the whole drawing so
+    it sits just right of the green line, touching it, ready for Spin around.
+[x] Fixed: Move to center / Straighten could get pulled straight back by measurements taken from the center of
+    the sketch, so it looked like nothing happened. Those measurements now move along.
+
+VERSION 0.8.4 (Oct 14, 2026)
+[x] Spin around: an outline a hair over the green line (up to 0.05 mm, from a slightly turned drawing) now spins
+    fine (the hair is trimmed). Further over: the message tells you to use Move to center.
+
+VERSION 0.8.3 (Oct 14, 2026)
+[x] Helper lines stay attached: an end snapped onto a line, corner, middle or circle center stays on it (purple
+    dot). A helper dropped along a side latches on and follows it. So a helper line between two sides, with a
+    length and Upright/Flat, now controls the distance between them. Moving the helper again unhooks it.
+    Helper lines give way first when something has to move.
+[x] Drawing turned? Pick a line > Straighten: turns the whole drawing so that line is exactly level.
+[x] Pick a corner > Move to center: slides the whole drawing so that corner sits where the red and green lines cross.
+[x] Pick a corner > Pin: nothing can move that point (stops the drawing sliding or turning). Click again to unpin.
+    Tip: Pin one corner and make one side Flat, and the drawing can't drift.
+[x] Dragging a point that rules won't allow (e.g. against a pin) now stops where the rules allow.
+
+VERSION 0.8.2 (Oct 14, 2026)
+[x] Move helper lines: drag one (Select tool) to move the whole line. Near another straight line (side, helper line,
+    the face's edges) and in line with it, it latches on; an end near a corner/middle/center lands on it.
+    Anywhere else it goes exactly where you drop it. Shift while dragging: only straight across or up-down.
+[x] Snap "On lines": points latch onto any line, arc, circle or helper line when you get close (on/off on the right).
+[x] Shift (like Paint): while drawing a line, arc end or helper line, only straight or 45°. Rectangle + Shift = a
+    square. Dragging a point + Shift: it only moves straight or at 45° from where it was.
+
+VERSION 0.8.1 (Oct 14, 2026) - measuring in the sketch (Jon's "invisible ruler")
+[x] Measure tool (M): click any two points (corners, circle centers, helper line ends, the center of the sketch).
+    It offers left-right, up-down and straight distance; click one and type the size. It stays (a rule) and shows
+    on the drawing like a real drawing dimension; click its number to change it.
+[x] Helper line (H): a dotted line to line things up and measure from. Never part of the solid. Rules and
+    measurements work on it too.
+[x] Arc radius you type now stays (lock shows), like typed lengths.
+[x] Smooth join: pick a corner where an arc meets another side, click Smooth join: no bump, and it stays smooth.
+[x] Tested with Jon's bracket drawing (88, 65, 42, 9, 23, 10, R33, smooth top): comes out exact.
+
+VERSION 0.8.0 (Oct 14, 2026) - the big sketch update
+[x] Arc tool: click where the curve ends, then a point it bends through. Switch between Line and Arc (L / A keys)
+    while drawing one outline.
+[x] Bend any straight side: pick the shape, drag the little diamond in the middle of a side. Or pick the side and
+    use Bend / Make straight / Flip bend / Half circle, or type a radius (click the "R" size on the drawing).
+[x] Rounded corners: click a corner (Select tool) and pick R1, R2, R3, R5, R10 or type a radius. "Round all" does
+    every corner of the picked shape. Rounded corners stay round when you move points.
+[x] Rules that stay: Flat, Upright, Parallel to, Square to, Same length as, and typed lengths (a lock shows on the
+    size). Change something later and the rules still hold. They show as small marks on the sides; the list on
+    the right lets you remove any of them.
+[x] Snaps (Ray's idea): corners, middles of sides, centers, line-up guides (dotted lines) and grid, each on/off.
+    A small box shows what it snapped to.
+[x] Double-click a side to add a corner there; pick a corner and Delete to take it out.
+[x] Spin around (revolve): Done asks "Push up" or "Spin around". Spin turns the outline around the green line,
+    like a lathe: cups, knobs, wheels. Any turn from 1 to 360 degrees. Changeable later in Properties.
+[x] Cut: Done asks "New object" or "Cut a hole" / "Cut into the face". It cuts right away.
+[x] Sketch on a face: Insert > Sketch > On a face..., click a flat face. The face's edges show as dotted lines,
+    and you can snap to its corners, middles and hole centers. The result sits right where you drew it.
+[x] Sketch on the floor: the bottoms of your objects show as dotted lines, and the result sits right where you
+    drew it (so you can draw a hole exactly under something).
+[x] Look at face (Ray's idea, View tab): click a face and the view turns to look straight at it.
+[x] Editing a sketch later (Properties > Edit sketch) keeps the solid where it was.
+
+VERSION 0.7.1 (Oct 14, 2026)
+[x] Z works like 3D Builder: the Z number is the MIDDLE of the object, like X and Y. A 40 mm cube on the floor
+    shows Z = 20, a 20 mm cube shows Z = 10. Bottom bar and Properties ("Position of the middle") both.
+    Only the number shown changed: old projects open exactly where they were. Making a shape taller keeps it
+    on the floor (its middle Z goes up). New shapes still go beside the others (decided: no centering on the selection).
+
+VERSION 0.7.0 (Oct 13, 2026) - from now on every update gets a version number (Help tab, Help > About, README).
+    The shareable Share\3DJames.zip is rebuilt with every update.
 ROUND 5 (in progress)
+[x] Sliders with live preview on every number: shape sizes (width, diameter, height, sides...), and every step's numbers
+    (hollow wall, shape-on-face size/depth/shift, push/pull, pattern count/spacing, split position...). One Undo per drag.
+    Boxes with a formula (like wall*2) keep just the box.
+[x] Center (Object tab): click the object to center on, Ctrl+click the ones to move, then Center > left-right and
+    front-back / every direction / left-right only / front-back only / up-down only.
+[x] Fillet / Chamfer size slider: drag it and the rounding/bevel changes live on the model (one Undo per drag); the box
+    still takes exact numbers. Works while picking edges too (before Apply): letting go keeps it and opens the step.
+[x] Sketch, part 2: every line shows its length; click a length, type a new one, Enter (the shape stretches to fit).
+    Select a line > Flat / Upright / Parallel to… / Square to… / Same length as… (then click the other line).
+    Center ↔ / Center ↕ for the picked shape or the whole sketch. Mirror ↔ / ↕: draw half an outline with both ends
+    on the center line and it becomes the whole symmetric shape (anything else gets a mirrored copy).
+    (These are one-time fixes. Rules that stay - e.g. stays parallel when you change something later - come later.)
+[x] Sketch, part 1 (Insert tab > Sketch): a flat drawing board with a mm grid. Line, Rectangle, Circle, Select.
+    Snaps to the grid and to points. Type exact sizes while drawing (25 Enter, or 15,0 for a step; 60,40 for a
+    rectangle; 10 for a circle's diameter). Shapes inside shapes are holes. Done > height > solid. Exact numbers for
+    every point on the right; Properties > Edit sketch reopens it later.
 [x] Parts menu reorganized and filled with ready-made maker parts (standard sizes, plain solids so they're fast):
     - Screws and bolts > Socket head / Button head / Countersunk / Hex head bolt / Set screw > M2..M10 > length
       (ISO 4762 / 7380 / 10642 / 4017 / 4026 head sizes)

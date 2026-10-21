@@ -1,0 +1,124 @@
+# Building and testing 3DJames
+
+The shipped `3DJames.html` works offline without installing development tools.
+
+To rebuild the source, use Node.js 20 or newer and Python 3. Install the JavaScript
+dependencies with `pnpm install --frozen-lockfile`, then run:
+
+```text
+python build.py
+```
+
+The resulting app is `local/3DJames.html`. The bundler reads source files through
+Node so Windows directory restrictions do not interfere with package resolution.
+
+Browser tests need Playwright and its Chromium browser:
+
+```text
+python -m pip install playwright
+python -m playwright install chromium
+python tests/features.py
+python tests/ui_features.py
+python tests/reliability.py
+python tests/run.py
+```
+
+The reliability suite tests saving during edits, failed imports, pending geometry
+exports, missing files, invalid project and mesh data, ZIP limits and CRC checks,
+cyclic 3MF components, backup errors, close warnings, worker recovery, and dialog
+keyboard behavior. The main suite also exercises modeling tools and real mouse
+interactions. Test screenshots are written to `dist/`.
+
+Run lint with `pnpm lint`. The source has no lint warnings or errors.
+
+The feature suite checks emboss/engrave geometry, SVG holes, read-only measurements,
+portable version records and imports, dependency-aware history, boolean previews,
+and export identity. The UI suite uses actual mouse clicks, narrow ribbon menus,
+and orbit controls. Run browser suites sequentially to avoid software-renderer contention.
+
+Named versions store model snapshots separately inside .3dj, editable .3mf, or JSON,
+with shared imported files. Restoring and deleting versions support Undo. The first
+versioned save also preserves the last saved model when it differs. There is a
+200-version and 400 MB project archive limit. Older projects remain readable; older
+app builds cannot evaluate the new emboss feature.
+
+Tangent plane checks: `python tests/planes.py` tests exact CAD surface projection,
+cylinder/sphere/cone normals, offset/flip, sketch cutting, file round trips, Undo/Redo
+and new-object orientation. `python tests/plane_ui.py` clicks a curved face and
+checks placement, cancellation, flip and both sketch entry points.
+
+Open sketch lines: `python tests/sketch_lines.py` checks that Line and Arc can stop anywhere (Enter / Esc) and
+carry on later from an orange end, that lines whose ends meet join into one line and then one outline (also across
+two sketches edited together), the Done prompt for unfinished lines, splitting a line, rules following the joins,
+live mirror of an open half, and that the engine ignores open lines saved in a sketch.
+
+Sketch redraw check: `python tests/sketch_redraw.py` uses real clicks to take sides out of a
+closed outline (Delete side / Delete key, Shift for a run of sides), redraw with Line and Arc,
+close on the dashed end, keep the rules of the kept sides, and put it back with Undo or Esc.
+Help pictures for it and for open lines: `python help/shots/lines_shots.py`.
+
+Double-click zoom: `python tests/doubleclick.py` double-clicks a cube with the real mouse:
+first view, twice as close, back again, and a fresh start after the view is moved by hand.
+
+Copies and several sketches: `python tests/copies.py` checks that Mirror copy makes a separate
+object (a sketch stays an editable sketch, flipped; compared with the engine's exact mirror for
+turned, spun and loft sketches), Turned copy, older joined mirror copies, Edit sketches together
+(round trip in place on the floor and on a turned, lifted plane; moving shapes between sketches)
+and Join into one sketch. Help pictures: `python help/shots/copies_shots.py`.
+
+Help is part of completing tool changes (AGENTS.md). Update the relevant topics,
+capture real screenshots using the commands in help/README.txt, prepare embedded
+JPEGs, and rebuild. Run `python tests/help.py` to verify all topics, offline image
+decoding, search, enlargement, keyboard focus and narrow-window layout. Inspect
+the generated screenshots in dist before delivery.
+
+Tutorial projects are authored as help/examples/*.json. Run
+`python help/build_examples.py` against a built app to generate real .3dj archives,
+validate one CAD solid per model through STEP export/import, exercise parameter
+edits and Undo, and capture screenshots. Rebuild afterward to embed updated archives
+and images. `python tests/tutorials.py` checks About session defaults, persistent
+reading position, docked modeling/sketching, unsaved work protection and downloads.
+The full suite expects Help to close when leaving the Help tab, and to stay docked beside
+the model only after Keep visible (until Close), then closes it before continuing.
+
+Putting a build where it is used: `python tools/ship.py` copies `local/3DJames.html` to the 3DJames folder
+(the one you open) and `single/`, updates the version in the shipped README, remakes `icons/originals`, and
+writes `Share/3DJames.zip`. The 3DJames folder above `source` is the master copy of everything that ships.
+
+Code map (the parts most changes touch):
+- `src/sketchgeom.js`: sketch loop geometry shared by the board and the engine (closed outlines, circles, helper
+  lines and open lines; `isSolidLoop`, `isOpenLoop`, `sideCount` say which is which).
+- `src/sketchsolve.js`: the sketch rules and their solver (plain math, no screen code).
+- The sketch board is one object, `sb`, made in `src/ui/sketch.js` (`openSketch`: its state, toolbar, Done
+  and the test hook). Each part installs its functions on `sb`, so they can call each other as `sb.name()`:
+  `sketchdraw.js` (screen, snapping, drawing), `sketchedit.js` (changing the drawing, rules, joining lines),
+  `sketchpanel.js` (the panel on the right), `sketchtools.js` (Line, Arc, Rectangle...), `sketchinput.js`
+  (mouse and keys), `sketchkit.js` (shared helpers and tables). Rules are renumbered only through
+  `sb.eachRef`/`sb.remapRules`, and open lines join and close only through `sb.joinEnds`.
+- `skill/3djames-project/SKILL.md`: the Claude skill that writes .3dj projects. Change it when the project
+  format changes (`tools/ship.py` zips it into `Share`).
+- `src/build.js`: the link to the geometry engine. `ENGINE_TIMEOUT_MS` (10 minutes) is how long one job may run.
+
+Touch and pen: `python tests/touch.py` sends real touch and pen events (Chrome DevTools protocol): touch mode,
+tap / hold-drag / swipe / pinch / double tap in 3D, touch-slide-lift and two-finger zoom in the sketch, the
+on-screen keys and 123 pad, pen drawing and palm rejection. `src/touch.js` holds touch mode and the on-screen keys.
+
+The 3DJames box (server): `server/` is the server (Python 3, standard library only). Try it on any PC:
+`python server/3djames_server.py --data testdata --app-port 8090 --admin-port 8091 --bundled-app local/3DJames.html`
+then open http://localhost:8091 (admin) and http://localhost:8090 (the app). `python tests/server.py` starts its
+own server and checks setup, users, sign-in, the server's Open/Save window, the shared folder, conflicts,
+presence, My parts, app uploads, the update folder and that nobody can reach outside their folders.
+The app talks to files through `src/drive/` (`local.js`: this computer; `server.js`: a box), chosen at start-up.
+`appliance/` builds the Orange Pi SD card image (on GitHub: `python tools/publish_appliance.py --push`, then
+Actions > Build SD card image in the 3djames-pi repository). Help pictures: `python help/shots/touch_server_shots.py`.
+
+Sketch from a photo: `python tests/photo.py` makes photos with known sizes (an L bracket with two holes on A4 paper
+seen at an angle, a 450 mm bar sized from a measured rectangle, a top view sized by a line) and checks the window,
+straightening, scaling, the outline found (6 corners, holes as circles, sizes within 1.5 mm), saving the photo in the
+project, Edit sketch, Move / Size again and Undo. The maths is in `src/photo.js`, the window in `src/ui/photowin.js`,
+the photo on the board in `src/ui/sketchphoto.js`. Help pictures: `python help/shots/photo_shots.py`.
+
+More sketch tools (Trim, Slot, Polygon, Offset, Pattern, helper <-> drawn line, Level & upright, Import DXF / SVG):
+`python tests/sketch_tools.py` (real mouse and keys). Where lines cross and cutting sides is in `src/sketchcut.js`,
+reading DXF / SVG in `src/sketchimport.js`, the tools on the board in `src/ui/sketchmore.js`; Offset runs in the
+geometry engine (`offsetLoops` in `src/engine.js`). Help pictures: `python help/shots/tools_shots.py`.

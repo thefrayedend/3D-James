@@ -1,0 +1,91 @@
+{
+  "v": 1,
+  "name": "Tutorial - Mounting plate",
+  "vars": [],
+  "bodies": {
+    "b1": {
+      "name": "Mounting plate",
+      "color": "#00A2E8",
+      "hole": false
+    }
+  },
+  "features": [
+    {
+      "id": "f1",
+      "type": "shape",
+      "body": "b1",
+      "kind": "sketch",
+      "p": {
+        "h": 4,
+        "loops": [
+          {
+            "type": "poly",
+            "pts": [
+              [
+                -30,
+                -15
+              ],
+              [
+                30,
+                -15
+              ],
+              [
+                30,
+                15
+              ],
+              [
+                -30,
+                15
+              ]
+            ]
+          },
+          {
+            "type": "circle",
+            "c": [
+              -22,
+              -7
+            ],
+            "r": 3
+          },
+          {
+            "type": "circle",
+            "c": [
+              -22,
+              7
+            ],
+            "r": 3
+          },
+          {
+            "type": "circle",
+            "c": [
+              22,
+              -7
+            ],
+            "r": 3
+          },
+          {
+            "type": "circle",
+            "c": [
+              22,
+              7
+            ],
+            "r": 3
+          }
+        ]
+      },
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "name": "Plate outline and four holes"
+    }
+  ],
+  "seq": 100,
+  "counters": {}
+}
