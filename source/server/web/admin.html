@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3DJames admin</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<header>
+  <b>3DJames</b> <span class="muted">admin</span>
+  <span id="who" class="muted"></span>
+</header>
+<nav id="tabs" hidden>
+  <button data-tab="users">Users</button>
+  <button data-tab="storage">Storage</button>
+  <button data-tab="shared">Shared folder</button>
+  <button data-tab="app">App</button>
+  <button data-tab="box">Network &amp; box</button>
+</nav>
+<main id="main"><p class="muted">Loading…</p></main>
+<div id="toast" role="status"></div>
+<script src="admin.js"></script>
+</body>
+</html>

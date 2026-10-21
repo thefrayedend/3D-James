@@ -1,0 +1,61 @@
+# 3DJames box - builds the ready-to-flash SD card image (and the server update zip).
+#
+# How to use: Actions -> "Build SD card image" -> Run workflow.
+# The Orange Pi Zero 4 base image comes from this project's "base-image" release, or (if there is none)
+# from the "base-image" release of the project named below (by default the FlashForge Bridge project,
+# which already has it). The finished image appears under Releases -> "Latest SD card image".
+name: Build SD card image
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_repo:
+        description: 'Where else to find the base image release (owner/name)'
+        default: 'thefrayedend/ffbridge-pi'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get the Orange Pi base image
+        run: |
+          mkdir -p base
+          gh release download base-image --dir base --repo "$GITHUB_REPOSITORY" 2>/dev/null \
+            || gh release download base-image --dir base --repo "${{ inputs.base_repo || 'thefrayedend/ffbridge-pi' }}" || {
+            echo "::error::No release called 'base-image' found. Create a release with the tag base-image and attach the Orange Pi Zero 4 image file to it."; exit 1; }
+          ls -lh base
+          BASE_FILE="$(ls -S base/* | head -1)"
+          echo "BASE_FILE=$BASE_FILE" >> "$GITHUB_ENV"
+
+      - name: Check the server
+        run: |
+          python3 -m py_compile server/3djames_server.py server/tdj/*.py appliance/rootfs/usr/local/lib/3djames/tdjsys.py
+          bash -n appliance/build-image.sh appliance/customize.sh
+
+      - name: Install image tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fdisk dosfstools mtools e2fsprogs xz-utils rsync python3 curl p7zip-full util-linux zip
+
+      - name: Build the SD card image
+        run: |
+          sudo bash appliance/build-image.sh --base "$BASE_FILE" --name 3djames-orangepi-zero4 --out "$GITHUB_WORKSPACE/out"
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE/out"
+          V="$(cat server/VERSION)"
+          (cd server && zip -qr "$GITHUB_WORKSPACE/out/3djames-server-$V.zip" . -x '__pycache__/*' 'testdata/*')
+          ls -lh out
+
+      - name: Publish it as the "Latest SD card image" release
+        run: |
+          gh release delete latest-image --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+          gh release create latest-image out/* --repo "$GITHUB_REPOSITORY" \
+            --title "Latest SD card image" --notes-file RELEASE-NOTES.md

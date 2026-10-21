@@ -1,0 +1,22 @@
+<h1>Combine objects</h1>
+<p>Join objects into one, cut one out of another, or keep only where they overlap. These are on the <b>Object</b> tab. Pick the objects first (hold <b>Ctrl</b> and click for more than one).</p>
+<ul>
+<li><b>Merge</b>: joins the picked objects into one solid. Holes (screw holes, nut traps and other hole parts) are cut out as it merges.</li>
+<li><b>Subtract</b>: pick the object to cut with (for example a cylinder for a hole) and click Subtract: it is cut out of everything it passes through. With several picked, the others are cut out of the first one you clicked.</li>
+<li><b>Intersect</b>: keeps only the part where the picked objects overlap.</li>
+</ul>
+<p>With two or more objects picked, Properties shows the same three buttons in a <b>Combine</b> card.</p>
+
+<h2>Check the preview, then Apply</h2>
+<p>Merge, Subtract and Intersect show the result first. Check <b>Object to keep</b> and the tools being used, turn the view to look at it, then click <b>Apply</b>. <b>Cancel</b> or Esc goes back to the unchanged model. Apply is one Undo step. Finish or cancel a preview before saving or exporting.</p>
+<figure><img src="tools-preview.jpg" alt="Merge preview showing Object to keep, result, Cancel and Apply"><figcaption>The preview says which object is kept. Look at the model before you apply.</figcaption></figure>
+
+<h2>Still changeable afterwards</h2>
+<p>A combine is a step in <a data-help-topic="history">History</a>, and the objects that went into it are kept inside it. Pick the result and open History to change the size or place of a hole you cut, or switch Merge to Subtract in the step's <b>Operation</b> setting. Delete the step to get the separate objects back.</p>
+
+<h2>Good to know</h2>
+<ul>
+<li>Objects that only touch at an edge or a point may not join. Let them overlap a little (0.1 mm is enough).</li>
+<li>To keep objects together without joining them into one, use <a data-help-topic="arrange">Group</a>.</li>
+<li>Imported meshes (STL, OBJ, 3MF) can be combined too, but very detailed meshes take longer.</li>
+</ul>

@@ -1,0 +1,29 @@
+{
+  "models": [
+    {
+      "model": "plate",
+      "solidCount": 1,
+      "volume": 6747.610657883066,
+      "editedVolume": 10121.415986824606,
+      "archiveBytes": 67836,
+      "ok": true
+    },
+    {
+      "model": "nameplate",
+      "solidCount": 1,
+      "volume": 9787.47586942219,
+      "editedVolume": 9752.926078352193,
+      "archiveBytes": 80275,
+      "ok": true
+    },
+    {
+      "model": "mug",
+      "solidCount": 1,
+      "volume": 94350.39853258335,
+      "editedVolume": 96034.48435639101,
+      "archiveBytes": 135499,
+      "ok": true
+    }
+  ],
+  "pageErrors": []
+}

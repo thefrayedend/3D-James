@@ -1,0 +1,80 @@
+<h1>The sketch board</h1>
+<p>Sketching is how you make a shape of your own: draw its outline flat, with exact sizes, then make it solid (push it up, spin it around, or cut it in). This chapter goes in order: this page covers the board and the drawing tools, the next pages cover unfinished lines, the extra tools, rules, and making it solid.</p>
+
+<h2>Start a sketch</h2>
+<p><b>Insert</b> tab &gt; <b>Sketch</b>:</p>
+<ul>
+<li><b>On the floor</b> (or <b>On the sketch plane</b> when a plane is set): the most common start.</li>
+<li><b>On a surface…</b>: click a flat or curved face of a solid to draw on it. See <a data-help-topic="curved">Sketch on a face or curved surface</a>.</li>
+<li><b>From a photo…</b>: trace a photo of a real part, or let 3DJames find its outline. See <a data-help-topic="sketchphoto">Sketch from a photo</a>.</li>
+<li><b>From a DXF / SVG file…</b>: a drawing made in another program. See <a data-help-topic="sketchimport">Import a DXF or SVG drawing</a>.</li>
+</ul>
+<p>To change a sketch you made earlier: pick it and click <b>Edit sketch</b> in Properties. The board opens with everything as you left it.</p>
+
+<h2>The board</h2>
+<img src="sketch.jpg" alt="The sketch board: the drawing tools at the top, the Rules row under them, the drawing in the middle and the panel on the right">
+<p>The board fills the window while you draw (that is <b>sketch mode</b>); the tabs are tucked away. <b>Done</b> makes the solid, <b>Cancel</b> leaves without changing anything. Around the drawing:</p>
+<ul>
+<li><b>Top bar</b>: the drawing tools, then Undo (curved arrow), Delete, Delete segment, Fit (square corners: the whole drawing in view) and Import.</li>
+<li><b>Rules row</b>: rules that keep lines flat, parallel, the same size… (see <a data-help-topic="sketchrules">Sketch rules</a>).</li>
+<li><b>The drawing</b>: a millimetre grid. The <b>red line</b> runs left-right and the <b>green line</b> up-down; they cross at the center of the sketch. The ⚓ marks the first point you drew.</li>
+<li><b>The note at the top left</b> says how many lines are unfinished, or how close the drawing is to fully locked.</li>
+<li><b>The bottom line</b> says what to click next for the tool you are using.</li>
+<li><b>The panel on the right</b>: what you picked (its exact numbers and buttons), then folding sections: Rules, Whole sketch (or Picked shape), Live mirror, Snap to and Shapes. Click a section's title to open or fold it; folded ones still show how they are set.</li>
+<li>Look around: <b>wheel</b> zooms, <b>right-drag</b> slides the board.</li>
+</ul>
+
+<h2>Drawing tools</h2>
+<ul>
+<li><b>Line</b> (L): click from point to point. Click the first point again to close the outline, or press <b>Enter</b> or <b>Esc</b> to stop: the line stays as it is and you can carry on later (see <a data-help-topic="sketchlines">Unfinished lines</a>).</li>
+<li><b>Arc</b> (A): click where the curve ends, then a point it bends through. Press L or A any time to switch between straight and curved sides on the same line.</li>
+<li><b>Rectangle</b> (R): click two corners. <b>Circle</b> (C): click the center, then the edge.</li>
+<li><b>Slot</b> (O) and <b>Polygon</b> (P): rounded slots, and hexagons (or any number of sides) by their size across flats. See <a data-help-topic="sketchtools">More sketch tools</a>.</li>
+<li><b>Helper line</b> (H): a dotted guide line that never becomes solid. Use it to line things up and measure from.</li>
+<li><b>Measure</b> (M): click two points (corners, circle centers, the center of the sketch): see how far apart they are left-right, up-down and straight. Click a number to set it; it stays.</li>
+<li><b>Select</b> (S): pick sides, corners and shapes; drag points to move them; drag the small ◆ on a side to bend it into an arc; double-click a side to add a corner there. Shift+click picks more than one.</li>
+<li><b>Trim</b> (T): cut away pieces of lines up to where other lines cross them. See <a data-help-topic="sketchtools">More sketch tools</a>.</li>
+<li><b>Delete</b> removes what is picked: a corner, a whole shape, or a side (the outline opens so you can draw something new in its place: see <a data-help-topic="sketchlines">Change part of a finished outline</a>).</li>
+<li><b>Undo</b> (Ctrl+Z) while drawing a line takes back its last point. Switching to another tool keeps the line you drew so far.</li>
+</ul>
+<p>Outlines inside other outlines become <b>holes</b>. Outlines that overlap are joined in the solid.</p>
+
+<h2>Exact sizes</h2>
+<ul>
+<li>While drawing, <b>type a number</b> and press Enter: the length of the next line, <b>60,40</b> for a rectangle, the diameter of a circle. Typing <b>x,y</b> for a line goes that far across and up.</li>
+<li>Click any size on the drawing and type a new number. A <b>🔒</b> means it stays that size.</li>
+<li>Pick a corner: type its exact spot, <b>round it</b> (R1, R2… or any radius), <b>Pin</b> it, <b>Move to center</b>, make an arc meet a side smoothly (<b>Smooth join</b>) or <b>Delete corner</b>.</li>
+<li>Pick a side: type its length (or an arc's radius), <b>Bend</b> it, <b>Make straight</b>, <b>Flip bend</b>, or <b>Straighten</b> (turns the whole drawing so that line is exactly level).</li>
+<li>The <b>Shapes</b> section lists every shape; the picked one shows every corner's X and Y to type into.</li>
+</ul>
+
+<h2>Snapping</h2>
+<p>A new point jumps onto things close by, and the pointer says what it found: <b>Corner</b>, <b>Middle</b>, <b>Center</b>, <b>On line</b>, a dotted purple line-up guide, or the grid. Each kind can be turned off under <b>Snap to</b> on the right.</p>
+<ul>
+<li>Hold <b>Shift</b>: only straight or at 45° (like Paint). Rectangle + Shift = square.</li>
+<li>Lines drawn nearly level or nearly straight up go exactly level or upright, and keep a Flat or Upright rule; rectangles keep theirs too (<b>Level &amp; upright</b> under Snap to).</li>
+<li>Loose ends of unfinished lines pull a new point in from 2 mm, or 10 mm while you hold <b>Alt</b> (see <a data-help-topic="sketchlines">Unfinished lines</a>).</li>
+<li>Hold <b>Ctrl</b>: the point goes exactly where the pointer is, no snapping at all.</li>
+</ul>
+
+<h2>The whole sketch</h2>
+<p>Under <b>Whole sketch</b> on the right (it says <b>Picked shape</b> when a shape is picked):</p>
+<ul>
+<li><b>Center ↔ / Center ↕</b>: center the drawing (or the picked shape) on the green or the red line. <b>Right of green line</b> slides it just right of the green line, for Spin around.</li>
+<li><b>Mirror ↔ / Mirror ↕</b> (picked shape): a mirrored copy across the green or red line. Draw half an outline with both ends on the line, and Mirror makes it one whole symmetric outline.</li>
+<li><b>Freeze</b>: the picked shape stays exactly where it is.</li>
+<li><b>Merge touching outlines</b>: outlines that touch or overlap become one outline (arcs stay arcs, holes stay holes). Shift+click shapes first to merge only those.</li>
+<li><b>Round all</b>: round every corner of the picked outline.</li>
+<li><b>Offset…</b>, <b>Pattern…</b> and <b>Make helper lines</b>: see <a data-help-topic="sketchtools">More sketch tools</a>.</li>
+</ul>
+<p><b>Live mirror</b> (right): everything you draw is mirrored across the green or red line as you draw. Draw half an outline from the line and back to it, and you get the whole symmetric outline.</p>
+
+<h2>Dotted outlines on the board</h2>
+<ul>
+<li><b>On the floor:</b> the gray dotted lines are the bottoms of the objects already in your scene (a cylinder shows as a dotted circle). Objects that don't touch the floor have none.</li>
+<li><b>On a face:</b> the dotted lines are the edges of the face.</li>
+<li>Your lines snap to their corners, middles and centers. They are only guides: they don't become part of your sketch.</li>
+</ul>
+
+<h2>Next</h2>
+<p>Click <b>Done</b> and choose how it becomes solid: <a data-help-topic="solid">Make the sketch solid</a>. Or read on: <a data-help-topic="sketchlines">Unfinished lines and changing outlines</a>.</p>

@@ -1,0 +1,18 @@
+[Unit]
+Description=3DJames server (the app on port 80, the admin page on port 8080)
+After=network.target 3djames-config.service
+Wants=network-online.target
+
+[Service]
+User=threedjames
+Group=threedjames
+WorkingDirectory=/var/lib/3djames
+ExecStart=/usr/bin/python3 /opt/3djames/server/3djames_server.py --data /var/lib/3djames --box /srv/3djames --app-port 80 --admin-port 8080 --bundled-app /opt/3djames/app/3DJames.html
+# Ports 80 and 8080 without running as root. NoNewPrivileges stays off: the admin page uses sudo for the root helper.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+Restart=always
+RestartSec=5
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target

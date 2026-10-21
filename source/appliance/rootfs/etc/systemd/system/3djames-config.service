@@ -1,0 +1,15 @@
+[Unit]
+Description=3DJames box - apply 3djames-config.txt from the SD card (Wi-Fi, name, first admin, SSH)
+After=NetworkManager.service tdjsetup.mount 3djames-firstboot.service
+Wants=NetworkManager.service
+Before=network-online.target 3djames.service 3djames-hotspot.service avahi-daemon.service
+RequiresMountsFor=/tdjsetup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/3djames-helper apply-config
+RemainAfterExit=yes
+TimeoutStartSec=2min
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[
+  { "section": "Start here", "pages": ["about", "start"] },
+  { "section": "Tutorials", "pages": ["tutorials", "plate", "nameplate", "mug"] },
+  { "section": "Shapes and objects", "pages": ["shapes", "arrange", "combine", "copies", "edges", "parts"] },
+  { "section": "Sketching", "pages": ["sketch", "sketchlines", "sketchtools", "sketchrules", "solid", "sketchmulti", "curved", "sketchphoto", "sketchimport"] },
+  { "section": "View, measure and files", "pages": ["view", "measure", "history", "files"] },
+  { "section": "Tablets and the 3DJames box", "pages": ["tablets", "box"] },
+  { "section": "Reference", "pages": ["keys"] }
+]

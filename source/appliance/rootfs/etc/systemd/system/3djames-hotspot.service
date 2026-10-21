@@ -1,0 +1,12 @@
+[Unit]
+Description=3DJames box - setup Wi-Fi hotspot when there is no network
+After=NetworkManager.service 3djames-config.service
+Wants=NetworkManager.service
+
+[Service]
+ExecStart=/usr/local/sbin/3djames-helper hotspot-watch
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

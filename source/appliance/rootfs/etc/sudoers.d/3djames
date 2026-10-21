@@ -1,0 +1,2 @@
+# The 3DJames server may run exactly one root helper (network, NAS shares, update folder, restart).
+threedjames ALL=(root) NOPASSWD: /usr/local/sbin/3djames-helper

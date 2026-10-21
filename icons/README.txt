@@ -12,31 +12,39 @@ In dark mode 3DJames turns black into white for you. Keep the exact file name.
 
 File                           Used for
 ------------------------------ -------------------------------------------------------
-align-center-horizontal.svg    Middles (Z)
-align-center-vertical.svg      Align, Centers left to right (X), Centers front to back (Y)
-align-end-horizontal.svg       Bottoms (Z)
-align-end-vertical.svg         Right sides (X), Backs (Y)
-align-start-horizontal.svg     Tops (Z)
-align-start-vertical.svg       Left sides (X), Fronts (Y)
+crosshair.svg                  Center, Center on it (left-right and front-back), Center on it in every direction
+pen-line.svg                   Edit picked sketches together, Sketch, Edit sketches together, Edit sketch
+square.svg                     (small buttons and lists)
+mouse-pointer-2.svg            (small buttons and lists)
+align-center-horizontal.svg    Up-down only
+align-center-vertical.svg      Align, Left-right only, Front-back only
+align-end-horizontal.svg       (small buttons and lists)
+align-end-vertical.svg         (small buttons and lists)
+align-start-horizontal.svg     (small buttons and lists)
+align-start-vertical.svg       (small buttons and lists)
 arrow-down-to-line.svg         Lay flat on a face, Settle
 arrow-left.svg                 Cancel
 arrow-up-down.svg              Push/pull a face
 arrow-up-from-line.svg         Shape on a face
-bolt.svg                       Hardware, Bolt, Thread
+bolt.svg                       Screws and bolts, Threaded bolt, Thread
 box.svg                        Cube
 box-select.svg                 Faces, Hollow
 check.svg                      Split, Apply
 chevron-down.svg               (small buttons and lists)
 chevron-left.svg               (small buttons and lists)
+camera.svg                     From a photo…
+eraser.svg                     (small buttons and lists)
+import.svg                     From a DXF / SVG file…
+pill.svg                       (small buttons and lists)
 chevron-right.svg              (small buttons and lists)
-circle.svg                     Sphere
-circle-dashed.svg              Threaded hole (cutter), Hole
-circle-dot.svg                 Tube, Heat-set insert pocket on a face
+circle.svg                     Washer, Round magnet, Sphere
+circle-dashed.svg              Holes and pockets, Screw hole (plain, countersunk, counterbored), Threaded hole (cutter)
+circle-dot.svg                 Bearings, Printed standoff, Heat-set insert hole, Tube, Heat-set insert pocket on a face
 clipboard-paste.svg            Paste
 cone.svg                       Cone
 copy.svg                       Mirror copy to the right, Mirror copy to the back, Mirror copy on top, Duplicate, Copy
 cylinder.svg                   Cylinder
-diamond.svg                    Chamfer
+diamond.svg                    Bevel edges
 eye.svg                        (small buttons and lists)
 eye-off.svg                    (small buttons and lists)
 file-plus.svg                  New
@@ -45,36 +53,38 @@ flip-vertical-2.svg            Flip front–back, Flip upside down
 folder-open.svg                Open…, Projects folder…
 grid-2x2.svg                   Aluminum extrusion, Pattern, Flat view
 group.svg                      Group
-hexagon.svg                    Hexagon
-history.svg                    Backups…, History, Show in History
+hexagon.svg                    Standoffs, Hex standoff (female-female), Hex standoff (male-female), Nut trap, Hexagon
+history.svg                    Save as new version…, Select version…, Backups…, History, Show in History
 house.svg                      Home
-layers.svg                     Workplane, Objects
+layers.svg                     On a surface…, Place sketch plane…, Workplane, Objects
 lock.svg                       (small buttons and lists)
 lock-open.svg                  (small buttons and lists)
 magnet.svg                     (small buttons and lists)
 maximize.svg                   Fit
 menu.svg                       (small buttons and lists)
-minus.svg                      Threaded rod
-mouse.svg                      Mouse and keys
+minus.svg                      Pins, rods and magnets, Dowel pin, Smooth rod, Threaded rod
+mouse.svg                      (small buttons and lists)
 mouse-pointer-click.svg        Select all
 move-3d.svg                    (small buttons and lists)
-nut.svg                        Nut
+nut.svg                        Nuts and washers, Threaded nut
 package.svg                    My parts, Parts, Save to My parts
 pipette.svg                    (small buttons and lists)
 plus.svg                       Save selected object, Insert a model…, Add
 printer.svg                    (small buttons and lists)
 pyramid.svg                    Pyramid
-settings-2.svg                 Manage My parts…
+settings-2.svg                 Adjust current plane…, Manage My parts…
 redo-2.svg                     Redo
-rotate-3d.svg                  (small buttons and lists)
-ruler.svg                      Ruler
+rotate-3d.svg                  Turned copy: ¼ turn left (90°), Turned copy: ½ turn (180°), Turned copy: ¼ turn right (−90°)
+ruler.svg                      Measure
+ruler-dimension-line.svg       Ruler
 save.svg                       Save
-save-all.svg                   Save as…, Save as
+save-all.svg                   Save as…, Export…, Save as
 scale-3d.svg                   (small buttons and lists)
+scan-eye.svg                   Look at face
 scissors.svg                   Split
 sliders-horizontal.svg         (small buttons and lists)
-spline.svg                     Edges
-square-round-corner.svg        Fillet
+spline.svg                     Custom threads, Edges
+square-round-corner.svg        Round edges
 squares-intersect.svg          Intersect
 squares-subtract.svg           Subtract
 squares-unite.svg              Merge
@@ -84,7 +94,7 @@ trash-2.svg                    Delete, Delete step
 triangle.svg                   Tetrahedron
 triangle-alert.svg             (small buttons and lists)
 triangle-right.svg             Wedge
-type.svg                       Text
+type.svg                       Text, Emboss
 undo-2.svg                     Undo
 ungroup.svg                    Ungroup
 x.svg                          Select none

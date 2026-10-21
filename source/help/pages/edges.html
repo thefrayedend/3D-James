@@ -1,0 +1,28 @@
+<h1>Edges, faces, split and emboss</h1>
+<p>Finish a solid: round or bevel its edges, hollow it out, add a pocket or a boss on a face, cut it in two, or put text and logos on it. All on the <b>Object</b> tab. These tools need a <b>solid</b> (shapes, sketches, parts, STEP imports): imported STL, OBJ and 3MF meshes have no faces or edges to work on, so the buttons stay pale for them.</p>
+
+<h2>Round and bevel edges</h2>
+<p>Pick one object and click <b>Round edges</b> (fillet) or <b>Bevel edges</b> (chamfer). Click the edges to change, or use <b>All</b>, <b>Top</b>, <b>Bottom</b> or <b>Vertical</b>, and drag the slider: you see the result as you drag. Later, the step in History changes the radius or size. To pick different edges, delete the step and run the tool again.</p>
+
+<h2>Faces</h2>
+<p>The <b>Faces</b> menu (Object tab) works on one picked solid. Click the face when asked.</p>
+<ul>
+<li><b>Hollow</b>: makes a shell with a wall thickness. Click faces to leave them open (the top of a box, for example); with none clicked it is closed inside.</li>
+<li><b>Shape on a face</b>: a rectangle, circle, slot or polygon grown out of the face, or cut into it as a pocket or hole. It starts in the middle of the face you clicked; set its size, depth and <b>Shift across / Shift up</b> in Properties. For any other outline, <a data-help-topic="curved">sketch on the face</a>.</li>
+<li><b>Push/pull a face</b>: click a flat face and type how far to move it. A positive distance pulls it out (adds material), a negative one pushes it in (makes a part shorter or a hole deeper).</li>
+<li><b>Lay flat on a face</b>: click a face, and the object turns so that face lies on the floor (the side you want on the print bed).</li>
+<li><b>Heat-set insert pocket on a face</b>: click a face for a ready-sized hole for a brass insert.</li>
+</ul>
+
+<h2>Split</h2>
+<p>Pick one object and click <b>Split</b> to cut it in two with a flat plane, for parts too big for the printer or to print in two halves. Move and tilt the plane in Properties (<b>Move from center</b>, <b>Roll</b>, <b>Pitch</b>, <b>Yaw</b>), and choose <b>Keep top</b>, <b>Keep bottom</b> or <b>Keep both</b> (two separate objects).</p>
+
+<h2>Emboss or engrave text and logos</h2>
+<p>Pick one solid, then <b>Object</b> &gt; <b>Emboss</b>, and click a flat face. Type text (or choose a filled SVG logo), set its size and depth, and choose <b>Raised</b> or <b>Recessed</b>. <b>Apply</b> adds an editable step to History; <b>Cancel</b> leaves the model unchanged.</p>
+<figure><img src="tools-emboss.jpg" alt="Raised JAMES text on a solid box, with the emboss settings in Properties"><figcaption>Emboss: text or a filled SVG, its size and depth, then Apply. Open its History step to change the text later.</figcaption></figure>
+<ul>
+<li>The artwork starts at the middle of the face. <b>Shift across</b>, <b>Shift up</b> and <b>Turn</b> place it. It is clipped where it runs off the face.</li>
+<li>Logos: use an SVG made of filled shapes; convert text and strokes to paths in your drawing program first. Curves are followed closely, not exactly.</li>
+<li>Flat faces only: emboss doesn't wrap around curved surfaces (a mug), and doesn't work on imported meshes.</li>
+</ul>
+<p>A whole word standing on its own, not on a face: <b>Insert</b> &gt; <b>Text</b> (see <a data-help-topic="shapes">Add and place shapes</a>). Worked example: the <a data-help-topic="nameplate">raised nameplate tutorial</a>.</p>

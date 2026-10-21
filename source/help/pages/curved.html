@@ -1,0 +1,55 @@
+<h1>Sketch on a face or curved surface</h1>
+<p>Draw right on an object: a pocket in the top of a box, a boss on its side, a hole in the side of a cylinder. The sketch board works as always; only where the drawing sits is different.</p>
+<h2>On a flat face</h2>
+<ol>
+<li><b>Insert</b> &gt; <b>Sketch</b> &gt; <b>On a surface…</b>, and click a flat face of a solid.</li>
+<li>The board opens on that face. Its edges show as dotted lines: your lines snap to their corners, middles and circle centers.</li>
+<li>Draw the outline, click <b>Done</b>, and choose <b>Push up</b> with <b>New object</b> (a boss standing on the face) or <b>Cut into the face</b> (a pocket as deep as the height). See <a data-help-topic="solid">Make the sketch solid</a>.</li>
+</ol>
+<p>For simple pockets and bosses (rectangle, circle, slot, polygon) you don't need a sketch: <b>Object</b> &gt; <b>Faces</b> &gt; <b>Shape on a face</b> (see <a data-help-topic="edges">Edges, faces, split and emboss</a>).</p>
+<h2>Sketch planes and the Workplane</h2>
+<ul>
+<li><b>Workplane</b> (Insert tab): click a face, and new shapes and sketches go onto that face until you click Workplane again to return to the floor.</li>
+<li><b>Insert</b> &gt; <b>Sketch</b> &gt; <b>Place sketch plane…</b>: click a spot, set the plane up (offset, flip), and keep it for several sketches: <b>Sketch</b> &gt; <b>On the sketch plane</b> then draws on it. <b>Adjust current plane…</b> changes it.</li>
+<li>The plane stays where it was placed: it doesn't follow the object if you change the object later.</li>
+</ul>
+<h2>On a curved surface: a worked example</h2>
+<p>On a cylinder, sphere or another smooth CAD solid you draw on a <b>flat plane touching the curved surface</b> at the spot you choose (a tangent plane). The outline is cut or pushed straight in, not wrapped around.</p>
+<p><b>Try this:</b> insert a cylinder, set Diameter to <b>40 mm</b> and Height to <b>40 mm</b>, then cut a <b>6 mm diameter</b> pocket into its side. Click any picture to enlarge it.</p>
+<h3>1. Choose where to sketch</h3>
+<p>Open <b>Insert → Sketch → On a surface…</b>. Click the side of the cylinder where you want the pocket, away from its top and bottom edges. The app calculates the surface point and the direction pointing out of it. If the model is rebuilding, wait, then click again.</p>
+<figure><img src="plane-menu.jpg" alt="Insert Sketch menu showing On a surface and Place sketch plane"><figcaption>Start with <b>On a surface…</b>. For this example, click the curved side, not the flat top.</figcaption></figure>
+
+<h3>2. Check the plane</h3>
+<p>A grid previews the plane. Leave <b>Offset</b> at <b>0</b> and leave <b>Flip</b> unchecked for this pocket. Choose <b>Sketch here</b>.</p>
+<figure><img src="plane-settings.jpg" alt="Sketch plane dialog on the cylinder with offset and flip controls"><figcaption><b>Offset</b> moves the plane along its starting normal. Positive moves in that direction; negative moves the other way. <b>Flip</b> reverses the direction for extrusion and cutting. The arrow shows the extrusion direction; a cut goes the opposite way.</figcaption></figure>
+<p><b>Cancel</b> closes placement and restores the previous active plane. The plane preview itself does not cut the model or create a History step.</p>
+
+<h3>3. Draw the pocket outline</h3>
+<p>The normal sketch board opens. The crossing axes mark the point you picked on the cylinder. Choose <b>Circle</b>, click the axes' crossing, and click again to finish a rough circle. Switch to <b>Select</b>, click the circle, and set <b>Diameter</b> to <b>6 mm</b> in the side panel. You can also click its diameter label to enter 6. Then choose <b>Done</b>.</p>
+<figure><img src="plane-sketch.jpg" alt="A circular pocket outline centered on the tangent sketch plane"><figcaption>This circle is a flat outline on the tangent plane. It will cut straight into the cylinder, rather than wrap around its side.</figcaption></figure>
+<p><b>Cancel</b> leaves Sketch mode without creating the solid. Escape cancels the current drawing action; use the Cancel button to leave the sketch.</p>
+
+<h3>4. Cut inward</h3>
+<p>In <b>Make it solid</b>, keep <b>Push up</b>, choose <b>Cut into the face</b>, and enter <b>6 mm</b> in Height. Here Height is the cut depth. Choose <b>OK</b>.</p>
+<figure><img src="plane-cut-settings.jpg" alt="Make it solid dialog set to Push up, 6 mm height and Cut into the face"><figcaption>Use a positive depth. Cut into the face sends the outline inward, opposite the plane's extrusion arrow.</figcaption></figure>
+
+<h3>5. Inspect and save</h3>
+<figure><img src="plane-result.jpg" alt="Cylinder with the completed circular pocket in its curved side"><figcaption>The finished pocket. Orbit the model to inspect it. <b>Undo</b> reverses the cut; the sketch and subtraction stay editable in <b>History</b>.</figcaption></figure>
+<p>Use <b>Save</b> to keep an editable .3dj project. The created sketch solid retains its position and orientation when reopened. Its original plane information is stored with the sketch.</p>
+
+<h2>Reuse a plane or make a raised boss</h2>
+<ul>
+<li><b>Place sketch plane… → Use plane</b> keeps a plane active without immediately drawing. <b>Sketch → On the sketch plane</b> reuses it.</li>
+<li><b>Adjust current plane…</b> offsets or flips the active plane, starting from its current placement.</li>
+<li>For a raised boss, choose <b>New object</b> instead of a cut. A perfectly tangent boss may only touch a cylinder at a point or line. Use a small <b>negative offset</b>, such as −1 mm, to give it real overlap, then select the boss and cylinder and use <b>Object → Merge → Apply</b>.</li>
+<li>Click <b>Workplane</b> to return to the floor. The active plane is temporary; created sketch solids are saved.</li>
+</ul>
+
+<h2>If the result is unexpected</h2>
+<ul>
+<li><b>No cut:</b> check the depth, flip direction and outline position. An outline far from the picked point may miss a curved body entirely.</li>
+<li><b>Cannot pick:</b> use a CAD solid. Mesh-only STL/OBJ surfaces are not supported. Near a singular tip, choose a smoother nearby point.</li>
+<li><b>The body changed:</b> plane placement stays fixed in space. It does not automatically reattach after the supporting body changes. Place a new plane if needed.</li>
+<li><b>Wanted a wrapped drawing:</b> this tool makes a flat tangent sketch with a straight extrusion or cut. Surface wrapping and constant-depth curved engraving are not included.</li>
+</ul>

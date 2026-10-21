@@ -1,0 +1,15 @@
+<h1>Tutorial: four-hole mounting plate</h1>
+<p><b>You will learn:</b> nested sketch outlines, exact circle centers, extrusion and editing an existing sketch. Finished size: <b>60 × 30 × 4 mm</b>, with four <b>6 mm</b> holes.</p>
+<div class="example-actions"><button class="btn primary" data-example="plate">Open editable example</button><button class="btn" data-example="plate" data-action="download">Download .3dj</button></div>
+<figure><img src="tutorial-plate.jpg" alt="Blue mounting plate with four through holes and its editable sketch History"><figcaption>The entire plate and all four holes come from one sketch. An inner closed outline becomes a hole.</figcaption></figure>
+<h2>1. Draw the outside</h2>
+<p>For a fresh build, save your current project, choose <b>File → New</b>, then <b>Insert → Sketch → On the floor</b>. Draw a rectangle. Switch to Select, choose its outline, and enter these corner coordinates in the Shapes panel: <b>(−30, −15), (30, −15), (30, 15), (−30, 15)</b>. Keep their order around the perimeter.</p>
+<h2>2. Add the holes</h2>
+<p>Draw four circles inside it. In the Shapes panel set each Diameter to <b>6</b> and use these Center values:</p>
+<table><tr><th>Hole</th><th>Center X</th><th>Center Y</th></tr><tr><td>1</td><td>−22</td><td>−7</td></tr><tr><td>2</td><td>−22</td><td>7</td></tr><tr><td>3</td><td>22</td><td>−7</td></tr><tr><td>4</td><td>22</td><td>7</td></tr></table>
+<figure><img src="tutorial-plate-sketch.jpg" alt="Plate sketch with a rectangular outline and four circles"><figcaption>Five closed outlines: one outside and four holes. The circles must stay inside the rectangle.</figcaption></figure>
+<h2>3. Make it solid</h2>
+<p>Choose <b>Done → Push up</b>, Height <b>4 mm</b>, Result <b>New object</b>, then OK. Inspect the holes by orbiting. The inner circles are already subtracted; you do not need four separate cylinder cutters.</p>
+<h2>4. Edit and save</h2>
+<p>In History open <b>Plate outline and four holes</b> in the example. Change Height from <b>4 to 6</b>. The same outline becomes thicker while the holes remain open. <b>Edit sketch</b> lets you change circle centers or diameters. Use Undo to compare, then Save as a .3dj project.</p>
+<p>If a hole disappears, check that its circle is a closed outline inside the outside boundary. Cancel leaves the sketch without applying changes. A suppressed or failed earlier step can affect later operations.</p>
