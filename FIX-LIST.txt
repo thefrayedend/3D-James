@@ -1,13 +1,19 @@
 3DJames - fix list
 ==================
 
+NEXT, AFTER THE ORANGE PI HARDWARE TEST (agreed Oct 21, 2026)
+[ ] 3DJames box: optional https (admin page switch "Use https"). The box makes its own certificate; the admin
+    page offers it as a download with install steps for Windows, iPad/iPhone and Android. Plain http stays on.
+    Then a service worker, so a device that trusts the certificate can open 3DJames with the box off.
+    (Service workers need trusted https on a network address: a self-signed certificate alone is not enough.)
+
 TO TALK ABOUT (ideas only - do NOT build any of these until Jon clearly says so)
 [?] "Hole" button like Tinkercad: one obvious button that turns any shape into a hole that cuts when grouped.
     Jon isn't sure how it works yet. NEVER start on this unless Jon makes clear he means it.
 
 To fix:
 [ ] Size (Scale) arrows: closer, but still not placed/turned exactly like 3D Builder at every angle. Jon will show
-    more side-by-side views; match them one angle at a time. (Move arrows are right: don't touch them.)
+    more side-by-side views; match them one angle at a time. (Move arrows: changed on Jon's request in 0.17.6, one on every side at the middle height.)
 [ ] General rule: match 3D Builder's look and feel as closely as possible without removing any tools.
 [ ] General rule: HELP COMES FIRST. Every change that needs explaining gets its Help page (with pictures) updated
     in the same version. A great app is pointless if only Jon knows how to use it.
@@ -73,6 +79,62 @@ Long-term goals (not now):
 From Jon's "fix list.rtf":
 
 Done:
+VERSION 0.17.11 (Oct 24, 2026)
+[x] Help > 3DJames box: storage rewritten for the box server 1.0.2 - adding a NAS share (with the
+    \\192.168.1.166\Jon\3D Objects example, no-password shares), and USB drives ("Use this drive"), new pictures.
+
+VERSION 0.17.10 (Oct 24, 2026)
+[x] Move arrows like 3D Builder: up close a set spot and size on the object (as in 0.17.9); zoomed out they don't
+    shrink below about 32 px and move out along the middle of their side to stay clear of the object. All six,
+    always centered. All handles blue (no green for the last direction used, none on the split plane).
+
+VERSION 0.17.9 (Oct 24, 2026)
+[x] Move arrows: their length is fixed to the object too (a tenth of its size, at least 6 mm), not a pixel size, so
+    zooming out shrinks them with the object instead of piling them up around it. Spots and show / hide as before;
+    too small to see on screen: hidden.
+
+VERSION 0.17.8 (Oct 24, 2026)
+[x] Move arrows back to their old length (about 40 px); same fixed spots and the same show / hide rules as 0.17.7.
+
+VERSION 0.17.7 (Oct 24, 2026)
+[x] Move arrows fixed to the object (0.17.6 moved them with the view: pixel distances, an arrow jumping beside the
+    outline, made-up stubs). Now each arrow has a fixed spot in the scene: centered on its side, side ones at the
+    middle height, the bottom one right under the object, a set distance out, sized to the object. Hidden only when
+    you couldn't see it: behind the object (taken as a solid block, so nothing shows through openings), under the
+    floor seen from above, or pointing nearly straight at you.
+
+VERSION 0.17.6 (Oct 24, 2026)
+[x] Move arrows on every side of the picked object (Jon's request): left/right and front/back at the middle of the
+    object's height (the front-back one used to sit on the floor), plus above and below for up-down. Arrows hidden
+    behind the object are left out; left and right always both show; one pointing straight at you stays as a
+    small slanted arrow in the middle of that side.
+
+VERSION 0.17.5 (Oct 24, 2026)
+[x] Drag shapes from the Insert toolbar into the view, like 3D Builder: they land where you let go, on the floor or on
+    top of another object (on the face under the pointer). A see-through copy of the shape shows where while you drag;
+    a click still adds it beside the others. Works with a finger too (sliding along the toolbar still scrolls it).
+
+VERSION 0.17.4 (Oct 21, 2026)
+[x] 0.17.3 did not fix Jon's DEWALT logo: that sketch had a leftover Move step (an even resize from an older
+    version), so sizing still treated it as a combined object and made a mesh. A shape followed only by
+    Move steps (moves, turns, even resizes) now has them taken into the shape (after a build, and before sizing):
+    it looks the same, Height in Properties shows its real thickness (= the Y you see), and sizing Y changes Height.
+    Tested on the real project file (Projects/dewalt screwdriver sketch.3dj).
+
+VERSION 0.17.3 (Oct 20, 2026)
+[x] Sizing a shape turned on its side (a sketch on an upright face): the bottom bar's X / Y / Z now change the
+    shape's own numbers for any quarter turn, so sizing across the face changes the sketch's Height and it stays
+    a sketch (before: Y made it a mesh).
+[x] Such a shape keeps its base where it is when its height changes (bottom bar or Height in Properties, typed
+    or with the slider): a logo on a face grows out of the face instead of half into it and drifting up.
+
+VERSION 0.17.2 (Oct 20, 2026)
+[x] Sketch: with two or more outlines that each have a hole (letters like D and A), one could go missing from
+    the solid (the DEWALT logo lost its D). Each outline now gets its own holes cut first, then the pieces are
+    joined (works around a bug in replicad's 2D cut). Also fixes Merge touching outlines and Sweep profiles.
+[x] Import DXF / SVG: line ends less than 0.01 mm apart are joined (an outline that ends a hair short of its
+    start in the file, like the W in that logo, now closes).
+
 VERSION 0.17.1 (Oct 20, 2026)
 [x] Help reorganised: 28 topics in 7 fold-out chapters (Start here, Tutorials, Shapes and objects, Sketching,
     View measure and files, Tablets and the 3DJames box, Reference). Each page says where it sits
@@ -84,6 +146,8 @@ VERSION 0.17.1 (Oct 20, 2026)
     History, variables and versions (Variables were not documented), a first-part walkthrough in
     Getting started, flat faces and the Workplane. New pictures; Spin around pictures retaken.
     Page order lives in help/pages/contents.json.
+[x] Help: the topic list on the left stays where you scrolled it when you open a chapter or pick a topic
+    (the line you clicked stays still).
 
 VERSION 0.17.0 (Oct 20, 2026)
 [x] Sketch tools (ideas from SolidCraft, kept simple; Help: More sketch tools):

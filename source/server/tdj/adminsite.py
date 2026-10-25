@@ -6,9 +6,9 @@ import re
 import socket
 import time
 
-from . import system
+from . import smbstore, system
 from .config import USERNAME, hash_password
-from .files import free_space
+from .files import clean_parts
 from .web import Handler, Response, cookie, js
 
 COOKIE = 'tdjadmin'
@@ -82,11 +82,16 @@ def make_handler(ctx):
         d = cfg.public()
         places = {}
         for pid, p in d['places'].items():
-            root = cfg.place_root(pid)
-            ok = os.path.isdir(root) if p['type'] == 'local' else os.path.ismount(root)
-            places[pid] = {**p, 'connected': ok, 'space': free_space(root) if ok else None, 'used': place_users(pid)}
+            ok, space, why = ctx.files.place_status(pid)
+            places[pid] = {**p, 'connected': ok, 'space': space, 'problem': why, 'used': place_users(pid)}
         d['places'] = places
-        return js({'ok': True, 'me': me, 'config': d, 'app': ctx.app.info(), 'previousApp': ctx.app.info(ctx.app.previous),
+        usb = None  # USB drives plugged into the box (only on the box itself)
+        if system.helper_available():
+            r = system.helper('usb-list', timeout=20)
+            if r.get('ok'):
+                taken = {p.get('uuid'): pid for pid, p in d['places'].items() if p['type'] == 'usb'}
+                usb = [{**x, 'place': taken.get(x.get('uuid'))} for x in r.get('drives', [])]
+        return js({'ok': True, 'me': me, 'config': d, 'usb': usb, 'app': ctx.app.info(), 'previousApp': ctx.app.info(ctx.app.previous),
                    'server': ctx.version, 'host': socket.gethostname(), 'appPort': ctx.app_port, 'adminPort': ctx.admin_port,
                    'helper': system.helper_available(), 'dropFolder': ctx.drop_dir})
 
@@ -106,7 +111,7 @@ def make_handler(ctx):
         for f in folders or []:
             if f.get('place') not in cfg.data['places']:
                 raise ValueError(f'Unknown storage place "{f.get("place")}".')
-            path = '/'.join(p for p in str(f.get('path', '')).replace('\\', '/').split('/') if p and p not in ('.', '..'))
+            path = '/'.join(clean_parts(f.get('path', '')))
             out.append({'label': (f.get('label') or 'Files').strip()[:40], 'place': f['place'], 'path': path, 'write': bool(f.get('write', True))})
         return out
 
@@ -141,12 +146,7 @@ def make_handler(ctx):
             cfg.data['users'][name] = u
             cfg.save()
         for f in u['folders']:  # make the folders right away where possible
-            root = cfg.place_root(f['place'])
-            try:
-                if cfg.data['places'][f['place']]['type'] == 'local' or os.path.ismount(root):
-                    os.makedirs(os.path.join(root, f['path']), exist_ok=True)
-            except OSError:
-                pass
+            ctx.files.make_folder(f['place'], f['path'])
         return js({'ok': True})
 
     @need_admin
@@ -167,52 +167,61 @@ def make_handler(ctx):
     def place_save(req, me):
         b = req.json()
         typ = b.get('type')
-        if typ not in ('local', 'smb', 'nfs'):
-            raise ValueError('Pick a kind of storage.')
         pid = (b.get('id') or '').strip().lower()
-        isnew = not pid
-        if isnew:
+        old = cfg.data['places'].get(pid) if pid else None
+        if typ not in ('smb', 'usb') and not (old and old['type'] == typ):
+            raise ValueError('Pick a kind of storage.')
+        if not pid:
             base = re.sub(r'[^a-z0-9-]', '-', (b.get('label') or typ).lower()).strip('-')[:16] or typ
             pid, k = base, 2
             while pid in cfg.data['places']:
                 pid, k = f'{base}-{k}', k + 1
         if not PLACE_ID.match(pid):
             raise ValueError('Bad place id.')
-        old = cfg.data['places'].get(pid)
         if old and old['type'] != typ:
             raise ValueError('The kind of a storage place cannot change. Add a new one instead.')
-        p = {'label': (b.get('label') or pid).strip()[:40], 'type': typ}
-        if typ == 'local':
-            path = (b.get('path') or '').strip()
-            if path and not os.path.isabs(path):
-                raise ValueError('Type the full path of the folder, starting with / (like /srv/3djames).')
-            p['path'] = path if pid != 'box' else ''
-            if path:
-                os.makedirs(path, exist_ok=True)
-        elif typ == 'smb':
-            for k in ('server', 'share'):
-                if not (b.get(k) or '').strip():
-                    raise ValueError('Type the NAS name (or address) and the share name.')
-            p.update({k: (b.get(k) or '').strip() for k in ('server', 'share', 'username', 'domain', 'vers')})
-        else:
-            if not (b.get('server') or '').strip() or not (b.get('export') or '').strip():
-                raise ValueError('Type the NAS name (or address) and the exported folder (like /volume1/3djames).')
-            p.update({k: (b.get(k) or '').strip() for k in ('server', 'export')})
-        msg = ''
-        if typ != 'local':
-            spec = dict(p, id=pid)
-            if b.get('password') is not None and b.get('password') != '':
-                spec['password'] = b['password']
-            elif old:
-                spec['keepPassword'] = True
-            r = system.helper('mount-place', pid, stdin=json.dumps(spec), timeout=90)
+        p = dict(old or {}, label=(b.get('label') or (old or {}).get('label') or pid).strip()[:40], type=typ)
+        msg = 'Saved.'
+        if typ == 'smb':
+            server, share = (b.get('server') or '').strip(), (b.get('share') or '').strip().strip('\\/')
+            server = server.replace('\\', '/').strip('/')
+            if '/' in server:  # \\nas\share (as Windows shows it) typed into the NAS box
+                server, _, rest = server.partition('/')
+                share = share or rest.split('/')[0]
+            if not server or not share:
+                raise ValueError('Type the NAS name (or address) and the share name.')
+            p.update(server=server, share=share, username=(b.get('username') or '').strip(), domain=(b.get('domain') or '').strip())
+            for k in ('vers', 'vers_used'):
+                p.pop(k, None)
+            password = b.get('password') or ''
+            if not password and old and p['username'] and p['username'] == old.get('username'):
+                password = cfg.secret(pid)  # left empty: keep it
+            test = smbstore.SmbShare(p['server'], p['share'], p['username'], password, p['domain'])
+            try:
+                test.test_write([])  # can it really save there? (a small test file, deleted right away)
+                msg = 'Connected. 3DJames can open and save files there.'
+            except smbstore.SmbError as e:
+                raise ValueError(str(e))
+            finally:
+                test.close()
+            cfg.set_secret(pid, password)
+            ctx.files.drop_share(pid)
+        elif typ == 'usb' and not old:
+            uuid = (b.get('uuid') or '').strip()
+            drive = next((x for x in (system.helper('usb-list', timeout=20).get('drives') or []) if x.get('uuid') == uuid), None)
+            if not uuid or not drive:
+                raise ValueError('That USB drive is not plugged in (any more).')
+            if any(x.get('uuid') == uuid for x in cfg.data['places'].values() if x['type'] == 'usb'):
+                raise ValueError('That USB drive is already in use here.')
+            p.update(uuid=uuid, fstype=drive.get('fstype', ''), name=drive.get('name', ''))
+            r = system.helper('mount-place', pid, stdin=json.dumps({'type': 'usb', 'uuid': uuid, 'fstype': p['fstype']}), timeout=90)
             if not r.get('ok'):
-                raise ValueError(r.get('message') or 'Could not connect to the NAS.')
-            msg = r.get('message', '')
+                raise ValueError(r.get('message') or 'Could not use that USB drive.')
+            msg = r.get('message') or 'Ready.'
         with cfg.lock:
             cfg.data['places'][pid] = p
             cfg.save()
-        return js({'ok': True, 'id': pid, 'message': msg or 'Saved.'})
+        return js({'ok': True, 'id': pid, 'message': msg})
 
     @need_admin
     def place_delete(req, me):
@@ -222,7 +231,10 @@ def make_handler(ctx):
         if place_users(pid):
             raise ValueError('Users (or the shared folder) still keep files there: move them first.')
         p = cfg.data['places'].get(pid)
-        if p and p['type'] != 'local':
+        if p and p['type'] == 'smb':
+            ctx.files.drop_share(pid)
+            cfg.set_secret(pid, None)
+        elif p and p['type'] != 'local':
             system.helper('forget-place', pid)
         with cfg.lock:
             cfg.data['places'].pop(pid, None)
@@ -232,6 +244,16 @@ def make_handler(ctx):
     @need_admin
     def place_connect(req, me):
         pid = req.json().get('id')
+        p = cfg.data['places'].get(pid)
+        if not p:
+            raise ValueError('That storage place no longer exists.')
+        if p['type'] == 'smb':
+            ctx.files.drop_share(pid)
+            try:
+                ctx.files.share_of(pid).check()
+            except smbstore.SmbError as e:
+                raise ValueError(str(e))
+            return js({'ok': True, 'message': 'Connected.'})
         r = system.helper('mount-place', pid, stdin=json.dumps({'id': pid, 'reconnect': True}), timeout=90)
         return js(r, 200 if r.get('ok') else 400)
 
@@ -241,7 +263,7 @@ def make_handler(ctx):
         b = req.json()
         if b.get('place') not in cfg.data['places']:
             raise ValueError('Pick where the shared folder is kept.')
-        path = '/'.join(p for p in str(b.get('path') or 'shared').replace('\\', '/').split('/') if p and p not in ('.', '..'))
+        path = '/'.join(clean_parts(b.get('path') or 'shared'))
         with cfg.lock:
             cfg.data['shared'] = {'enabled': bool(b.get('enabled')), 'label': (b.get('label') or 'Shared').strip()[:40], 'place': b['place'], 'path': path, 'write': bool(b.get('write', True))}
             cfg.save()

@@ -69,8 +69,9 @@ class Request:
 
 
 class Response:
-    def __init__(self, status=200, body=b'', ctype='text/plain; charset=utf-8', headers=None, file=None):
+    def __init__(self, status=200, body=b'', ctype='text/plain; charset=utf-8', headers=None, file=None, remove_file=False):
         self.status, self.body, self.ctype, self.headers, self.file = status, body, ctype, dict(headers or {}), file
+        self.remove_file = remove_file  # file is a temporary copy: delete it once sent
 
 
 def js(obj, status=200, headers=None):
@@ -143,6 +144,12 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(res.body)
         except (BrokenPipeError, ConnectionResetError):
             self.close_connection = True
+        finally:
+            if res.file and res.remove_file:
+                try:
+                    os.remove(res.file)
+                except OSError:
+                    pass
 
     do_GET = do_POST = do_PUT = do_DELETE = do_HEAD = handle_any
 

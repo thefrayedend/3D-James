@@ -1,4 +1,4 @@
-// 3DJames admin page: set up the box, users and their folders, storage places (this box or a NAS), the shared
+// 3DJames admin page: set up the box, users and their folders, storage places (this box, a USB drive or a NAS), the shared
 // folder, app updates, network and the box itself. Talks to the admin API of 3djames_server.py.
 'use strict';
 
@@ -118,46 +118,63 @@ function editUser(name) {
 // ---------------------------------------------------------------- storage places
 function storage() {
   const P = S.config.places;
-  const kind = { local: 'Folder on this box', smb: 'Network share (Windows / SMB)', nfs: 'Network share (NFS)' };
+  const kind = { local: 'On this box', usb: 'USB drive', smb: 'NAS share (Windows file sharing)', nfs: 'Network share (NFS)' };
+  const where = (p) => p.type === 'local' ? (p.path || 'the SD card') : p.type === 'smb' ? `\\\\${p.server}\\${p.share}` : p.type === 'usb' ? (p.name || 'USB drive') : `${p.server}:${p.export}`;
+  const status = (p) => p.connected ? (p.type === 'usb' ? 'ready' : p.type === 'local' ? 'ready' : 'connected') : p.type === 'usb' ? 'not plugged in' : 'not connected';
   const rows = Object.entries(P).map(([id, p]) => h('tr', {},
     h('td', {}, h('b', {}, p.label), h('div', { class: 'muted' }, kind[p.type])),
-    h('td', { class: 'muted' }, p.type === 'local' ? (p.path || 'the SD card') : p.type === 'smb' ? `\\\\${p.server}\\${p.share}` : `${p.server}:${p.export}`),
-    h('td', {}, h('span', { class: 'pill ' + (p.connected ? 'ok' : 'bad') }, p.connected ? 'connected' : 'not connected'), p.space ? h('div', { class: 'muted' }, `${gb(p.space.free)} free of ${gb(p.space.total)}`) : null),
+    h('td', { class: 'muted' }, where(p)),
+    h('td', {}, h('span', { class: 'pill ' + (p.connected ? 'ok' : 'bad') }, status(p)),
+      p.space ? h('div', { class: 'muted' }, `${gb(p.space.free)} free of ${gb(p.space.total)}`) : null,
+      !p.connected && p.problem && p.type !== 'usb' ? h('div', { class: 'muted' }, p.problem) : null),
     h('td', { class: 'muted' }, p.used.length ? `Used by ${p.used.join(', ')}` : 'Not used yet'),
-    h('td', {}, p.type !== 'local' ? h('button', { class: 'btn', onclick: run(async () => { const r = await api('/api/place/connect', { id }); toast(r.message || 'Connected.'); await load(); }) }, 'Reconnect') : null,
+    h('td', {}, p.type !== 'local' ? h('button', { class: 'btn', onclick: run(async () => { const r = await api('/api/place/connect', { id }); toast(r.message || 'Connected.'); await load(); }) }, p.type === 'usb' ? 'Check' : 'Reconnect') : null,
       id !== 'box' ? h('button', { class: 'btn', onclick: () => editPlace(id) }, 'Edit') : null)));
-  $('main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Where files are kept'),
-    h('p', { class: 'muted' }, 'Each person\'s folders are inside one of these. Keep everything on this box (the SD card), or on your NAS so it is backed up with everything else.'),
+  const cards = [h('div', { class: 'card' }, h('h2', {}, 'Where files are kept'),
+    h('p', { class: 'muted' }, 'Each person\'s folders are inside one of these: this box (the SD card), a USB drive plugged into the box, or a share on your NAS (so it is backed up with everything else).'),
     h('table', {}, h('tr', {}, h('th', {}, 'Place'), h('th', {}, 'Where'), h('th', {}, 'Status'), h('th', {}, ''), h('th', {}, '')), rows),
-    h('div', { class: 'btns' }, h('button', { class: 'btn primary', onclick: () => editPlace(null, 'smb') }, 'Add a NAS share'), h('button', { class: 'btn', onclick: () => editPlace(null, 'local') }, 'Add a folder on this box'))));
+    h('div', { class: 'btns' }, h('button', { class: 'btn primary', onclick: () => editPlace(null, 'smb') }, 'Add a NAS share')),
+    h('p', { class: 'muted' }, 'Next: give people a folder there (Users tab > Edit > Add a folder, and pick it under "storage place").'))];
+  if (S.usb) {
+    const free = S.usb.filter((d) => !d.place);
+    cards.push(h('div', { class: 'card' }, h('h2', {}, 'USB drives'),
+      free.length ? h('table', {}, free.map((d) => h('tr', {},
+        h('td', {}, h('b', {}, d.name), h('div', { class: 'muted' }, `${gb(d.size)} · ${d.fstype}`)),
+        h('td', {}, h('button', { class: 'btn primary', onclick: run(async () => {
+          toast('Getting the drive ready…');
+          const r = await api('/api/place/save', { type: 'usb', uuid: d.uuid, label: d.name === 'USB drive' ? 'USB drive' : `USB: ${d.name}` }); toast(r.message || 'Ready.'); tab = 'storage'; await load();
+        }) }, 'Use this drive')))))
+        : h('p', { class: 'muted' }, S.usb.length ? 'Every USB drive plugged in is already in the list above.' : 'No USB drive is plugged in. Plug one into the box (formatted by Windows or a Mac: exFAT, FAT32 or NTFS), then click Look again.'),
+      h('p', { class: 'muted' }, 'Files are kept in normal folders on the drive, so you can also plug it into a PC and see them. Wait until saving has finished before you pull the drive out.'),
+      h('div', { class: 'btns' }, h('button', { class: 'btn', onclick: run(async () => { await load(); }) }, 'Look again'))));
+  }
+  $('main').replaceChildren(...cards);
 }
 function editPlace(id, newType) {
-  const p = id ? S.config.places[id] : { type: newType, label: newType === 'local' ? 'USB drive' : 'NAS' };
+  const p = id ? S.config.places[id] : { type: newType, label: 'NAS' };
   const label = input({ value: p.label }), fields = { label };
   const body = [field('Name shown in 3DJames and here', label)];
-  if (p.type === 'local') { fields.path = input({ value: p.path || '', placeholder: '/media/usb/3djames' }); body.push(field('Folder on this box', fields.path, 'The full path, like a USB drive\'s folder. Made if it is not there.')); }
-  else {
-    if (!id) { fields.type = h('select', { onchange: (e) => editPlace(null, e.target.value) }, h('option', { value: 'smb', selected: p.type === 'smb' }, 'Windows / SMB share (most NAS boxes)'), h('option', { value: 'nfs', selected: p.type === 'nfs' }, 'NFS share')); body.push(field('Kind', fields.type)); }
-    fields.server = input({ value: p.server || '', placeholder: 'mynas.local or 192.168.1.20' }); body.push(field('NAS name or address', fields.server));
-    if (p.type === 'smb') {
-      fields.share = input({ value: p.share || '', placeholder: '3djames' }); fields.username = input({ value: p.username || '', autocapitalize: 'none' });
-      fields.password = input({ type: 'password', placeholder: id ? 'leave empty to keep it' : '' }); fields.domain = input({ value: p.domain || '', placeholder: '(usually empty)' });
-      fields.vers = h('select', {}, ['', '3.0', '2.1', '2.0', '1.0'].map((v) => h('option', { value: v, selected: (p.vers || '') === v }, v ? `SMB ${v}` : 'Automatic')));
-      body.push(h('div', { class: 'row' }, field('Share name', fields.share), field('NAS user name', fields.username), field('NAS password', fields.password)),
-        h('div', { class: 'row' }, field('Domain / workgroup', fields.domain), field('SMB version', fields.vers, 'Leave on Automatic unless connecting fails.')),
-        h('p', { class: 'muted' }, 'Tip: on the NAS, make a share (for example "3djames") and a NAS user just for this box with read and write access to it. Everyone\'s folders go inside that share; 3DJames keeps people out of each other\'s folders.'));
-    } else {
-      fields.export = input({ value: p.export || '', placeholder: '/volume1/3djames' }); body.push(field('Exported folder', fields.export, 'The NAS must allow this box\'s address to read and write it.'));
-    }
+  if (p.type === 'local') { fields.path = input({ value: p.path || '', placeholder: '/srv/3djames' }); body.push(field('Folder on this box', fields.path, 'The full path. Made if it is not there.')); }
+  else if (p.type === 'usb') body.push(h('p', { class: 'muted' }, `The USB drive "${p.name || 'USB drive'}". Files stay on the drive when you remove it here.`));
+  else if (p.type === 'smb') {
+    fields.server = input({ value: p.server || '', placeholder: '192.168.1.20 or mynas.local' });
+    fields.share = input({ value: p.share || '', placeholder: 'Files' }); fields.username = input({ value: p.username || '', autocapitalize: 'none' });
+    fields.password = input({ type: 'password', placeholder: id && p.username ? 'leave empty to keep it' : '' }); fields.domain = input({ value: p.domain || '', placeholder: '(usually empty)' });
+    body.push(h('div', { class: 'row' }, field('NAS name or address', fields.server, 'Like 192.168.1.20. (In Windows it is the part after \\\\.)'), field('Share name', fields.share, 'The first folder under the NAS, like Files.')),
+      h('div', { class: 'row' }, field('NAS user name', fields.username, 'Leave empty if the share needs no password.'), field('NAS password', fields.password), field('Domain / workgroup', fields.domain)),
+      h('p', { class: 'muted' }, 'Example: if Windows shows the folder as \\\\192.168.1.166\\Jon\\3D Objects, the NAS address is 192.168.1.166 and the share name is Jon. Pick the "3D Objects" folder inside it later, when you give someone a folder (Users tab). 3DJames keeps people out of each other\'s folders.'));
+  } else {
+    fields.server = input({ value: p.server || '' }); fields.export = input({ value: p.export || '' });
+    body.push(field('NAS name or address', fields.server), field('Exported folder', fields.export));
   }
   const save = run(async () => {
-    const b = { id, type: fields.type?.value || p.type };
-    for (const [k, el] of Object.entries(fields)) if (k !== 'type') b[k] = el.value;
-    toast('Connecting…');
+    const b = { id, type: p.type };
+    for (const [k, el] of Object.entries(fields)) b[k] = el.value;
+    if (p.type === 'smb') toast('Connecting… (3DJames saves a small test file there and deletes it again)');
     const r = await api('/api/place/save', b); toast(r.message || 'Saved.'); tab = 'storage'; await load();
   });
-  $('main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, id ? `Edit ${p.label}` : p.type === 'local' ? 'Add a folder on this box' : 'Add a NAS share'), ...body,
-    h('div', { class: 'btns' }, h('button', { class: 'btn primary', onclick: save }, p.type === 'local' ? 'Save' : 'Save and connect'), h('button', { class: 'btn', onclick: () => load() }, 'Cancel'),
+  $('main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, id ? `Edit ${p.label}` : 'Add a NAS share'), ...body,
+    h('div', { class: 'btns' }, h('button', { class: 'btn primary', onclick: save }, p.type === 'smb' ? 'Save and connect' : 'Save'), h('button', { class: 'btn', onclick: () => load() }, 'Cancel'),
       id ? h('button', { class: 'btn danger', onclick: run(async () => { if (!confirm(`Remove ${p.label}? Files on it are not deleted.`)) return; await api('/api/place/delete', { id }); toast('Removed.'); await load(); }) }, 'Remove') : null)));
 }
 

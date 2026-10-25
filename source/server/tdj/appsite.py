@@ -108,10 +108,9 @@ def make_handler(ctx):
     @need_user
     @file_errors
     def get_file(req, u):
-        p, st = files.stat(u, req.query.get('folder'), req.query.get('path', ''))
-        from .files import etag_of
-        return Response(200, ctype='application/octet-stream', file=p,
-                        headers={'ETag': etag_of(st), 'X-Modified': str(int(st.st_mtime * 1000)), 'Cache-Control': 'no-store'})
+        p, temp, it = files.open(u, req.query.get('folder'), req.query.get('path', ''))
+        return Response(200, ctype='application/octet-stream', file=p, remove_file=temp,
+                        headers={'ETag': it.etag, 'X-Modified': str(it.mtime_ms), 'Cache-Control': 'no-store'})
 
     @need_user
     @file_errors

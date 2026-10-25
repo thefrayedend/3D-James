@@ -25,11 +25,18 @@
 <figure><img src="box-setup.jpg" alt="The admin page's first screen: Welcome to your 3DJames box, with boxes for the sign-in name, your name and the password"><figcaption>The first time: make the admin account.</figcaption></figure>
 <figure><img src="box-users.jpg" alt="The admin page's Users tab: Jon (admin) and Sarah, each with My files on the box and the shared folder"><figcaption>The Users tab: who can sign in, and their folders.</figcaption></figure>
 <h2>Where the files are kept</h2>
-<p>On the <b>Storage</b> tab: <b>This box</b> (its SD card) is always there. Add a <b>NAS share</b> to keep everyone's designs on your NAS (so they are backed up with everything else), or a folder on a USB drive plugged into the box. Then, on the Users tab, pick for each person where their folders are.</p>
-<figure><img src="box-nas.jpg" alt="Adding a NAS share: name, NAS address, share name, NAS user name and password"><figcaption>Adding a NAS share. On the NAS, make a share (for example "3djames") and a NAS user just for the box, with read and write access. Everyone's folders go inside it; 3DJames keeps people out of each other's folders.</figcaption></figure>
+<p>On the <b>Storage</b> tab: <b>This box</b> (its SD card) is always there. You can also keep everyone's designs on a <b>NAS share</b> (so they are backed up with everything else), or on a <b>USB drive</b> plugged into the box. Then, on the Users tab, pick for each person where their folders are (Edit &gt; Add a folder &gt; pick the place, and the folder inside it).</p>
+<figure><img src="box-nas.jpg" alt="Adding a NAS share: name, NAS address, share name, NAS user name and password"><figcaption>Adding a NAS share: <b>Add a NAS share</b>, type the NAS address and the share name, then <b>Save and connect</b>.</figcaption></figure>
 <ul>
-<li>Windows/SMB shares work with nearly every NAS (Synology, QNAP, TrueNAS, a Windows PC). NFS works too.</li>
-<li>If the NAS is off for a while, the box connects again by itself when it is back. Folders on it can't be used meanwhile.</li>
+<li>Example: if Windows shows the folder as <b>\\192.168.1.166\Jon\3D Objects</b>, the NAS address is <b>192.168.1.166</b> and the share name is <b>Jon</b>. "3D Objects" is the folder you pick later for a person.</li>
+<li>A share that opens without a password: leave the NAS user name and password empty. Otherwise type the same name and password you use on your PC.</li>
+<li>When you save, the box connects and saves (and deletes) a small test file, so you know straight away that it works. If not, it says what is wrong in plain words.</li>
+<li>Works with nearly every NAS (Synology, QNAP, TrueNAS, a Windows PC sharing a folder). If the NAS is off for a while, the box connects again by itself when it is back. Folders on it can't be used meanwhile.</li>
+</ul>
+<figure><img src="box-usb.jpg" alt="The Storage tab's USB drives card: a SanDisk drive with a Use this drive button"><figcaption>A USB drive plugged into the box shows up under <b>USB drives</b>: click <b>Use this drive</b>.</figcaption></figure>
+<ul>
+<li>USB drives formatted by Windows or a Mac work as they are (exFAT, FAT32 or NTFS). Nothing on the drive is erased: 3DJames keeps its files in normal folders, so you can also plug the drive into a PC and see them.</li>
+<li>Pulled the drive out? Plug it back in: it is ready again within a few seconds. Wait until a save has finished before you pull it out.</li>
 <li><b>Shared folder</b> tab: switch on a folder everyone you allow can use (tick "May use the shared folder" for each person). It can be read-only.</li>
 </ul>
 <h2>Updating 3DJames on the box</h2>

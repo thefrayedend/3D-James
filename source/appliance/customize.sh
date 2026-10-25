@@ -26,7 +26,7 @@ restore_apt() {
 }
 trap restore_apt EXIT
 PKGS="avahi-daemon libnss-mdns network-manager dnsmasq-base wpasupplicant iw rfkill wireless-regdb
-  sudo python3 ca-certificates dosfstools fdisk e2fsprogs util-linux curl tzdata cifs-utils nfs-common"
+  sudo python3 ca-certificates dosfstools fdisk e2fsprogs util-linux curl tzdata"
 
 # Writes /etc/apt/sources.list for one of several server choices.
 set_sources() {
@@ -76,8 +76,12 @@ done
 [ "$INSTALLED" = 1 ] || { echo "[customize] ERROR: could not install the system packages from any package server"; exit 1; }
 # Optional, nice to have; ignore if the distro calls them differently.
 apt-get install -y --no-install-recommends openssh-server || true
-# Samba: only for the optional "3DJames-update" network folder (switched off until the admin turns it on).
-apt-get install -y --no-install-recommends samba samba-common-bin || log "samba not available: the update folder will be missing"
+# Samba: for the optional "3DJames-update" network folder (switched off until the admin turns it on), and the NAS
+# self-test below.
+apt-get install -y --no-install-recommends samba samba-common-bin || log "samba not available"
+# USB drives formatted as exFAT or NTFS, for kernels without their own driver (the self-test checks what is there).
+apt-get install -y --no-install-recommends exfat-fuse || log "exfat-fuse not available"
+apt-get install -y --no-install-recommends ntfs-3g || log "ntfs-3g not available"
 
 # ---------------------------------------------------------------- user & folders
 if ! id threedjames >/dev/null 2>&1; then
@@ -89,6 +93,13 @@ install -d -o threedjames -g threedjames -m 775 /srv/3djames
 install -d -m 755 /var/lib/3djames-sys /tdjsetup /mnt/3djames
 install -d -m 700 /etc/3djames /etc/3djames/places
 chown -R root:root /opt/3djames
+# Every system file this image adds belongs to root (sudo refuses a sudoers folder owned by anyone else, and then the
+# server can't run its helper: no NAS shares, no Wi-Fi changes). Checked, so a broken image can't be shipped again.
+chown root:root /etc/sudoers.d /etc/sudoers.d/3djames /usr/local/sbin/3djames-helper
+chown -R root:root /usr/local/lib/3djames /etc/systemd/system/3djames*.service /etc/NetworkManager/conf.d /etc/NetworkManager/dnsmasq-shared.d /etc/avahi/services /etc/systemd/journald.conf.d
+chmod 755 /etc/sudoers.d /usr/local/sbin/3djames-helper; chmod 440 /etc/sudoers.d/3djames
+visudo -c >/dev/null || { echo "[customize] ERROR: the sudoers settings are not valid"; visudo -c; exit 1; }
+[ "$(stat -c %u /etc/sudoers.d)" = 0 ] && [ "$(stat -c %u /etc/sudoers.d/3djames)" = 0 ] || { echo "[customize] ERROR: /etc/sudoers.d must belong to root"; exit 1; }
 python3 -m py_compile /opt/3djames/server/3djames_server.py
 # Samba: off until the admin switches the update folder on
 mkdir -p /etc/samba
@@ -141,6 +152,128 @@ systemctl enable 3djames-firstboot.service 3djames-config.service 3djames-hotspo
 if [ -f /etc/network/interfaces ]; then
   sed -i -E '/^\s*(auto|allow-hotplug)\s+wlan[0-9]+/d; /^\s*iface\s+wlan[0-9]+/,/^\s*$/d' /etc/network/interfaces || true
 fi
+
+# ---------------------------------------------------------------- self-test (the build fails if any of this is wrong)
+# The admin page runs the root helper as the service user, through sudo, with no password: try exactly that.
+log "Self-test: the service user can run the root helper"
+out=$(runuser -u threedjames -- sudo -n /usr/local/sbin/3djames-helper build-selftest 2>&1 || true)
+echo "$out" | grep -q 'unknown command build-selftest' || { echo "[customize] ERROR: the server can't run its helper through sudo: $out"; exit 1; }
+for f in /etc/sudoers.d /etc/sudoers.d/3djames /usr/local/sbin/3djames-helper /usr/local/lib/3djames/tdjsys.py /opt/3djames/server/3djames_server.py; do
+  [ "$(stat -c %u "$f")" = 0 ] || { echo "[customize] ERROR: $f does not belong to root"; exit 1; }
+done
+for t in lsblk blkid findmnt; do command -v "$t" >/dev/null || { echo "[customize] ERROR: $t is missing (needed for USB drives)"; exit 1; }; done
+
+# USB drives: the board's own kernel must read USB sticks and the usual Windows/Mac formats.
+has_mod() {  # built into the kernel, or a module file
+  local d
+  for d in /lib/modules/*/; do
+    grep -q "/$1\.ko" "$d/modules.builtin" 2>/dev/null && return 0
+    [ -n "$(find "$d" -name "$1.ko*" -print -quit 2>/dev/null)" ] && return 0
+  done
+  return 1
+}
+log "Kernel support (for USB drives and NAS shares):"
+for m in usb-storage uas vfat exfat ntfs3 fuse ext4 cifs; do
+  if has_mod "$m"; then log "  $m: yes"; else log "  $m: no"; fi
+done
+has_mod usb-storage || { echo "[customize] ERROR: this kernel can't use USB drives (no usb-storage)"; exit 1; }
+has_mod vfat || { echo "[customize] ERROR: this kernel can't read FAT32 USB drives (no vfat)"; exit 1; }
+if ! has_mod exfat; then
+  { has_mod fuse && command -v mount.exfat-fuse >/dev/null; } || { echo "[customize] ERROR: no way to read exFAT USB drives (no exfat in the kernel, no exfat-fuse)"; exit 1; }
+fi
+has_mod ntfs3 || { has_mod fuse && command -v ntfs-3g >/dev/null; } || log "WARNING: NTFS USB drives can't be used (no ntfs3, no ntfs-3g)"
+
+# USB drives: a pretend drive (a FAT32 disk image, as Windows formats a stick) goes through what the admin page does:
+# get it ready, the server's user saves on it, "pulled out" (the box lets go of it), forgotten.
+log "Self-test: a USB drive"
+USBIMG=/tmp/tdj-usbtest.img
+rm -f "$USBIMG"; truncate -s 64M "$USBIMG"; mkfs.vfat -n TDJTEST "$USBIMG" >/dev/null
+LOOPU=$(losetup -f --show "$USBIMG")
+UUIDU=$(blkid -o value -s UUID "$LOOPU" || true)
+for _ in $(seq 1 30); do [ -e "/dev/disk/by-uuid/$UUIDU" ] && break; sleep 0.5; done
+if [ -n "$UUIDU" ] && [ -e "/dev/disk/by-uuid/$UUIDU" ]; then
+  helper() { /usr/local/sbin/3djames-helper "$@"; }
+  r=$(echo "{\"type\": \"usb\", \"uuid\": \"$UUIDU\", \"fstype\": \"vfat\"}" | helper mount-place usbtest || true)
+  echo "  get it ready: $r"
+  echo "$r" | grep -q '"ok": true' && echo "$r" | grep -q 'can open and save' || { echo "[customize] ERROR: a USB drive could not be got ready"; exit 1; }
+  runuser -u threedjames -- sh -c 'mkdir -p "/mnt/3djames/usbtest/users/jon" && echo test > "/mnt/3djames/usbtest/users/jon/a b.3dj" && cat "/mnt/3djames/usbtest/users/jon/a b.3dj" >/dev/null' \
+    || { echo "[customize] ERROR: the server can't save on a USB drive"; exit 1; }
+  r=$(echo '{"reconnect": true}' | helper mount-place usbtest || true)
+  echo "$r" | grep -q '"ok": true' || { echo "[customize] ERROR: a ready USB drive is not seen as ready: $r"; exit 1; }
+  rm -f "/dev/disk/by-uuid/$UUIDU"  # as if pulled out (a mounted disk image itself can't vanish)
+  r=$(echo '{"reconnect": true}' | helper mount-place usbtest || true)
+  echo "  pulled out: $r"
+  ! mountpoint -q /mnt/3djames/usbtest || { echo "[customize] ERROR: the box did not let go of a USB drive that was pulled out"; exit 1; }
+  helper forget-place usbtest >/dev/null
+else
+  log "WARNING: no /dev/disk/by-uuid on this build machine: the USB self-test was skipped"
+fi
+[ -n "$LOOPU" ] && losetup -d "$LOOPU" 2>/dev/null || true
+rm -f "$USBIMG" /etc/3djames/places/usbtest.json
+
+# NAS shares: the server talks to them itself (no kernel driver needed). Start a real test share here (Samba, one with
+# a user name and password, one anyone may open) and run the server from this image against it, as its own user: add
+# the share on the admin page, save, open, "someone else saved it", folders, delete. The image is not made otherwise.
+log "Self-test: saving to a NAS share"
+command -v smbd >/dev/null && command -v smbpasswd >/dev/null || { echo "[customize] ERROR: samba is missing (needed for the NAS self-test)"; exit 1; }
+SMBT=/tmp/tdj-smbtest
+rm -rf "$SMBT"; mkdir -p "$SMBT/share" "$SMBT/open" "$SMBT/state/ncalrpc"
+id tdjnas >/dev/null 2>&1 || useradd -M -s /usr/sbin/nologin tdjnas
+chown tdjnas "$SMBT/share"; chmod 777 "$SMBT/open"
+cat > "$SMBT/smb.conf" <<EOF
+[global]
+  workgroup = WORKGROUP
+  server role = standalone server
+  map to guest = Bad User
+  passdb backend = tdbsam:$SMBT/state/passdb.tdb
+  private dir = $SMBT/state
+  lock directory = $SMBT/state
+  state directory = $SMBT/state
+  cache directory = $SMBT/state
+  pid directory = $SMBT/state
+  ncalrpc dir = $SMBT/state/ncalrpc
+  log file = $SMBT/log.%m
+  smb ports = 445
+  disable netbios = yes
+  load printers = no
+  printing = bsd
+  printcap name = /dev/null
+  disable spoolss = yes
+[test]
+  path = $SMBT/share
+  read only = no
+  valid users = tdjnas
+[open]
+  path = $SMBT/open
+  read only = no
+  guest ok = yes
+  force user = nobody
+  create mask = 0666
+  force create mode = 0666
+  directory mask = 0777
+  force directory mode = 0777
+EOF
+printf 'nas-pass1\nnas-pass1\n' | smbpasswd -c "$SMBT/smb.conf" -s -a tdjnas >/dev/null
+# in its own process group: smbd stops its whole group when it ends, which would otherwise be this build
+setsid smbd -s "$SMBT/smb.conf" --foreground --no-process-group </dev/null >"$SMBT/smbd.out" 2>&1 &
+python3 -c "
+import socket, time
+for _ in range(60):
+    try:
+        socket.create_connection(('127.0.0.1', 445), 1).close(); break
+    except OSError:
+        time.sleep(0.5)
+else:
+    raise SystemExit('the test share did not start')" || { cat "$SMBT/smbd.out" "$SMBT"/log.* 2>/dev/null | tail -40; exit 1; }
+chmod 644 /tmp/selftest-nas.py
+nas_ok=1
+runuser -u threedjames -- python3 /tmp/selftest-nas.py 127.0.0.1 test --user tdjnas --password nas-pass1 || nas_ok=0
+runuser -u threedjames -- python3 /tmp/selftest-nas.py 127.0.0.1 open "3D Objects" || nas_ok=0
+for p in /proc/[0-9]*; do grep -qa "$SMBT/smb.conf" "$p/cmdline" 2>/dev/null && kill "${p#/proc/}" 2>/dev/null; done; sleep 1  # stop the test share
+[ "$nas_ok" = 1 ] || { cat "$SMBT"/log.* 2>/dev/null | tail -60; echo "[customize] ERROR: saving to a NAS share does not work in this image"; exit 1; }
+userdel tdjnas 2>/dev/null || true
+rm -rf "$SMBT" /tmp/selftest-nas.py
+log "Self-test passed"
 
 # ---------------------------------------------------------------- tidy up
 restore_apt; trap - EXIT

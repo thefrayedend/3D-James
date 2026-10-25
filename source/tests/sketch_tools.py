@@ -220,6 +220,21 @@ async def main():
     check('SVG in mm: the rectangle (30 x 20), the circle (r 10) and an open arc', len(rect) == 1 and near(bounds(rect[0])[2] - bounds(rect[0])[0], 30) and near(bounds(rect[0])[3] - bounds(rect[0])[1], 20)
           and len(circ) == 1 and near(circ[0]['r'], 10) and len(arc) == 1 and arc[0].get('bulge') and near(abs(arc[0]['bulge'][0]), 1, 1e-6), ls)
     check('…placed with its middle on the center of the sketch', near(circ[0]['c'][0], 70 - 45) and near(circ[0]['c'][1], 27.5 - 25), circ)
+    # a path that ends a hair short of its start (rounding in the file) still closes into an outline
+    gap = '<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100"><path d="M10 10 L60 10 L60 40 L10 40 L10.004 10.003"/></svg>'
+    r = await ev("(t)=>__k.readDrawing('gap.svg', t)", gap)
+    await board(); await ev("(t)=>{ const r=__k.readDrawing('gap.svg', t); __k.addImported(r.loops, 'keep'); }", gap)
+    ls = await L()
+    check('an SVG outline that ends 0.004 mm short of its start is closed on import', len(ls) == 1 and ls[0]['type'] == 'poly' and len(ls[0]['pts']) == 4, ls)
+    # several outlines that each have a hole (letters like D and A): every one becomes solid
+    two = [{'type': 'poly', 'pts': [[0, 0], [30, 0], [30, 20], [0, 20]]}, {'type': 'poly', 'pts': [[5, 5], [25, 5], [25, 15], [5, 15]]},
+           {'type': 'poly', 'pts': [[40, 0], [60, 0], [60, 20], [40, 20]]}, {'type': 'poly', 'pts': [[45, 5], [55, 5], [55, 15], [45, 15]]},
+           {'type': 'circle', 'c': [80, 10], 'r': 8}, {'type': 'circle', 'c': [80, 10], 'r': 3}]
+    vol = await ev("""async(ls)=>{ const before=new Set(__3dj.app.results.bodies.keys()); __3dj.commands.addShape('sketch', { loops: ls, h: 2 }, 'Holes');
+      await new Promise(r=>setTimeout(r,300)); while (__3dj.app.building) await new Promise(r=>setTimeout(r,100)); await new Promise(r=>setTimeout(r,200));
+      const id=[...__3dj.app.results.bodies.keys()].find(k=>!before.has(k)); return __3dj.app.results.bodies.get(id)?.volume; }""", two)
+    want = 2 * ((600 - 200) + (400 - 100) + math.pi * (64 - 9))
+    check('three outlines that each have a hole all become solid (none goes missing)', vol and near(vol, want, 0.5), [vol, want])
     bad = await ev("()=>{ try { __k.readDrawing('x.dxf', 'hello'); return 'no error'; } catch (e) { return e.message; } }")
     check('a file that is not a DXF says so', 'not a DXF' in bad, bad)
     # Done after an import makes the solid as usual
@@ -227,6 +242,39 @@ async def main():
     if await ev("()=>!!document.querySelector('dialog.modal')"):
       await ev("()=>[...document.querySelectorAll('dialog.modal button')].find(b=>b.textContent==='Finish without them').click()")
     check('Done with an imported drawing finishes', await ev("()=>!!window.__done"))
+
+    # a sketch standing on an upright face: sizing across the face (Y here) changes its height, it stays a sketch, and
+    # it grows out of the face (its back stays put), the same as changing Height in Properties
+    await ev("()=>{ document.querySelector('.sketch') && window.__k?.close(); __3dj.commands.newProject(); }"); await pg.wait_for_timeout(800)
+    await ev("""()=>{ const C=__3dj.commands, A=__3dj.app; C.createSketch([{type:'poly',pts:[[-20,-10],[20,-10],[20,10],[-20,10]]}], [], {mode:'extrude', h:2, cut:false}, null);
+      window.__id=A.sel[0]; A.settings.lock=false; }""")
+    built = "async()=>{ await new Promise(r=>setTimeout(r,300)); while (__3dj.app.building) await new Promise(r=>setTimeout(r,100)); await new Promise(r=>setTimeout(r,300)); while (__3dj.app.building) await new Promise(r=>setTimeout(r,100)); }"
+    await ev(built)
+    await ev("()=>{ __3dj.store.commit((doc)=>{ const g=doc.features.find(x=>x.type==='shape'&&x.body===window.__id); g.rot=[90,0,0]; g.pos=[0,-30,20]; }); }"); await ev(built)
+    box = lambda: ev("()=>__3dj.app.results.bodies.get(window.__id).bbox.map(v=>v.map(x=>Math.round(x*1000)/1000))")
+    state = lambda: ev("()=>{ const f=__3dj.store.doc.features.filter(x=>x.body===window.__id); return {solid:__3dj.app.results.bodies.get(window.__id).solid, h:f[0].p.h, steps:f.length}; }")
+    b0 = await box()
+    await ev("()=>{ __3dj.vp.setSelection([window.__id]); __3dj.app.gizmo='scale'; __3dj.commands.barCommit(1, '5'); }"); await ev(built)
+    b1, s1 = await box(), await state()
+    check('a sketch standing on a face: sizing Y (across the face) changes its Height and it stays a sketch', s1 == {'solid': True, 'h': 5, 'steps': 1}, s1)
+    check('…it grows out of the face: its back and its height off the floor stay where they were', b1[1][1] == b0[1][1] and b1[0][1] == b0[1][1] - 5 and b1[0][2] == b0[0][2] and b1[1][2] == b0[1][2], [b0, b1])
+    await ev("()=>__3dj.store.undo()"); await ev(built)
+    await ev("()=>{ __3dj.commands.openPanel('props'); __3dj.commands.renderAll(); }"); await ev(built)
+    hbox = pg.locator('#side .field', has=pg.locator('label', has_text='Height')).locator('input.in').first
+    await hbox.fill('5'); await hbox.press('Enter'); await ev(built)
+    check('changing Height in Properties grows it out of the face the same way (one Undo step)', await box() == b1, [await box(), b1])
+    await ev("()=>__3dj.store.undo()"); await ev(built)
+    check('…and Undo puts it back where it was', await box() == b0, [await box(), b0])
+
+    # the same sketch with a leftover Move step from an older version (shrunk evenly to about half, like the DEWALT logo):
+    # it is taken into the sketch, Height shows the real thickness, and sizing Y changes Height (not a mesh)
+    await ev("()=>{ __3dj.store.commit((doc)=>{ doc.features.push({ id:'fmv', type:'move', body:window.__id, m:[0.5,0,0,0, 0,0.5,0,0, 0,0,0.5,0, 0,10,5,1] }); }); }"); await ev(built)
+    s2 = await state()
+    check('a leftover even resize (Move step) is taken into the sketch: one step, Height = its real thickness', s2['steps'] == 1 and s2['solid'] and abs(s2['h'] - 1) < 1e-3, s2)
+    b2 = await box()
+    await ev("()=>{ __3dj.vp.setSelection([window.__id]); __3dj.app.gizmo='scale'; __3dj.commands.barCommit(1, '3'); }"); await ev(built)
+    s3, b3 = await state(), await box()
+    check('…then sizing Y changes its Height and it stays a sketch, its back where it was', s3 == {'solid': True, 'h': 3, 'steps': 1} and b3[1][1] == b2[1][1], [s3, b2, b3])
 
     check('no page errors', not errs, errs)
     await b.close()

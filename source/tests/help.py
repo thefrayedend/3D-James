@@ -19,6 +19,21 @@ async def main():
   await page.locator('.help-section',has_text='Sketching').click()
   assert await page.locator('.help-link',has_text='The sketch board').count()==0
   results.append({'name':'Help chapters fold open and shut; the page says which chapter it is in','ok':True})
+  # the topic list stays where it was scrolled to when a chapter is opened or a topic is picked
+  await page.set_viewport_size({'width':1440,'height':600})
+  await page.locator('.help-section',has_text='Sketching').click()
+  await page.locator('.help-nav').evaluate('(e)=>e.scrollTop=e.scrollHeight')
+  top=await page.locator('.help-nav').evaluate('(e)=>e.scrollTop'); assert top>50,top
+  await page.locator('.help-section',has_text='Reference').click()
+  t2=await page.locator('.help-nav').evaluate('(e)=>e.scrollTop'); assert abs(t2-top)<2,(top,t2)
+  y0=(await page.locator('.help-link',has_text='Import a DXF or SVG drawing').bounding_box())['y']
+  await page.locator('.help-link',has_text='Import a DXF or SVG drawing').click()
+  y1=(await page.locator('.help-link',has_text='Import a DXF or SVG drawing').bounding_box())['y']; assert abs(y1-y0)<2,(y0,y1)
+  assert await page.locator('.help-body h1').inner_text()=='Import a DXF or SVG drawing'
+  await page.locator('.help-section',has_text='Sketching').click(); await page.locator('.help-section',has_text='Reference').click()
+  await page.set_viewport_size({'width':1440,'height':960})
+  await page.locator('.help-section',has_text='Start here').click(); await page.locator('.help-link',has_text='About 3DJames').click()
+  results.append({'name':'the topic list keeps its scroll position when a chapter or topic is clicked','ok':True})
   while await page.locator('.help-section:not(.open)').count(): await page.locator('.help-section:not(.open)').first.click()
   count=await page.locator('.help-link').count();assert count==28,count
   # every link between pages goes to a page that exists, and clicking one opens it

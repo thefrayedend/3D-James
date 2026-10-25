@@ -114,5 +114,10 @@ export function trioField(label, values, onCommit, step = 1) {
   return h('div', { style: 'margin-bottom:8px' }, h('div', { style: 'color:var(--ink-2);margin-bottom:4px' }, label), h('div', { class: 'trio' }, cells));
 }
 
-export function updateFeature(fid, fn, kind = 'geom') { store.commit((doc) => { const f = doc.features.find((x) => x.id === fid); if (f) fn(f, doc); }, kind); }
-export function liveFeature(fid, fn) { store.transient((doc) => { const f = doc.features.find((x) => x.id === fid); if (f) fn(f, doc); }); }
+/** A shape's numbers are about to change: after the rebuild, a turned shape is moved so its base stays put (build.js). */
+function keepBase(fid) {
+  const f0 = store.doc.features.find((x) => x.id === fid), h0 = app.results?.heights?.[fid];
+  if (f0?.type === 'shape' && h0 != null) app.keepBase = [...(app.keepBase || []).filter((k) => k.fid !== fid), { fid, h: h0 }];
+}
+export function updateFeature(fid, fn, kind = 'geom') { keepBase(fid); store.commit((doc) => { const f = doc.features.find((x) => x.id === fid); if (f) fn(f, doc); }, kind); }
+export function liveFeature(fid, fn) { keepBase(fid); store.transient((doc) => { const f = doc.features.find((x) => x.id === fid); if (f) fn(f, doc); }); }

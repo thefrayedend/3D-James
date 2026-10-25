@@ -180,10 +180,11 @@ echo "  root filesystem: $(. "$MNT/etc/os-release" 2>/dev/null; echo "${PRETTY_N
 # ----------------------------------------------------------------------------- payload
 say "Copying the 3DJames server"
 install -d "$MNT/opt/3djames/server" "$MNT/opt/3djames/app"
-rsync -a --delete --exclude '__pycache__' --exclude 'testdata' "$REPO/server/" "$MNT/opt/3djames/server/"
+# (--no-owner/--no-group: files belong to root in the image, never to the build machine's user)
+rsync -a --no-owner --no-group --delete --exclude '__pycache__' --exclude 'testdata' "$REPO/server/" "$MNT/opt/3djames/server/"
 if [ -n "$APP" ]; then install -m 644 "$APP" "$MNT/opt/3djames/app/3DJames.html"; echo "  app: $(basename "$APP")"; else echo "  no app file: the admin uploads 3DJames.html on the admin page"; fi
 install -m 644 "$REPO/LICENSE" "$MNT/opt/3djames/LICENSE" 2>/dev/null || true
-rsync -a --exclude '__pycache__' "$HERE/rootfs/" "$MNT/"
+rsync -a --no-owner --no-group --exclude '__pycache__' "$HERE/rootfs/" "$MNT/"
 chmod 440 "$MNT/etc/sudoers.d/3djames"
 chmod 755 "$MNT/usr/local/sbin/3djames-helper"
 git -C "$REPO" describe --always --dirty > "$MNT/opt/3djames/BUILD" 2>/dev/null || date -u +%Y%m%d > "$MNT/opt/3djames/BUILD"
@@ -214,6 +215,7 @@ if [ "$SKIP_CUSTOMIZE" = 0 ]; then
   cp -L /etc/resolv.conf "$MNT/etc/resolv.conf"
   printf '#!/bin/sh\nexit 101\n' > "$MNT/usr/sbin/policy-rc.d"; chmod 755 "$MNT/usr/sbin/policy-rc.d"
   install -m 755 "$HERE/customize.sh" "$MNT/tmp/customize.sh"
+  install -m 644 "$HERE/selftest-nas.py" "$MNT/tmp/selftest-nas.py"
   # Clean environment inside the image; only proxy settings are passed through.
   CENV=(PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root LANG=C.UTF-8 TERM=dumb)
   for v in http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY; do
@@ -224,7 +226,7 @@ if [ "$SKIP_CUSTOMIZE" = 0 ]; then
     CENV+=(PIP_CERT=/tmp/extra-ca.crt SSL_CERT_FILE=/tmp/extra-ca.crt REQUESTS_CA_BUNDLE=/tmp/extra-ca.crt)
   fi
   chroot "$MNT" /usr/bin/env -i "${CENV[@]}" /bin/bash /tmp/customize.sh
-  rm -f "$MNT/usr/sbin/policy-rc.d" "$MNT/tmp/customize.sh" "$MNT/tmp/extra-ca.crt" "$MNT/etc/resolv.conf"
+  rm -f "$MNT/usr/sbin/policy-rc.d" "$MNT/tmp/customize.sh" "$MNT/tmp/selftest-nas.py" "$MNT/tmp/extra-ca.crt" "$MNT/etc/resolv.conf"
   [ -n "$RESOLV_BAK" ] && mv "$RESOLV_BAK" "$MNT/etc/resolv.conf"
   umount "$MNT/dev/pts" "$MNT/dev" "$MNT/proc" "$MNT/sys"
 else
