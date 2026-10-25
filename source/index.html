@@ -448,6 +448,9 @@ body.operation-preview #tabbar, body.operation-preview #cmdbar, body.operation-p
 .help-toolbar { display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel); }
 .help-toolbar b { margin-right:auto; }
 .help-topics { display:none; }
+.drag-chip { position:fixed;z-index:200;pointer-events:none;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.18);font:600 13px var(--ui);color:var(--ink); }
+.drag-chip.no { opacity:.55;border-color:var(--line-2); }
+.drag-chip svg { width:16px;height:16px; }
 .help-group { display:flex;flex-direction:column;gap:2px; }
 .help-section { display:flex;align-items:center;gap:8px;width:100%;margin:6px 0 0;padding:8px 8px;border:0;border-radius:8px;background:none;cursor:pointer;text-align:left;font:700 12px var(--ui);text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2); }
 .help-section:hover { background:var(--accent-soft); }

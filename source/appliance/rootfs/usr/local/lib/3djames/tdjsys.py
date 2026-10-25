@@ -9,8 +9,9 @@ Used by systemd units:
 
 Used by the server's admin page (`sudo 3djames-helper <cmd>`), all print JSON:
   net-status | wifi-scan | wifi-connect <ssid> (password on stdin) | set-hostname <name> | reboot | shutdown | system-info
-  mount-place <id>      connect a NAS share (settings as JSON on stdin; the password is kept here, root only)
-  forget-place <id>     disconnect it and forget its settings
+  usb-list              the USB drives plugged into the box
+  mount-place <id>      get a USB drive ready for 3DJames (settings as JSON on stdin; {"reconnect": true}: the saved ones)
+  forget-place <id>     let go of it and forget its settings
   update-share on|off <folder>   the "3DJames-update" network folder (password on stdin)
   server-update <zip>   install a new server program and restart it
 """
@@ -414,7 +415,7 @@ def hotspot_watch():
         time.sleep(15)
 
 
-# ----------------------------------------------------------------------------- NAS shares
+# ----------------------------------------------------------------------------- storage places (USB drives)
 def place_paths(pid):
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,23}", pid or ""):
         raise ValueError("bad place id")
@@ -435,6 +436,8 @@ def friendly_mount_error(text, typ):
 
 
 def mount_place(pid):
+    """Get a USB drive (or an old-style NFS share) ready at MOUNT_ROOT/<id>. (NAS shares over SMB need no mounting:
+    the server talks to them itself.)"""
     spec_in = json.loads(sys.stdin.read() or "{}")
     spec_path, cred_path, mnt = place_paths(pid)
     os.makedirs(PLACES_DIR, mode=0o700, exist_ok=True)
@@ -442,37 +445,27 @@ def mount_place(pid):
     if os.path.exists(spec_path):
         old = json.load(open(spec_path))
     spec = old if spec_in.get("reconnect") else dict(spec_in)
+    spec.pop("reconnect", None)
     if not spec.get("type"):
         return {"ok": False, "message": "This storage place has no settings yet. Edit it on the admin page."}
-    if spec_in.get("keepPassword") and "password" in old:
-        spec["password"] = old["password"]
-    spec.pop("keepPassword", None)
-    spec.pop("reconnect", None)
-    uid, gid = service_ids()
     os.makedirs(mnt, exist_ok=True)
-    if os.path.ismount(mnt):
-        if spec_in.get("reconnect"):
-            return {"ok": True, "message": "Connected."}
-        run(["umount", "-l", mnt])
-    if spec["type"] == "smb":
-        with open(cred_path, "w") as f:
-            os.chmod(cred_path, 0o600)
-            f.write(f"username={spec.get('username', '')}\npassword={spec.get('password', '')}\n")
-            if spec.get("domain"):
-                f.write(f"domain={spec['domain']}\n")
-        base = f"credentials={cred_path},uid={uid},gid={gid},file_mode=0664,dir_mode=0775,iocharset=utf8,noperm,soft"
-        versions = [spec["vers"]] if spec.get("vers") else ["3.0", "2.1", "2.0", "1.0"]
-        src = f"//{spec['server']}/{spec['share']}"
-        err = ""
-        for v in versions:
-            r = run(["mount", "-t", "cifs", src, mnt, "-o", f"{base},vers={v}"], timeout=40)
-            if r.returncode == 0:
-                spec["vers_used"] = v
-                break
-            err = (r.stderr or r.stdout)
-        if not os.path.ismount(mnt):
-            return {"ok": False, "message": friendly_mount_error(err, "smb")}
+    if spec["type"] == "usb":
+        if os.path.ismount(mnt):
+            dev = usb_device(spec.get("uuid", ""))
+            src = (run(["findmnt", "-n", "-o", "SOURCE", "--mountpoint", mnt]).stdout or "").strip()
+            if dev and spec_in.get("reconnect") and os.path.realpath(src) == dev:
+                return {"ok": True, "message": "Ready."}
+            release_usb(mnt)  # pulled out (or plugged in again under another name): let go of the old one
+            if not usb_device(spec.get("uuid", "")):
+                return {"ok": False, "message": "Not plugged in."}
+        ok, msg = mount_usb(spec, mnt)
+        if not ok:
+            return {"ok": False, "message": msg}
     elif spec["type"] == "nfs":
+        if os.path.ismount(mnt):
+            if spec_in.get("reconnect"):
+                return {"ok": True, "message": "Connected."}
+            run(["umount", "-l", mnt])
         r = run(["mount", "-t", "nfs", f"{spec['server']}:{spec['export']}", mnt, "-o", "soft,timeo=100,retrans=2"], timeout=40)
         if r.returncode != 0:
             return {"ok": False, "message": friendly_mount_error(r.stderr or r.stdout, "nfs")}
@@ -485,8 +478,10 @@ def mount_place(pid):
     test = os.path.join(mnt, f".3djames-test-{os.getpid()}")
     r = run(["runuser", "-u", SERVICE_USER, "--", "sh", "-c", f"echo ok > '{test}' && rm -f '{test}'"])
     if r.returncode != 0:
-        return {"ok": True, "message": "Connected, but 3DJames may not write there. On the NAS, give this user (or this box) read and write access to the share.", "readOnly": True}
-    return {"ok": True, "message": "Connected."}
+        if spec["type"] == "usb":
+            return {"ok": True, "message": "The drive is plugged in, but 3DJames can only read it (it may be write-protected, or full).", "readOnly": True}
+        return {"ok": True, "message": "Connected, but 3DJames may not write there. On the NAS, allow this box's address to read and write the exported folder.", "readOnly": True}
+    return {"ok": True, "message": "Ready. 3DJames can open and save files there." if spec["type"] == "usb" else "Connected."}
 
 
 def forget_place(pid):
@@ -503,6 +498,82 @@ def forget_place(pid):
     except OSError:
         pass
     return {"ok": True}
+
+
+# ----------------------------------------------------------------------------- USB drives
+def usb_list():
+    """USB drives (their partitions) plugged into the box: never the SD card the box runs from."""
+    r = run(["lsblk", "-J", "-b", "-o", "NAME,PATH,UUID,LABEL,FSTYPE,SIZE,TRAN,TYPE,MODEL,VENDOR"], timeout=20)
+    if r.returncode != 0:
+        return {"ok": False, "message": "Could not list the USB drives: " + (r.stderr or "").strip()[-200:]}
+    drives = []
+
+    def walk(dev, usb, model):
+        usb = usb or dev.get("tran") == "usb"
+        model = model or " ".join(x for x in ((dev.get("vendor") or "").strip(), (dev.get("model") or "").strip()) if x)
+        kids = dev.get("children") or []
+        if usb and dev.get("uuid") and dev.get("fstype") and dev.get("fstype") not in ("swap", "LVM2_member", "crypto_LUKS"):
+            size = int(dev.get("size") or 0)
+            name = dev.get("label") or model or "USB drive"
+            drives.append({"uuid": dev["uuid"], "fstype": dev["fstype"], "label": dev.get("label") or "", "name": name,
+                           "size": size, "dev": dev.get("path") or ""})
+        for k in kids:
+            walk(k, usb, model)
+
+    for d in json.loads(r.stdout or "{}").get("blockdevices", []):
+        if (d.get("name") or "").startswith(("mmcblk", "zram", "loop", "mtd")):
+            continue
+        walk(d, False, "")
+    return {"ok": True, "drives": drives}
+
+
+def usb_device(uuid):
+    p = os.path.join("/dev/disk/by-uuid", uuid)
+    return os.path.realpath(p) if uuid and "/" not in uuid and os.path.exists(p) else None
+
+
+def mount_usb(spec, mnt):
+    """Mount a USB drive so the server (not root) can read and write it. (ok, message)"""
+    dev = usb_device(spec.get("uuid", ""))
+    if not dev:
+        return False, "That USB drive is not plugged in."
+    fstype = (spec.get("fstype") or "").lower()
+    r = run(["blkid", "-o", "value", "-s", "TYPE", dev])
+    fstype = (r.stdout or "").strip().lower() or fstype
+    uid, gid = service_ids()
+    own = f"uid={uid},gid={gid},fmask=0113,dmask=0002"
+    tries = {
+        "vfat": [["mount", "-t", "vfat", "-o", f"{own},utf8,flush,noatime", dev, mnt]],
+        "exfat": [["mount", "-t", "exfat", "-o", f"{own},noatime", dev, mnt],
+                  ["mount.exfat-fuse", dev, mnt, "-o", f"uid={uid},gid={gid},umask=0002,allow_other,noatime"]],
+        "ntfs": [["mount", "-t", "ntfs3", "-o", f"uid={uid},gid={gid},umask=0002,noatime", dev, mnt],
+                 ["ntfs-3g", dev, mnt, "-o", f"uid={uid},gid={gid},umask=0002,noatime,big_writes"]],
+    }.get(fstype, [["mount", "-o", "noatime", dev, mnt]])
+    err = ""
+    for cmd in tries:
+        if not shutil.which(cmd[0]):
+            continue
+        r = run(cmd, timeout=60)
+        if r.returncode == 0 and os.path.ismount(mnt):
+            break
+        err = (r.stderr or r.stdout or "").strip()
+    if not os.path.ismount(mnt):
+        if fstype not in ("vfat", "exfat", "ntfs", "ext4", "ext3", "ext2", "btrfs", "xfs"):
+            return False, (f"The box can't read this kind of drive ({fstype or 'unknown'}). Use a drive formatted as "
+                           "exFAT, FAT32 or NTFS (as Windows formats them).")
+        if "wrong fs type" in err.lower() or "dirty" in err.lower() or "corrupt" in err.lower():
+            return False, "The USB drive needs checking: plug it into a Windows PC, let Windows repair it, then try again."
+        return False, "Could not use the USB drive: " + err[-300:]
+    if fstype not in ("vfat", "exfat", "ntfs"):
+        # a Linux-formatted drive keeps owners: let the server use its top folder
+        run(["chown", f"{uid}:{gid}", mnt])
+        run(["chmod", "u+rwx,g+rwx", mnt])
+    return True, ""
+
+
+def release_usb(mnt):
+    """The drive was pulled out: let go of it (so it can be used again when it is plugged back in)."""
+    run(["umount", "-l", mnt])
 
 
 # ----------------------------------------------------------------------------- the update folder (Samba)
@@ -664,6 +735,8 @@ def main():
             out(system_info())
         elif cmd == "mount-place" and args:
             out(mount_place(args[0]))
+        elif cmd == "usb-list":
+            out(usb_list())
         elif cmd == "forget-place" and args:
             out(forget_place(args[0]))
         elif cmd == "update-share" and len(args) == 2:

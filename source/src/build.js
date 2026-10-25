@@ -6,7 +6,7 @@ import { $, toast } from './ui/dom.js';
 import { fileStore, referencedFiles } from './storage.js';
 import { vp } from './view.js';
 import { renderAll, renderStatus } from './ui/panels.js';
-import { bodyMatrixFeature } from './commands.js';
+import { bodyMatrixFeature, turnedUp, foldableBodies, foldMoves } from './commands.js';
 
 let worker = null;
 let workerReady = false;
@@ -159,6 +159,30 @@ function applyResults(m) {
         f.pos = [0, 1, 2].map((i) => Math.round((P[i] + (n[i] / len) * k - (i === 2 ? h / 2 : 0)) * 1e4) / 1e4);
       }
     });
+  }
+  if (app.keepBase?.length) {
+    // a turned shape whose numbers changed (Properties): its height grew from its middle; move it so its base stays
+    // where it was, as on the floor (a sketch standing on a face grows out of the face, not into it)
+    const list = app.keepBase; app.keepBase = null;
+    const moves = [];
+    for (const { fid, h } of list) {
+      const f = store.doc.features.find((x) => x.id === fid), h2 = app.results.heights[fid];
+      if (!f || h2 == null || Math.abs(h2 - h) < 1e-9 || !Array.isArray(f.pos) || !Array.isArray(f.rot)) continue;
+      if (![...f.pos, ...f.rot].every((v) => typeof v === 'number')) continue; // typed as formulas: left as typed
+      const up = turnedUp(f.rot);
+      if (Math.abs(up[2] - 1) < 1e-9) continue; // standing upright: its base already stays on the floor
+      moves.push({ fid, d: [0, 1, 2].map((i) => ((up[i] - (i === 2 ? 1 : 0)) * (h2 - h)) / 2) });
+    }
+    if (moves.length) store.amend((doc) => { for (const { fid, d } of moves) { const f = doc.features.find((x) => x.id === fid); f.pos = f.pos.map((v, i) => Math.round((v + d[i]) * 1e4) / 1e4); } });
+  }
+  // a shape with leftover Move steps (moved, turned or evenly sized by an older version): taken into the shape, so its
+  // own numbers (Height...) are its real size again. It looks exactly the same.
+  if (!app.preview && !app.scrubbing) {
+    const ids = foldableBodies(store.doc).filter((id) => { const f = store.doc.features.find((x) => x.body === id && x.type === 'shape'); return app.results.heights?.[f.id] != null && !app.results.errors?.[f.id]; });
+    if (ids.length) {
+      const test = JSON.parse(JSON.stringify(store.doc)), ok = ids.filter((id) => foldMoves(test, id));
+      if (ok.length) store.amend((doc) => { for (const id of ok) foldMoves(doc, id); });
+    }
   }
   if (app.settle?.length) {
     // objects that sat on the floor before turning are put back down on it, like 3D Builder

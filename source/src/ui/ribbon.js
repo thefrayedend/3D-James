@@ -1,11 +1,11 @@
 // The 3D Builder-style ribbon: the blue tab strip at the top and the row of commands under it, plus its menus.
 import { store } from '../store.js';
-import { PALETTE, threadDefaults, EXTRUSIONS, HARDWARE, HARDWARE_DEFAULTS } from '../shared.js';
+import { PALETTE, threadDefaults, EXTRUSIONS, HARDWARE, HARDWARE_DEFAULTS, SHAPES } from '../shared.js';
 import { SCREW_TYPES, NUT_TYPES, BEARINGS, BEARING_GROUPS, DOWELS, RODS, MAGNETS, STANDOFF_SIZES, SCREW_LENGTHS, presetFor } from '../catalog.js';
 import { app, saveSettings } from '../state.js';
 import { $, h, ic, toast, popMenu, closeMenu, mi, pickMenu, subMenu } from './dom.js';
 import { vp } from '../view.js';
-import { centerOn, addShape, mirrorSel, turnCopySel, addPattern, groupSel, ungroupSel, duplicateSel, dropSel, deleteSel, setBodyProp, selectAll, selectNone, select, editStep, copySel, paste } from '../commands.js';
+import { centerOn, addShape, addShapeAt, mirrorSel, turnCopySel, addPattern, groupSel, ungroupSel, duplicateSel, dropSel, deleteSel, setBodyProp, selectAll, selectNone, select, editStep, copySel, paste } from '../commands.js';
 import { setWorkplane, startTool, endTool, applyTool } from '../tools.js';
 import { newProject, openDialog, saveDoc, saveAs, exportDialog, insertDialog, chooseProjectsFolder, updateTitle } from '../files.js';
 import { previewCombine } from '../boolean-preview.js';
@@ -132,6 +132,52 @@ function cb(key, icon, label, fn, opts = {}) {
   return b;
 }
 const sepEl = () => h('span', { class: 'csep' });
+/** Roughly how big a new shape is ([w, d, h] mm), for the see-through preview while dragging it in. */
+function ghostSize(kind, extra) {
+  const p = { ...SHAPES[kind]?.defaults, ...extra }, n = (v, d = 20) => (Number.isFinite(+v) && +v > 0 ? +v : d);
+  if (kind === 'box' || kind === 'wedge') return [n(p.w), n(p.d), n(p.h)];
+  if (kind === 'sphere') return [n(p.d), n(p.d), n(p.d)];
+  if (kind === 'torus') { const D = n(p.D) + n(p.d, 5); return [D, D, n(p.d, 5)]; }
+  if (kind === 'cone') { const d = Math.max(n(p.d1), n(p.d2, 0)); return [d, d, n(p.h)]; }
+  if (kind === 'tube') return [n(p.od), n(p.od), n(p.h)];
+  if (kind === 'prism') { const d = n(p.af) * 1.155; return [d, n(p.af), n(p.h)]; }
+  if (kind === 'text') return [n(p.size, 10) * 3, n(p.size, 10), n(p.depth, 3)];
+  return [n(p.d), n(p.d), n(p.h)];
+}
+/**
+ * A shape button: click it and the shape goes beside what is already there; drag it into the view and it lands
+ * where you let go (on the floor, or on top of an object), like 3D Builder. A see-through box shows where.
+ */
+function shapeCb(icon, label, kind, extra, label0, after) {
+  const b = cb('', icon, label, () => { if (b.dragged) { b.dragged = false; return; } addShape(kind, extra, label0); after?.(); });
+  b.title = `${label}: click to add it, or drag it to where you want it`;
+  b.style.touchAction = 'pan-x'; // a finger sliding along the toolbar still scrolls it; down into the view drags
+  b.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const x0 = e.clientX, y0 = e.clientY;
+    let chip = null, at = null;
+    const canvas = vp.renderer.domElement, size = ghostSize(kind, extra);
+    const overView = (ev) => document.elementFromPoint(ev.clientX, ev.clientY) === canvas;
+    const move = (ev) => {
+      if (!chip && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
+      if (!chip) { chip = h('div', { class: 'drag-chip' }, ic(icon), h('span', {}, label)); document.body.append(chip); b.dragged = true; }
+      chip.style.left = `${ev.clientX + 12}px`; chip.style.top = `${ev.clientY + 12}px`;
+      at = overView(ev) ? vp.dropPoint(ev) : null;
+      if (at) { const g = app.settings.grid > 0 ? app.settings.grid : 0; if (g) { at.x = Math.round(at.x / g) * g; at.y = Math.round(at.y / g) * g; } }
+      vp.showDrop(at, size, kind, +(extra?.n || 0));
+      chip.classList.toggle('no', !at);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      if (!chip) return; // a plain click
+      chip.remove(); vp.showDrop(null);
+      if (at) { addShapeAt([at.x, at.y, at.z], kind, extra, label0); after?.(); }
+      setTimeout(() => { b.dragged = false; }, 0); // (the click that may follow a drag is not another add)
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  });
+  return b;
+}
 
 export function buildTabBar() {
   const bar = $('tabbar'); bar.replaceChildren();
@@ -191,12 +237,12 @@ export function renderCmdBar() {
   const t = app.tab;
   if (t === 'Insert') {
     bar.append(cb('', 'Plus', 'Add', insertDialog, { title: 'Insert a model from a file (STL, STEP, 3MF, OBJ)' }), sepEl(),
-      cb('', 'Box', 'Cube', () => addShape('box')), cb('', 'Cylinder', 'Cylinder', () => addShape('cyl')), cb('', 'Pyramid', 'Pyramid', () => addShape('pyramid')),
-      cb('', 'Cone', 'Cone', () => addShape('cone')), cb('', 'Circle', 'Sphere', () => addShape('sphere')), cb('', 'Hexagon', 'Hexagon', () => addShape('prism', { n: 6, af: 20, h: 20 }, 'Hexagon')),
-      cb('', 'TriangleRight', 'Wedge', () => addShape('wedge')), cb('', 'Torus', 'Torus', () => addShape('torus')),
-      cb('', 'Triangle', 'Tetrahedron', () => addShape('pyramid', { n: 3, d: 23.09, h: 16.33 }, 'Tetrahedron')),
-      cb('', 'CircleDot', 'Tube', () => addShape('tube')), sepEl(),
-      cb('', 'Type', 'Text', () => { addShape('text'); openPanel('props'); }), cb('', 'PenLine', 'Sketch', (b) => sketchMenu(b), { dd: true, title: 'Draw an outline (lines, arcs, rectangles, circles) with exact sizes, then push it up, spin it around, or cut it in. On the floor or on a face.' }), cb('', 'Package', 'Parts', (b) => partsMenu(b), { dd: true, title: 'Ready-made parts: hardware, aluminum extrusion and more' }), sepEl(),
+      shapeCb('Box', 'Cube', 'box'), shapeCb('Cylinder', 'Cylinder', 'cyl'), shapeCb('Pyramid', 'Pyramid', 'pyramid'),
+      shapeCb('Cone', 'Cone', 'cone'), shapeCb('Circle', 'Sphere', 'sphere'), shapeCb('Hexagon', 'Hexagon', 'prism', { n: 6, af: 20, h: 20 }, 'Hexagon'),
+      shapeCb('TriangleRight', 'Wedge', 'wedge'), shapeCb('Torus', 'Torus', 'torus'),
+      shapeCb('Triangle', 'Tetrahedron', 'pyramid', { n: 3, d: 23.09, h: 16.33 }, 'Tetrahedron'),
+      shapeCb('CircleDot', 'Tube', 'tube'), sepEl(),
+      shapeCb('Type', 'Text', 'text', undefined, undefined, () => openPanel('props')), cb('', 'PenLine', 'Sketch', (b) => sketchMenu(b), { dd: true, title: 'Draw an outline (lines, arcs, rectangles, circles) with exact sizes, then push it up, spin it around, or cut it in. On the floor or on a face.' }), cb('', 'Package', 'Parts', (b) => partsMenu(b), { dd: true, title: 'Ready-made parts: hardware, aluminum extrusion and more' }), sepEl(),
       cb('workplane', 'Layers', 'Workplane', () => (app.workplane ? setWorkplane(null) : startTool('workplane')), { on: !!app.workplane || app.tool?.type === 'workplane', title: app.workplane ? 'New shapes go on the picked face. Click to go back to the floor.' : 'Click a flat or curved solid to place a sketch plane; click again to return to the floor' }));
   } else if (t === 'Object') {
     bar.append(cb('union', 'SquaresUnite', 'Merge', () => previewCombine('union'), { title: 'Join the selected objects (holes get cut out)' }),

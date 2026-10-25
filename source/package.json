@@ -1,6 +1,6 @@
 {
   "name": "3djames",
-  "version": "0.17.1",
+  "version": "0.17.11",
   "description": "3DJames: a local, 3D Builder-style parametric 3D modeler",
   "scripts": {
     "build": "python build.py",
@@ -23,6 +23,8 @@
     "ship": "python tools/ship.py",
     "test:doubleclick": "python tests/doubleclick.py",
     "test:copies": "python tests/copies.py",
+    "test:dragdrop": "python tests/dragdrop.py",
+    "test:movearrows": "python tests/movearrows.py",
     "test:tutorials": "python tests/tutorials.py",
     "test:examples": "python help/build_examples.py"
   },

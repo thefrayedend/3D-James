@@ -583,7 +583,7 @@ export class Viewport {
   /** Which axis (0 X, 1 Y, 2 Z) a handle works on right now, or null (corners), or undefined (not an arrow). */
   handleAxis(d, L) {
     if (d.type === 'lift' || d.type === 'planemove') return 2;
-    if (d.type === 'slide') return d.at === 'depth' ? L.depth.ax : L.lrAx;
+    if (d.type === 'slide') return d.ax ?? (d.at === 'depth' ? L.depth.ax : L.lrAx);
     if (d.type === 'edge') return d.side === 'top' || d.side === 'bottom' ? 2 : L.lrAx;
     if (d.type === 'depth') return L.depth.ax;
     if (d.type === 'face') return d.ax;
@@ -638,19 +638,20 @@ export class Viewport {
       rings();
       rotArrow('z', 'currentColor', 4); rotArrow('a', 'currentColor', 4); rotArrow('b', 'currentColor', 3.2);
     } else if (pe) {
-      add(mkSvg('lift', 24, 36, dbl('#7ed321')), { type: 'planemove' });
+      add(mkSvg('lift', 24, 36, dbl('#1ea0ff')), { type: 'planemove' });
     } else if (mode === 'translate') {
-      // like 3D Builder: three arrows drawn in 3D, each lying along its direction: up-down above the middle of the top,
-      // left-right beside the middle of the right side, front-back at the middle of the bottom front edge
+      // an arrow on every side, drawn in 3D lying along its direction, just outside the middle of that side at the
+      // object's middle height (above the top and under the bottom for up-down). Arrows behind the object are hidden.
       const moveArrow = (cls, data) => {
         const el = document.createElementNS(NS, 'svg');
         el.setAttribute('class', 'hrot hmove ' + cls);
+        el.dataset.ax = data.ax; el.dataset.sign = data.sign;
         el.innerHTML = '<path class="grab" d=""/><path class="shaft" d="" stroke="currentColor" stroke-width="3.2"/><path class="head1" fill="currentColor"/><path class="head2" fill="currentColor"/>';
         add(el, data);
       };
-      moveArrow('lift', { type: 'lift', at: 'top' });
-      moveArrow('slide', { type: 'slide', at: 'right' });
-      moveArrow('slide', { type: 'slide', at: 'depth' });
+      moveArrow('lift', { type: 'lift', at: 'top', ax: 2, sign: 1 });
+      moveArrow('lift', { type: 'lift', at: 'bottom', ax: 2, sign: -1 });
+      for (const ax of [0, 1]) for (const sign of [1, -1]) moveArrow('slide', { type: 'slide', ax, sign });
     } else {
       const frame = document.createElement('div'); frame.className = 'hframe'; passive(frame, { type: 'frame' });
       for (const c of ['tl', 'tr', 'bl', 'br']) add(Object.assign(document.createElement('div'), { className: 'hdot' }), { type: 'corner', at: c });
@@ -733,24 +734,39 @@ export class Viewport {
     const dq = dp.clone(); dq.setComponent(dAx, dp.getComponent(dAx) + dSign * Math.max(1, diag * 0.2));
     const s1 = this.toScreen(dp), s2 = this.toScreen(dq);
     const depth = { ax: dAx, sign: dSign, p: dp, x: s1.x - rect.left, y: s1.y - rect.top, ang: Math.atan2(s2.y - s1.y, s2.x - s1.x) };
-    // the 3D move arrows: a middle point just outside the object, and a half-length along the direction (about 20 px)
-    const arrow3 = (P, ax) => {
-      const w = this.worldPerPixel(P);
-      const M = P.clone();
-      const half = 20 * w, a = M.clone(), b = M.clone();
-      a.setComponent(ax, a.getComponent(ax) - half); b.setComponent(ax, b.getComponent(ax) + half);
-      const sa = this.toScreen(a), sb = this.toScreen(b);
-      return { a: { x: sa.x - rect.left, y: sa.y - rect.top }, b: { x: sb.x - rect.left, y: sb.y - rect.top } };
-    };
-    const out = (P, ax, sign, px) => { const q = P.clone(); q.setComponent(ax, q.getComponent(ax) + sign * px * this.worldPerPixel(P)); return q; };
-    const rightP = c.clone(); rightP.setComponent(lrAx, lrSign > 0 ? box.max.getComponent(lrAx) : box.min.getComponent(lrAx));
-    const frontP = c.clone(); frontP.z = box.min.z; frontP.setComponent(dAx, dSign > 0 ? box.max.getComponent(dAx) : box.min.getComponent(dAx));
-    const topP = c.clone(); topP.z = box.max.z;
-    const move = {
-      right: arrow3(out(rightP, lrAx, lrSign, 34), lrAx),
-      depth: arrow3(out(frontP, dAx, dSign, 30), dAx),
-      top: arrow3(out(topP, 2, 1, 30), 2),
-    };
+    // move arrows: one per side, centered on that side (the side ones at the object's middle height, the bottom one
+    // right under it), lying along its direction. Up close they sit at a set spot and size on the object; zoomed out
+    // they keep a readable size and move out just enough to stay clear of it, like 3D Builder. Turning the view never
+    // moves them. One you could not see from here (behind the object, under the floor, tip-on) is hidden.
+    const move = {};
+    if (this.gizmoMode === 'translate' && !this.planeEdit) {
+      const half = Math.min(25, Math.max(4, diag * 0.12)), gap = half * 0.5 + 2; // mm
+      const block = box.clone().expandByScalar(1e-3), ray = new THREE.Ray();
+      const seen = (P) => {
+        // under the floor, seen from above: the floor hides it (from below you look through the floor, as at the objects)
+        if (cam.z > 0 && P.z < -1e-6) return false;
+        // the object, taken as a solid block, in the way (so a hollow box doesn't show arrows through its openings)
+        const dir = P.clone().sub(cam), dist = dir.length(); ray.set(cam, dir.normalize());
+        const hit = ray.intersectBox(block, new THREE.Vector3());
+        return !hit || hit.distanceTo(cam) > dist - 1e-6;
+      };
+      const scr = (q) => { const s = this.toScreen(q); return { x: s.x - rect.left, y: s.y - rect.top }; };
+      for (const ax of [0, 1, 2]) for (const sign of [1, -1]) {
+        // up close: a set spot and length on the object (a tenth of its size, at least 6 mm). Zoomed out, like 3D
+        // Builder, it doesn't shrink below about 32 px on screen and moves out along the middle of its side just enough
+        // to stay about 12 px clear of the object (always centered on that side)
+        const F = c.clone(); F.setComponent(ax, sign > 0 ? box.max.getComponent(ax) : box.min.getComponent(ax));
+        const wpp = this.worldPerPixel(F), objHalf = Math.max(3, diag * 0.05);
+        const hl = Math.max(objHalf, 16 * wpp), inner = Math.max(gap + half - objHalf, 12 * wpp);
+        const M = F.clone(); M.setComponent(ax, F.getComponent(ax) + sign * (inner + hl));
+        const A = M.clone(), B = M.clone();
+        A.setComponent(ax, A.getComponent(ax) - hl); B.setComponent(ax, B.getComponent(ax) + hl);
+        const a = scr(A), b = scr(B), len = Math.hypot(b.x - a.x, b.y - a.y);
+        // pointing (nearly) straight at you or away, you would only see its tip: hidden
+        const along = Math.abs(M.clone().sub(cam).normalize().getComponent(ax));
+        move[`${ax}${sign}`] = { a, b, hidden: !seen(M) || along > 0.87 || len < 12 };
+      }
+    }
     // size arrows: one per side of the object, ~30 px straight out from the middle of that side
     const faces = {};
     if (this.gizmoMode === 'scale' && !this.planeEdit) {
@@ -818,7 +834,7 @@ export class Viewport {
     for (const { el, data } of this.hudItems) {
       // green for the active axis, blue for the others (the split plane's own arrow stays green)
       const ax = this.handleAxis(data, L);
-      if (ax !== undefined) el.style.color = data.type === 'planemove' || ax === this.activeAxis ? '#7ed321' : '#1ea0ff';
+      if (ax !== undefined) el.style.color = '#1ea0ff'; // all handles blue (no green for the last direction used)
       if (data.type === 'rings') {
         const { ball, z, a, b } = L.rot;
         const ci = el.querySelector('.ball'); ci.setAttribute('cx', ball.x); ci.setAttribute('cy', ball.y); ci.setAttribute('r', ball.r);
@@ -844,13 +860,13 @@ export class Viewport {
         continue;
       }
       if (el.classList.contains('hmove')) {
-        let { a, b } = L.move[data.type === 'lift' ? 'top' : data.at];
-        // looking straight down an arrow makes it very short: keep it big enough to grab
-        let dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
-        // looking straight down on it, the up-down arrow disappears (like 3D Builder)
-        el.style.display = data.type === 'lift' && len < 12 ? 'none' : '';
-        if (len < 18) { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, ux = len > 0.01 ? dx / len : 0, uy = len > 0.01 ? dy / len : 1; a = { x: mx - ux * 9, y: my - uy * 9 }; b = { x: mx + ux * 9, y: my + uy * 9 }; dx = b.x - a.x; dy = b.y - a.y; len = 18; }
-        const ux = dx / len, uy = dy / len, s = 6.5;
+        const m = L.move[`${data.ax}${data.sign}`];
+        const { a, b } = m;
+        // drawn exactly where it is in the scene (the layout hides ones you could not see)
+        el.style.display = m.hidden ? 'none' : '';
+        if (m.hidden) continue;
+        const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
+        const ux = dx / len, uy = dy / len, s = Math.min(6.5, len / 4); // (heads shrink on a short arrow)
         const head = (tip, sgn) => {
           const bx = tip.x - sgn * ux * s * 1.3, by = tip.y - sgn * uy * s * 1.3;
           return `M${tip.x} ${tip.y} L${bx - uy * s} ${by + ux * s} L${bx + uy * s} ${by - ux * s} Z`;
@@ -1004,6 +1020,53 @@ export class Viewport {
     const v = p.clone().project(this.camera);
     const r = this.renderer.domElement.getBoundingClientRect();
     return new THREE.Vector2(r.left + ((v.x + 1) / 2) * r.width, r.top + ((1 - v.y) / 2) * r.height);
+  }
+
+  /**
+   * Where a shape dragged in from the toolbar lands under the pointer: on top of an object when the pointer is over
+   * a face that points up, otherwise on the floor. Returns the spot for the shape's bottom middle, or null (sky).
+   */
+  dropPoint(e) {
+    const hit = this.hitBody(e);
+    if (hit?.face) {
+      const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+      if (n.z > 0.7) return hit.point.clone();
+    }
+    const p = new THREE.Vector3();
+    if (!this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), p)) return null;
+    // close to the horizon the floor goes on for ever: too far away to mean it
+    return p.distanceTo(this.camera.position) > 8 * this.camera.position.distanceTo(this.orbit.target) ? null : p;
+  }
+  /**
+   * The see-through shape shown where a dragged shape will land: p its bottom middle, size [w, d, h] mm, kind the
+   * shape (a cylinder looks like a cylinder...; anything else a box). null hides it.
+   */
+  showDrop(p, size = [20, 20, 20], kind = 'box', sides = 0) {
+    const key = `${kind}:${sides}`;
+    if (this.dropGhost && this.dropGhost.userData.key !== key) { this.scene.remove(this.dropGhost); this.dropGhost.traverse((o) => o.geometry?.dispose()); this.dropGhost = null; }
+    if (!this.dropGhost) {
+      // a shape 1 mm across and 1 mm high, standing on 0: scaled to size below
+      const up = (geo) => { geo.rotateX(Math.PI / 2); geo.translate(0, 0, 0.5); return geo; };
+      const n = sides || 4;
+      const geo = kind === 'cyl' || kind === 'tube' ? up(new THREE.CylinderGeometry(0.5, 0.5, 1, 40))
+        : kind === 'prism' ? up(new THREE.CylinderGeometry(0.5, 0.5, 1, 6).rotateY(Math.PI / 6))
+          : kind === 'cone' ? up(new THREE.CylinderGeometry(0.15, 0.5, 1, 40))
+            : kind === 'pyramid' ? up(new THREE.ConeGeometry(0.5, 1, n).rotateY(Math.PI / n))
+              : kind === 'sphere' ? new THREE.SphereGeometry(0.5, 32, 16).translate(0, 0, 0.5)
+                : kind === 'torus' ? new THREE.TorusGeometry(0.4, 0.1, 12, 40).scale(1, 1, 5).translate(0, 0, 0.5)
+                  : new THREE.BoxGeometry(1, 1, 1).translate(0, 0, 0.5);
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: this.colors.accent, transparent: true, opacity: 0.22, depthWrite: false })));
+      g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color: this.colors.accent })));
+      g.traverse((o) => { o.raycast = () => {}; });
+      g.userData.key = key;
+      this.dropGhost = g;
+    }
+    if (!p) { this.scene.remove(this.dropGhost); this.requestRender(); return; }
+    this.dropGhost.position.copy(p).setZ(p.z + 0.01);
+    this.dropGhost.scale.set(...size);
+    if (!this.dropGhost.parent) this.scene.add(this.dropGhost);
+    this.requestRender();
   }
 
   hitBody(e) {
@@ -1166,7 +1229,10 @@ export class Viewport {
       if (h.type === 'depth') { anchor = L.depth.p.clone(); info = { ax: L.depth.ax, sign: L.depth.sign }; }
       if (h.type === 'face') { anchor = c.clone(); anchor.setComponent(h.ax, h.sign > 0 ? box.max.getComponent(h.ax) : box.min.getComponent(h.ax)); info = { ax: h.ax, sign: h.sign }; }
       let slideAxis = 0;
-      if (h.type === 'slide') slideAxis = h.at === 'depth' ? L.depth.ax : L.lrAx;
+      if (h.type === 'slide') {
+        slideAxis = h.ax ?? (h.at === 'depth' ? L.depth.ax : L.lrAx);
+        if (h.ax != null) { anchor = c.clone(); anchor.setComponent(h.ax, h.sign > 0 ? box.max.getComponent(h.ax) : box.min.getComponent(h.ax)); }
+      }
       const corner = h.type === 'corner' ? { x: (h.at[1] === 'l' ? L.r.x0 : L.r.x1) + L.rect.left, y: (h.at[0] === 't' ? L.r.y0 : L.r.y1) + L.rect.top } : null;
       const center = { x: (L.r.x0 + L.r.x1) / 2 + L.rect.left, y: (L.r.y0 + L.r.y1) / 2 + L.rect.top };
       this.handleDrag = { ...base, h: { ...h, ...info, slideAxis }, box, anchor, corner, center };

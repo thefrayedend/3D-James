@@ -1,8 +1,10 @@
 """The appliance's settings: users, storage places, the shared folder. Kept in <data>/config.json.
 
-  places   where files can live: {id: {label, type: 'local' | 'smb' | 'nfs', ...}}
-           local: path (a folder on the box)    smb: server, share, username, domain, vers    nfs: server, export
-           (NAS passwords are not kept here: the root helper keeps them where only it can read them)
+  places   where files can live: {id: {label, type: 'local' | 'usb' | 'smb', ...}}
+           local: path (a folder on the box; '' = the SD card)
+           usb: uuid, fstype, name (a USB drive plugged into the box: the root helper mounts it at MOUNT_ROOT/<id>)
+           smb: server, share, username, domain (a NAS share: the server talks to it itself, see smbstore.py)
+           (NAS passwords are not kept here but in <data>/secrets.json, which only the server can read)
   users    {username: {name, hash, admin, folders: [{label, place, path, write}], shared: bool}}
   shared   {enabled, label, place, path, write}: one folder everybody with `shared` may use
 """
@@ -28,6 +30,7 @@ USERNAME = re.compile(r'^[a-z][a-z0-9._-]{0,31}$')
 class Config:
     def __init__(self, data_dir, box_root):
         self.path = os.path.join(data_dir, 'config.json')
+        self.secrets_path = os.path.join(data_dir, 'secrets.json')
         self.box_root = box_root  # where "This box" keeps files
         self.lock = threading.RLock()
         self.data = copy.deepcopy(DEFAULT)
@@ -45,6 +48,30 @@ class Config:
             with open(tmp, 'w', encoding='utf-8') as f:
                 json.dump(self.data, f, indent=1)
             os.replace(tmp, self.path)
+
+    # ------------------------------------------------------------------ NAS passwords
+    def secrets(self):
+        try:
+            with open(self.secrets_path, encoding='utf-8') as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    def secret(self, place_id):
+        return self.secrets().get(place_id, '')
+
+    def set_secret(self, place_id, password):
+        with self.lock:
+            d = self.secrets()
+            if password is None:
+                d.pop(place_id, None)
+            else:
+                d[place_id] = password
+            tmp = self.secrets_path + '.tmp'
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(d, f)
+            os.replace(tmp, self.secrets_path)
 
     # ------------------------------------------------------------------ users
     def user(self, name):
@@ -70,16 +97,18 @@ class Config:
         return out
 
     def place_root(self, place_id):
-        """The folder on this box where a place's files are (a NAS share is mounted there)."""
+        """The folder on this box where a place's files are (a USB drive is mounted there; None for a NAS share)."""
         p = self.data['places'].get(place_id)
         if not p:
             return None
         if p['type'] == 'local':
             return p.get('path') or self.box_root
+        if p['type'] == 'smb':
+            return None
         return os.path.join(MOUNT_ROOT, place_id)
 
     def public(self):
-        """Everything for the admin page (no password hashes)."""
+        """Everything for the admin page (no password hashes; NAS passwords are not in here at all)."""
         d = copy.deepcopy(self.data)
         for u in d['users'].values():
             u.pop('hash', None)

@@ -336,12 +336,12 @@
       C.showAbout(); const n = document.querySelectorAll('.modal .lic').length; document.querySelector('.modal-back').remove();
       assert(n >= 11, 'about rows ' + n);
     });
-    await t('handles: blue, the active axis green (like 3D Builder)', async () => {
+    await t('handles: always blue (no green arrows, by request); the bar still marks the axis being used', async () => {
       await fresh(); a = await add('box'); sel([a]); B.commands.setGizmo('scale'); B.vp.setActiveAxis(null); B.vp.render();
       const cols = () => [...document.querySelectorAll('.hud svg.tri')].map((e) => e.style.color);
       assert(cols().length === 6 && cols().every((c) => c === 'rgb(30, 160, 255)' || c === '#1ea0ff'), 'not all blue: ' + cols());
       B.vp.setActiveAxis(2); B.vp.render();
-      assert(cols().filter((c) => c === 'rgb(126, 211, 33)' || c === '#7ed321').length === 2, 'Z arrows not green: ' + cols());
+      assert(cols().every((c) => c === 'rgb(30, 160, 255)' || c === '#1ea0ff'), 'an arrow turned another colour: ' + cols());
       assert(document.querySelectorAll('#objbar .bf')[2].classList.contains('on'), 'Z box not green');
       B.commands.setGizmo('translate'); B.vp.setActiveAxis(null);
     });

@@ -437,24 +437,13 @@ function buildPrimitive(kind, p, num, ctx, st = [1, 1, 1]) {
         }
         const spine = pen.done().sketchOnPlane('XY');
         // the profile: the outlines, centered on the path's start, standing across the path
-        const sortedP = loops.slice().sort((a, b) => SG.loopArea(b) - SG.loopArea(a));
-        let prof = null;
-        for (const l of sortedP) {
-          const depth = sortedP.filter((o) => o !== l && SG.loopArea(o) > SG.loopArea(l) && SG.loopInside(o, l)).length;
-          const s3 = shape(l); prof = !prof ? s3 : depth % 2 ? prof.cut(s3) : prof.fuse(s3);
-        }
+        let prof = profileOf(loops, shape);
         const bb = SG.loopsBounds(loops), cx = (bb[0] + bb[2]) / 2, cy = (bb[1] + bb[3]) / 2;
         prof = prof.translate(-cx, -cy);
         const solid = spine.sweepSketch((plane, origin) => prof.clone().sketchOnPlane(plane, origin), { transitionMode: 'round', frenet: true });
         return { shape: solid };
       }
-      const sorted = loops.slice().sort((a, b) => SG.loopArea(b) - SG.loopArea(a));
-      let d = null;
-      for (const l of sorted) {
-        const depth = sorted.filter((o) => o !== l && SG.loopArea(o) > SG.loopArea(l) && SG.loopInside(o, l)).length;
-        const s = shape(l);
-        d = !d ? s : depth % 2 ? d.cut(s) : d.fuse(s);
-      }
+      const d = profileOf(loops, shape);
       if (p.mode === 'revolve') {
         const ang = num(p.angle ?? 360);
         if (!(ang > 0 && ang <= 360)) fail('Turn angle must be between 0 and 360');
@@ -1167,6 +1156,27 @@ export function surfacePlane(id, index, point) {
  * Gets the outlines (holes included, as in a sketch: inside another outline = a hole) and returns the outlines
  * of the resulting region: [{type:'poly', pts, bulge?} | {type:'circle', c, r}], outer ones and holes.
  */
+/**
+ * The flat shape of sketch outlines: an outline inside an odd number of others is a hole (inside a hole again: solid).
+ * Each solid outline gets the holes inside it cut out first, then the pieces are joined. (Cutting holes one after
+ * another out of everything at once loses pieces: replicad drops a piece that already has a hole when a later hole
+ * lies outside it, so two letters with holes, like D and A, came out as only one.)
+ */
+function profileOf(loops, shapeOf) {
+  const area = new Map(loops.map((l) => [l, SG.loopArea(l)]));
+  const sorted = loops.slice().sort((a, b) => area.get(b) - area.get(a));
+  const around = new Map(sorted.map((l) => [l, sorted.filter((o) => o !== l && area.get(o) > area.get(l) && SG.loopInside(o, l))]));
+  const isHole = (l) => around.get(l).length % 2 === 1;
+  let d = null;
+  for (const l of sorted) {
+    if (isHole(l)) continue;
+    let piece = shapeOf(l);
+    for (const hole of sorted) if (isHole(hole) && around.get(hole).includes(l)) piece = piece.cut(shapeOf(hole));
+    d = d ? d.fuse(piece) : piece;
+  }
+  return d;
+}
+
 /** One sketch outline as a replicad drawing (arcs stay arcs). */
 function drawLoop(l) {
   if (l.type === 'circle') return R.drawCircle(+l.r).translate(+l.c[0], +l.c[1]);
@@ -1258,13 +1268,7 @@ export function unionLoops(loops, tol = 0.01) {
     }
     if (best) { P[0] = best[0]; P[1] = best[1]; }
   }
-  const sorted = ls.slice().sort((a, b) => SG.loopArea(b) - SG.loopArea(a));
-  let d = null;
-  for (const l of sorted) {
-    const depth = sorted.filter((o) => o !== l && SG.loopArea(o) > SG.loopArea(l) && SG.loopInside(o, l)).length;
-    const s = drawLoop(l); d = !d ? s : depth % 2 ? d.cut(s) : d.fuse(s);
-  }
-  return loopsOfDrawing(d);
+  return loopsOfDrawing(profileOf(ls, drawLoop));
 }
 
 /**

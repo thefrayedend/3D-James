@@ -247,8 +247,34 @@ export function readSvg(text, SVGLoader) {
   return { loops: tidy(loops), skipped };
 }
 
+/** Line ends closer than this (mm) are the same point: rounding in the file, not a real gap. */
+const SAME_END = 0.01;
+/**
+ * Ends that nearly meet are put exactly together (a line's end onto its own start, or onto another line's end), so the
+ * board joins them into outlines. Looked up on a grid, so big drawings stay quick.
+ */
+function weldEnds(loops) {
+  const cell = (p) => `${Math.floor(p[0] / SAME_END)},${Math.floor(p[1] / SAME_END)}`;
+  const grid = new Map();
+  const near = (p) => {
+    const [cx, cy] = [Math.floor(p[0] / SAME_END), Math.floor(p[1] / SAME_END)];
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const q of grid.get(`${cx + dx},${cy + dy}`) || []) if (q !== p && Math.hypot(q[0] - p[0], q[1] - p[1]) < SAME_END) return q;
+    return null;
+  };
+  for (const l of loops) {
+    if (l.type !== 'open') continue;
+    const n = l.pts.length, A = l.pts[0], B = l.pts[n - 1];
+    // its own start: closed (when that leaves a real outline, not a line folded back on itself)
+    if (n > 2 && Math.hypot(A[0] - B[0], A[1] - B[1]) < SAME_END) { B[0] = A[0]; B[1] = A[1]; }
+    for (const P of [A, B]) {
+      const Q = near(P);
+      if (Q) { P[0] = Q[0]; P[1] = Q[1]; } else { const k = cell(P); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(P); }
+    }
+  }
+}
 /** Round to a millionth of a mm, drop empty pieces. */
 function tidy(loops) {
+  weldEnds(loops);
   const out = [];
   for (const l of loops) {
     if (l.type === 'circle') { if (l.r > 1e-6 && l.c.every(Number.isFinite)) out.push({ type: 'circle', c: l.c.map(r6), r: r6(l.r) }); continue; }

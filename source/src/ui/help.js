@@ -7,6 +7,8 @@ import { bindExamples } from './help-examples.js';
 import { showAbout } from './about.js';
 
 let view = null, docked = false, pinned = false, currentPage = 'about'; // pinned: Keep visible was clicked
+let navPage = null; // the page the topic list was last drawn for
+let navAnchor = null; // the chapter or topic just clicked in the list: it stays at the same spot on screen
 const openChapters = new Set(); // chapters folded open by hand (the current page's chapter is always open)
 const positions = new Map();
 function readingPosition() {
@@ -64,9 +66,9 @@ function render(query = '') {
   const groups = chapters.map((c, ci) => {
     const items = c.items.filter((i) => shown.has(i)); if (!items.length) return null;
     const open = isOpen(c);
-    const head = h('button', { class: 'help-section' + (open ? ' open' : ''), 'aria-expanded': String(open), title: open ? 'Fold this chapter away' : 'Show the topics in this chapter', onclick: () => { if (!q) toggle(c); } },
+    const head = h('button', { class: 'help-section' + (open ? ' open' : ''), 'aria-expanded': String(open), title: open ? 'Fold this chapter away' : 'Show the topics in this chapter', 'data-key': 'c:' + c.name, onclick: () => { if (!q) { navAnchor = 'c:' + c.name; toggle(c); } } },
       h('span', { class: 'help-chev' }, open ? '▾' : '▸'), h('span', { class: 'help-ch-num' }, String(ci + 1)), h('span', { class: 'help-ch-name' }, c.name), h('span', { class: 'help-ch-count' }, String(c.items.length)));
-    return h('div', { class: 'help-group' }, head, ...(open ? items.map((i) => h('button', { class: 'help-link' + (i === cur ? ' on' : ''), onclick: () => go(i) }, h('span', { class: 'help-num' }, `${ci + 1}.${c.items.indexOf(i) + 1}`), pages[i].title)) : []));
+    return h('div', { class: 'help-group' }, head, ...(open ? items.map((i) => h('button', { class: 'help-link' + (i === cur ? ' on' : ''), 'data-key': 'p:' + pages[i].id, onclick: () => { navAnchor = 'p:' + pages[i].id; go(i); } }, h('span', { class: 'help-num' }, `${ci + 1}.${c.items.indexOf(i) + 1}`), pages[i].title)) : []));
   });
   const nav = h('nav', { class: 'help-nav' }, search, ...groups,
     list.length ? null : h('div', { class: 'muted', style: 'padding:8px' }, 'Nothing found.'),
@@ -107,7 +109,17 @@ function render(query = '') {
   const topics = h('select', { class: 'in help-topics', 'aria-label': 'Help topic', onchange: (e) => goPage(e.target.value) },
     ...chapters.map((c) => h('optgroup', { label: c.name }, ...c.items.map((i) => h('option', { value: pages[i].id }, pages[i].title))))); topics.value = pages[cur].id;
   const toolbar = h('div', { class: 'help-toolbar' }, h('b', {}, 'Help & tutorials'), topics, h('button', { class: 'btn', 'data-help-dock': '', onclick: () => { if (docked) modelTab('Help'); else { pinned = true; dock(true); modelTab('Insert'); } } }, docked ? 'Full Help' : 'Keep visible'), h('button', { class: 'btn', onclick: closeHelp, 'aria-label': 'Close Help' }, 'Close'));
+  // the topic list keeps its scroll position when it is drawn again (opening a chapter, picking a topic)
+  const oldNav = view.querySelector('.help-nav'), navTop = oldNav?.scrollTop || 0;
+  const find = (n, key) => key && [...n.querySelectorAll('[data-key]')].find((e) => e.dataset.key === key);
+  const gap = (n, e) => e.getBoundingClientRect().top - n.getBoundingClientRect().top;
+  const was = oldNav && find(oldNav, navAnchor), wasGap = was ? gap(oldNav, was) : 0;
   view.replaceChildren(toolbar, h('div', { class: 'help-content' }, nav, article));
+  nav.scrollTop = navTop;
+  const now = was && find(nav, navAnchor);
+  if (now) nav.scrollTop += gap(nav, now) - wasGap; // chapters above it may have folded or opened: keep the clicked line still
+  else if (navPage !== currentPage) nav.querySelector('.help-link.on')?.scrollIntoView({ block: 'nearest' }); // Next / Back or a link: its topic in sight
+  navAnchor = null; navPage = currentPage;
   restorePosition(positions.get(currentPage));
   if (document.activeElement !== search && query) { search.focus(); search.setSelectionRange(query.length, query.length); }
 }

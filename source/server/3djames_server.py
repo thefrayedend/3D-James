@@ -9,7 +9,9 @@ Run on the box by systemd (3djames.service). To try it on any computer (Python 3
 """
 import argparse
 import os
+import shutil
 import sys
+import tempfile
 import threading
 import time
 
@@ -85,16 +87,44 @@ def watch_drop_folder(ctx):
         time.sleep(5)
 
 
-def keep_shares_connected(ctx):
-    """NAS shares come back by themselves after the NAS or the network was away."""
-    time.sleep(5)
+def mounted_from(path):
+    """The device mounted at path (from /proc/mounts), or None."""
+    found = None
+    try:
+        with open('/proc/mounts', encoding='utf-8') as f:
+            for line in f:
+                dev, at = line.split()[:2]
+                if at.replace('\\040', ' ') == path:
+                    found = os.path.realpath(dev)  # the last one counts
+    except OSError:
+        pass
+    return found
+
+
+def keep_drives_connected(ctx):
+    """USB drives are ready by themselves when the box starts and a few seconds after they are plugged in again.
+    (The root helper also lets go of a drive that was pulled out.) NAS shares need nothing: the server connects to
+    them itself whenever it needs them."""
+    time.sleep(3)
+    said = {}
     while True:
         for pid, p in list(ctx.config.data['places'].items()):
-            if p['type'] != 'local' and not os.path.ismount(ctx.config.place_root(pid)):
+            if p['type'] in ('usb', 'nfs'):
+                root = ctx.config.place_root(pid)
+                mounted = os.path.ismount(root)
+                if p['type'] == 'usb':
+                    dev = f'/dev/disk/by-uuid/{p.get("uuid")}'
+                    present = os.path.exists(dev)
+                    if (not present and not mounted) or (present and mounted_from(root) == os.path.realpath(dev)):
+                        continue  # not plugged in, or plugged in and ready: nothing to do
+                if p['type'] == 'nfs' and mounted:
+                    continue
                 r = system.helper('mount-place', pid, stdin='{"id": "%s", "reconnect": true}' % pid, timeout=90)
-                if not r.get('ok'):
-                    print(f'storage place {pid}: {r.get("message")}', flush=True)
-        time.sleep(60)
+                msg = r.get('message', '')
+                if said.get(pid) != msg:
+                    print(f'storage place {pid}: {msg}', flush=True)
+                    said[pid] = msg
+        time.sleep(8)
 
 
 def main():
@@ -108,6 +138,10 @@ def main():
     a = ap.parse_args()
 
     os.makedirs(a.data, exist_ok=True)
+    # uploads and files on their way from a NAS wait here, on the SD card (/tmp may be a small memory disk)
+    tempfile.tempdir = os.path.join(a.data, 'tmp')
+    shutil.rmtree(tempfile.tempdir, ignore_errors=True)
+    os.makedirs(tempfile.tempdir, exist_ok=True)
     ctx = Context()
     ctx.version = open(os.path.join(HERE, 'VERSION'), encoding='utf-8').read().strip() if os.path.exists(os.path.join(HERE, 'VERSION')) else 'dev'
     ctx.app_port, ctx.admin_port = a.app_port, a.admin_port
@@ -126,7 +160,7 @@ def main():
     threading.Thread(target=admin_srv.serve_forever, daemon=True).start()
     threading.Thread(target=watch_drop_folder, args=(ctx,), daemon=True).start()
     if system.helper_available():
-        threading.Thread(target=keep_shares_connected, args=(ctx,), daemon=True).start()
+        threading.Thread(target=keep_drives_connected, args=(ctx,), daemon=True).start()
     info = ctx.app.info()
     print(f'3DJames server {ctx.version}: app on port {a.app_port}, admin on port {a.admin_port}; '
           f'app {info["version"] if info else "not installed"}; data in {a.data}', flush=True)

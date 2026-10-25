@@ -5,7 +5,7 @@ Turns an Orange Pi Zero 4 into a **3DJames server** for your home network:
 * **http://3djames.local**: everyone signs in and uses 3DJames in their browser (PC, Mac, tablet, phone).
   Open and Save show their own folders, plus a shared folder if the admin allows it.
 * **http://3djames.local:8080**: the admin page. People and passwords, where files are kept (on the
-  box's SD card, a USB drive, or your NAS over SMB or NFS), the shared folder, app updates, Wi-Fi.
+  box's SD card, a USB drive plugged into the box, or a share on your NAS), the shared folder, app updates, Wi-Fi.
 
 The 3DJames app itself is one file, `3DJames.html`. Updating it never needs a new SD card: upload the new
 file on the admin page (App tab), or switch on the update folder there and copy the file to

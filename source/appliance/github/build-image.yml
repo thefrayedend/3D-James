@@ -13,6 +13,10 @@ on:
         description: 'Where else to find the base image release (owner/name)'
         default: 'thefrayedend/ffbridge-pi'
         required: false
+      app_repo:
+        description: 'Where the 3DJames app (3DJames.html) put on the card comes from (owner/name)'
+        default: 'thefrayedend/3D-James'
+        required: false
 
 permissions:
   contents: write
@@ -38,8 +42,13 @@ jobs:
 
       - name: Check the server
         run: |
-          python3 -m py_compile server/3djames_server.py server/tdj/*.py appliance/rootfs/usr/local/lib/3djames/tdjsys.py
+          python3 -m py_compile server/3djames_server.py server/tdj/*.py appliance/rootfs/usr/local/lib/3djames/tdjsys.py appliance/selftest-nas.py
           bash -n appliance/build-image.sh appliance/customize.sh
+
+      - name: Get the 3DJames app (so the box is ready to use without uploading it)
+        run: |
+          curl -fsSL --retry 3 -o "$GITHUB_WORKSPACE/3DJames.html" "https://raw.githubusercontent.com/${{ inputs.app_repo || 'thefrayedend/3D-James' }}/main/3DJames.html"
+          grep -aq 'window.__3DJ_VERSION=' "$GITHUB_WORKSPACE/3DJames.html" || { echo "::error::That is not the 3DJames app"; exit 1; }
 
       - name: Install image tools
         run: |
@@ -48,7 +57,7 @@ jobs:
 
       - name: Build the SD card image
         run: |
-          sudo bash appliance/build-image.sh --base "$BASE_FILE" --name 3djames-orangepi-zero4 --out "$GITHUB_WORKSPACE/out"
+          sudo bash appliance/build-image.sh --base "$BASE_FILE" --name 3djames-orangepi-zero4 --app "$GITHUB_WORKSPACE/3DJames.html" --out "$GITHUB_WORKSPACE/out"
           sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE/out"
           V="$(cat server/VERSION)"
           (cd server && zip -qr "$GITHUB_WORKSPACE/out/3djames-server-$V.zip" . -x '__pycache__/*' 'testdata/*')

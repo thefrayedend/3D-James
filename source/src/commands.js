@@ -1,7 +1,7 @@
 // Changes to the project: adding shapes, moving and sizing, combining, copying, deleting, grouping.
 // Each one is a single undo step.
 import { Matrix4, Vector3, Euler, Quaternion, MathUtils } from 'three';
-import { store, creatorOf, isSimplePrimitive, lastFeatureOf, nextName, nextColor } from './store.js';
+import { store, creatorOf, isSimplePrimitive, lastFeatureOf, nextName, nextColor, featuresOfBody } from './store.js';
 import { SHAPES, evalExpr, HOLE_KINDS } from './shared.js';
 import { app, scope, bodyData } from './state.js';
 import { r2, r4, toast } from './ui/dom.js';
@@ -45,14 +45,20 @@ export function defaultColor(kind, label, doc) {
   return SHAPE_COLORS[kind] || nextColor(doc);
 }
 
+/** Add a shape with its bottom middle at a spot (dropped there from the toolbar). Same arguments as addShape after it. */
+export function addShapeAt(at, ...args) {
+  dropAt = at;
+  try { return addShape(...args); } finally { dropAt = null; }
+}
+let dropAt = null;
 export function addShape(kind, extra = {}, label0) {
   let id;
   store.commit((doc) => {
     id = store.newId('b');
     const p = { ...SHAPES[kind].defaults, ...extra };
     const fid = store.newId('f');
-    let pos = placeNew(), rot = [0, 0, 0];
-    const wp = app.workplane;
+    let pos = dropAt ? dropAt.map(r4) : placeNew(), rot = [0, 0, 0];
+    const wp = dropAt ? null : app.workplane; // dropped somewhere: right there, even with a workplane set
     if (wp) {
       // on the workplane: standing out from the face; the exact spot is set once its height is known (see build.js)
       const e = new Euler().setFromQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), new Vector3(...wp.n).normalize()), 'ZYX');
@@ -124,6 +130,70 @@ const SCALE_MAP = {
   pin: (p, s) => [{ len: p.len * s.z }, [s.x, s.y, 1]], rod: (p, s) => [{ len: p.len * s.z }, [s.x, s.y, 1]], insert: () => [{}, null], screwhole: () => [{}, null], nuttrap: () => [{}, null],
 };
 
+/** Which way a shape's own height grows, after its turn (rot in degrees): [x, y, z]. */
+export function turnedUp(rot) {
+  return new Vector3(0, 0, 1).applyEuler(new Euler(...rot.map((d) => MathUtils.degToRad(d)), 'ZYX')).toArray();
+}
+/** For a shape turned only in quarter turns: which of X, Y, Z (0, 1, 2) each of its own X, Y, Z lies along; else null. */
+function axisMap(rot) {
+  const e = new Matrix4().makeRotationFromEuler(new Euler(...rot.map((d) => MathUtils.degToRad(d)), 'ZYX')).elements;
+  const own = [0, 1, 2].map((i) => [0, 1, 2].findIndex((j) => Math.abs(Math.abs(e[i * 4 + j]) - 1) < 1e-6));
+  return own.every((j) => j >= 0) && new Set(own).size === 3 ? own : null;
+}
+
+/**
+ * A shape followed only by Move steps (moves, turns, and sizing the same in every direction, e.g. from an older
+ * version): fold those steps into the shape itself, so it is a plain shape again whose own numbers can be changed.
+ * The result looks exactly the same. Returns true when it is a plain shape afterwards.
+ */
+const r6 = (v) => Math.round(v * 1e6) / 1e6;
+/** Objects that are a shape plus leftover Move steps it can take in: their ids (checked after a build). */
+export function foldableBodies(doc) {
+  return Object.keys(doc.bodies).filter((id) => {
+    const fs = featuresOfBody(doc, id), f = fs[0];
+    return fs.length > 1 && f?.type === 'shape' && f.body === id && fs.slice(1).every((x) => x.type === 'move' && x.body === id);
+  });
+}
+export function foldMoves(doc, id) {
+  if (isSimplePrimitive(doc, id)) return true;
+  const f = creatorOf(doc, id), h = app.results.heights?.[f?.id];
+  if (f?.type !== 'shape' || f.body !== id || h == null || !SCALE_MAP[f.kind] || f.kind === 'thread') return false;
+  const rest = featuresOfBody(doc, id).filter((x) => x !== f);
+  if (!rest.length || !rest.every((x) => x.type === 'move' && x.body === id && Array.isArray(x.m))) return false;
+  let M = new Matrix4();
+  for (const x of rest) M = new Matrix4().multiplyMatrices(new Matrix4().fromArray(x.m), M);
+  const t = new Vector3(), q = new Quaternion(), sv = new Vector3();
+  M.decompose(t, q, sv);
+  const k = sv.x;
+  if (!(k > 0) || Math.abs(sv.y - k) > 1e-6 * k || Math.abs(sv.z - k) > 1e-6 * k || M.determinant() < 0) return false; // stretched or mirrored
+  const sc = scope();
+  let p, pos;
+  try {
+    p = Object.fromEntries(Object.entries(f.p).map(([key, v]) => [key, typeof v === 'string' && SHAPES[f.kind].fields.find((x) => x[0] === key)?.[2] === 'num' ? evalExpr(v, sc) : v]));
+    pos = f.pos.map((v) => evalExpr(v, sc)); f.rot.map((v) => evalExpr(v, sc));
+  } catch { return false; }
+  // 1. the size: the shape's own numbers k times bigger (what they can't show goes into its stretch)
+  if (Math.abs(k - 1) > 1e-9) {
+    const [np, extra0] = SCALE_MAP[f.kind](p, { x: k, y: k, z: k });
+    for (const [key, v] of Object.entries(np)) f.p[key] = r4(v); // (its stretch is kept finer: it must look the same)
+    const extra = extra0 === null ? [k, k, k] : extra0;
+    if (extra) {
+      const st = (f.stretch || [1, 1, 1]).map((v, i) => r6(evalExpr(v, sc) * extra[i]));
+      if (st.every((v) => Math.abs(v - 1) < 1e-4)) delete f.stretch; else f.stretch = st;
+    }
+    // sized around 0,0,0 like the step did: its middle moves k times as far out
+    const c = new Vector3(0, 0, h / 2), mid = new Vector3(...pos).add(c).multiplyScalar(k);
+    f.pos = mid.sub(new Vector3(0, 0, (h * k) / 2)).toArray().map(r4);
+  }
+  // 2. the move and turn
+  const rigid = new Matrix4().compose(t, q, new Vector3(1, 1, 1));
+  const pr = placeByMatrix(f, rigid, h * k);
+  if (!pr) return false;
+  f.pos = pr.pos; f.rot = pr.rot;
+  doc.features = doc.features.filter((x) => !rest.includes(x));
+  return true;
+}
+
 export function markSettle(ids) {
   // objects resting on the floor before turning are put back down on it afterwards, like 3D Builder
   app.settle = ids.filter((id) => { const d = bodyData(id); return d && Math.abs(d.bbox[0][2]) < 0.01; });
@@ -137,6 +207,7 @@ export function commitTransform(ids, M, info) {
       if (info.mode === 'scale') {
         const s = info.scale;
         const piv = new Vector3(...info.pivot);
+        foldMoves(doc, id); // a shape that was only moved, turned or evenly sized since: its own numbers again
         const f = creatorOf(doc, id);
         const simple = isSimplePrimitive(doc, id);
         const sc = scope();
@@ -147,23 +218,26 @@ export function commitTransform(ids, M, info) {
             p = Object.fromEntries(Object.entries(f.p).map(([k, v]) => [k, typeof v === 'string' && SHAPES[f.kind].fields.find((x) => x[0] === k)?.[2] === 'num' ? evalExpr(v, sc) : v]));
             rot = f.rot.map((v) => evalExpr(v, sc)); pos = f.pos.map((v) => evalExpr(v, sc));
           } catch { p = null; }
-          if (p) {
-            const quarter = (a) => Math.abs(((a % 90) + 90) % 90) < 1e-6;
-            const flatRot = Math.abs(rot[0]) < 1e-6 && Math.abs(rot[1]) < 1e-6 && quarter(rot[2]);
-            if (flatRot) {
-              // turned a quarter turn: the shape's own X and Y are swapped
-              const swap = Math.abs(((rot[2] % 180) + 180) % 180 - 90) < 1e-6;
-              const ss = swap ? { x: s.y, y: s.x, z: s.z } : s;
-              const [np, extra0] = SCALE_MAP[f.kind](p, ss);
-              const extra = extra0 === null ? [ss.x, ss.y, ss.z] : extra0;
-              for (const [k, v] of Object.entries(np)) f.p[k] = r2(v);
-              if (extra) {
-                const st = (f.stretch || [1, 1, 1]).map((v, i) => r4(evalExpr(v, sc) * extra[i]));
-                if (st.every((v) => Math.abs(v - 1) < 1e-4)) delete f.stretch; else f.stretch = st;
-              }
-              f.pos = new Vector3(...pos).sub(piv).multiply(s).add(piv).toArray().map(r4);
-              continue;
+          // turned only in quarter turns (any way: a sketch on an upright face is turned on its side): each of the
+          // shape's own directions lies along one of X, Y, Z, so sizing along that one changes the shape's own number
+          // (for a sketch standing on a face, sizing across the face changes its height)
+          const own = p && axisMap(rot), data = bodyData(id);
+          if (own && data) {
+            const sw = [s.x, s.y, s.z], ss = { x: sw[own[0]], y: sw[own[1]], z: sw[own[2]] };
+            const [np, extra0] = SCALE_MAP[f.kind](p, ss);
+            const extra = extra0 === null ? [ss.x, ss.y, ss.z] : extra0;
+            for (const [k, v] of Object.entries(np)) f.p[k] = r2(v);
+            if (extra) {
+              const st = (f.stretch || [1, 1, 1]).map((v, i) => r6(evalExpr(v, sc) * extra[i]));
+              if (st.every((v) => Math.abs(v - 1) < 1e-4)) delete f.stretch; else f.stretch = st;
             }
+            // the shape is placed by its middle, half its own height above pos. Its middle goes where sizing puts it,
+            // except along its own height: there its base (the side on the floor, or on the face it stands on) stays
+            const j = own[2], up = turnedUp(rot)[j], h = data.bbox[1][j] - data.bbox[0][j], h2 = h * ss.z;
+            const mid0 = new Vector3(...pos).add(new Vector3(0, 0, h / 2)), mid = mid0.clone().sub(piv).multiply(s).add(piv);
+            if (ids.length === 1) mid.setComponent(j, mid0.getComponent(j) + (up * (h2 - h)) / 2); // (several at once: sized together)
+            f.pos = mid.sub(new Vector3(0, 0, h2 / 2)).toArray().map(r4);
+            continue;
           }
         }
         // anything else is sized by a scaling step (a combined solid sized unevenly becomes a mesh)

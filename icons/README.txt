@@ -39,7 +39,7 @@ pill.svg                       (small buttons and lists)
 chevron-right.svg              (small buttons and lists)
 circle.svg                     Washer, Round magnet, Sphere
 circle-dashed.svg              Holes and pockets, Screw hole (plain, countersunk, counterbored), Threaded hole (cutter)
-circle-dot.svg                 Bearings, Printed standoff, Heat-set insert hole, Tube, Heat-set insert pocket on a face
+circle-dot.svg                 Bearings, Printed standoff, Heat-set insert hole, Heat-set insert pocket on a face, Tube
 clipboard-paste.svg            Paste
 cone.svg                       Cone
 copy.svg                       Mirror copy to the right, Mirror copy to the back, Mirror copy on top, Duplicate, Copy
@@ -91,10 +91,10 @@ squares-unite.svg              Merge
 sun-moon.svg                   Theme
 torus.svg                      Torus
 trash-2.svg                    Delete, Delete step
-triangle.svg                   Tetrahedron
+triangle.svg                   (small buttons and lists)
 triangle-alert.svg             (small buttons and lists)
 triangle-right.svg             Wedge
-type.svg                       Text, Emboss
+type.svg                       Emboss, Text
 undo-2.svg                     Undo
 ungroup.svg                    Ungroup
 x.svg                          Select none
