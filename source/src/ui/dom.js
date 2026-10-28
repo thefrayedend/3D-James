@@ -5,7 +5,7 @@ import {
   FlipVertical2, FolderOpen, Grid2x2, Group, Hexagon, History, House, Layers, Lock, LockOpen, Magnet, Maximize, Menu, Minus, Mouse,
   MousePointerClick, Move3d, Nut, Package, Pipette, Plus, Printer, Pyramid, Settings2, Redo2, Rotate3d, Ruler, RulerDimensionLine, Save, SaveAll, Scale3d, ScanEye, Scissors, SlidersHorizontal, Spline,
   SquareRoundCorner, SquaresIntersect, SquaresSubtract, SquaresUnite, SunMoon, Torus, Trash2, Triangle, TriangleAlert, TriangleRight, Type,
-  Undo2, Ungroup, X,
+  Undo2, Ungroup, X, Bot,
 } from 'lucide';
 
 const LUCIDE = {
@@ -13,7 +13,7 @@ const LUCIDE = {
   CircleDashed, CircleDot, ClipboardPaste, Cone, Copy, Cylinder, Diamond, Eye, EyeOff, FilePlus, FlipHorizontal2, FlipVertical2, FolderOpen,
   Grid2x2, Group, Hexagon, History, House, Layers, Lock, LockOpen, Magnet, Maximize, Menu, Minus, Mouse, MousePointerClick, Move3d, Nut,
   Package, Pipette, Plus, Printer, Pyramid, Settings2, Redo2, Rotate3d, Ruler, RulerDimensionLine, Save, SaveAll, Scale3d, ScanEye, Scissors, SlidersHorizontal, Spline, SquareRoundCorner, SquaresIntersect,
-  SquaresSubtract, SquaresUnite, SunMoon, Torus, Trash2, Triangle, TriangleAlert, TriangleRight, Type, Undo2, Ungroup, X,
+  SquaresSubtract, SquaresUnite, SunMoon, Torus, Trash2, Triangle, TriangleAlert, TriangleRight, Type, Undo2, Ungroup, X, Bot,
 };
 
 export const $ = (id) => document.getElementById(id);
@@ -72,7 +72,7 @@ export function h(tag, attrs = {}, ...kids) {
 }
 
 export const r2 = (v) => Math.round(v * 100) / 100;
-export const r4 = (v) => Math.round(v * 1e4) / 1e4;
+export { r4 } from '../shared.js';
 export const fmt = (v) => (Math.abs(v) < 0.005 ? '0' : (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)).replace(/\.?0+$/, '') || '0');
 export const isPlainNumber = (s) => /^[-+]?(\d+\.?\d*|\.\d+)$/.test(String(s).trim());
 
@@ -80,6 +80,7 @@ export function toast(msg, kind = 'info', ms = 4200) {
   const t = h('div', { class: 'toast' + (kind === 'err' ? ' err' : ''), role: kind === 'err' ? 'alert' : 'status' }, msg);
   $('toasts').append(t);
   setTimeout(() => t.remove(), ms);
+  return t;
 }
 
 // ---------------------------------------------------------------- pop-up menus

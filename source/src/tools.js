@@ -11,7 +11,7 @@ import { renderAll, renderProps, openPanel } from './ui/panels.js';
 import { renderCmdBar } from './ui/ribbon.js';
 import { measurePick } from './measure.js';
 import { planeDialog } from './sketchplane.js';
-import { workerCall, waitForBuild } from './build.js';
+import { workerCall, waitForBuild, refreshToolPreview } from './build.js';
 import { lookAtFace } from './sketchcmd.js';
 
 // tools that finish with a single click (no Apply button)
@@ -79,11 +79,13 @@ export function startTool(type) {
 export function endTool() {
   if (app.tool?.type === 'workplane') app.afterWorkplane = null;
   const wasSplit = app.tool?.type === 'split';
+  const hadPreview = app.tool?.type === 'emboss' && app.tool.face; // its orange preview goes away
   if (app.tool?.type === 'align') vp.setAlign(null);
   app.tool = null;
   vp.setMeasurements([]);
   vp.endPick();
   if (wasSplit) vp.endPlane();
+  if (hadPreview) refreshToolPreview();
   renderCmdBar();
   renderAll();
 }
@@ -131,7 +133,7 @@ export function toolPick(kind, hit) {
   if (t.type === 'emboss') {
     const d = bodyData(hit.body);
     if (d.flat && !d.flat[hit.index]) return toast('Pick a flat face for embossing. Curved wrapping is not supported yet.', 'err');
-    t.face = faceRef(d, hit.index); t.items = [hit]; vp.setPickItems(t.items); renderProps(); return;
+    t.face = faceRef(d, hit.index); t.items = [hit]; vp.setPickItems(t.items); renderProps(); refreshToolPreview(); return;
   }
   if (t.type === 'lookat') { endTool(); lookAtFace(hit); return; }
   if (t.type === 'layflat') {

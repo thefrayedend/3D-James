@@ -4,8 +4,6 @@ import { app } from './state.js';
 import { $, h, menuOpen, closeMenu, loadCustomIcons, iconNames, iconFile } from './ui/dom.js';
 import { vp } from './view.js';
 import { startWorker, workerCall, requestBuild } from './build.js';
-import { previewCombine, booleanPlan } from './boolean-preview.js';
-import { exportDialog } from './files.js';
 import { createVersion, restoreVersion, deleteVersion, versionsDialog } from './versions.js';
 import { parseLogo } from './logo.js';
 import { moveFeature, canMoveFeature, historyDependencies, dependentSteps } from './history.js';
@@ -32,12 +30,13 @@ import { applyTheme } from './theme.js';
 import { detectDrive } from './drive/index.js';
 import { applyTouchMode, toggleMod, mods, onTouchModeChange } from './touch.js';
 import * as server from './drive/server.js';
+import { makeEditable } from './editable.js';
+import { startBridge } from './bridge.js';
 
 // ---------------------------------------------------------------- keyboard
 // Remember what a text box held when you clicked into it, so Ctrl+Z can tell typing from undoing.
 document.addEventListener('focusin', (e) => { const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) t.dataset.start = t.value; });
 document.addEventListener('keydown', (e) => {
-  if (app.preview) { if (e.key === 'Escape') { e.preventDefault(); app.preview.cancel?.(); } else if (e.ctrlKey || e.metaKey || e.altKey) e.preventDefault(); return; }
   const ae = document.activeElement;
   const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA') && !['checkbox', 'radio', 'color', 'file'].includes(ae.type);
   const mod = e.ctrlKey || e.metaKey;
@@ -80,7 +79,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   if (ev !== 'drop') return;
   const f = e.dataTransfer.files?.[0];
-  if (f) { if (fmtOf(f.name) === 'json' || !app.results.bodies.size) openFile(f, null); else insertFile(f); }
+  if (f) { if (['3dj', 'json'].includes(fmtOf(f.name)) || !app.results.bodies.size) openFile(f, null); else insertFile(f); }
 }));
 window.addEventListener('beforeunload', (e) => { if (app.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -127,6 +126,7 @@ store.onChange((kind) => {
   // opened from a 3DJames server? Then files come from the server's folders, and each person keeps their own backups
   if ((await detectDrive()).mode === 'server') { idb.name = `3djames-${server.me.user}`; buildTabBar(); renderCmdBar(); }
   loadMyParts();
+  startBridge(); // an AI helper on this computer may ask to work in this window (src/bridge.js)
   loadCustomIcons(() => { buildTabBar(); renderCmdBar(); renderAll(); });
   const last = await restoreSession();
   store.doc = last?.doc || exampleDoc();
@@ -148,9 +148,9 @@ store.onChange((kind) => {
 window.__3dj = {
   app, store, vp,
   commands: {
-    previewCombine, booleanPlan, exportDialog, createVersion, restoreVersion, deleteVersion, versionsDialog, parseLogo, moveFeature, canMoveFeature, historyDependencies, dependentSteps, measureResult, measurePick, setMeasureMode,
+    createVersion, restoreVersion, deleteVersion, versionsDialog, parseLogo, moveFeature, canMoveFeature, historyDependencies, dependentSteps, measureResult, measurePick, setMeasureMode,
     startWorker, barCommit, setGizmo, openPanel, endTool, showAbout, presetFor, openSketch, renderCmdBar, workerCall, applyTheme, addShape, combine, startTool, applyTool, quickEdges, addThread, mirrorSel, turnCopySel,
     iconNames, iconFile, centerOn, alignSel, addPattern, duplicateSel, deleteSel, dropSel, rotateSel, saveDoc, saveAs, openFile, insertFile, groupSel, ungroupSel, readZip, parse3mf,
-    buildFileData, translateSel, setBodyProp, toolPick, createSketch, startSketch, editSketch, editSketches, startFaceSketch, startPhotoSketch, startImportSketch, planeDialog, adjustedPlane, setWorkplane, newProject, loadProject, editStep, renderAll, saveToMyParts, insertMyPart, loadMyParts, usePartsFolder, idb,
+    buildFileData, makeEditable, translateSel, setBodyProp, toolPick, createSketch, startSketch, editSketch, editSketches, startFaceSketch, startPhotoSketch, startImportSketch, planeDialog, adjustedPlane, setWorkplane, newProject, loadProject, editStep, renderAll, saveToMyParts, insertMyPart, loadMyParts, usePartsFolder, idb,
   },
 };

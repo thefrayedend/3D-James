@@ -359,17 +359,19 @@ export class Viewport {
     this.requestRender();
   }
 
-  /** See-through copies of objects a step used up (shown while that step is being edited). */
+  /** See-through copies of objects a step used up (shown while that step is being edited), and the piece pointed out
+   * by hovering an Edit sketch button (hover: orange, drawn over everything so it shows inside the object too). */
   setGhosts(list) {
     while (this.ghosts.children.length) { const o = this.ghosts.children.pop(); o.geometry.dispose(); o.children.forEach((c) => c.geometry.dispose()); }
+    this.pieceMat ||= new THREE.MeshBasicMaterial({ color: 0xff8a00, transparent: true, opacity: 0.38, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
     for (const b of list || []) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(b.vertices, 3));
       g.setIndex(new THREE.BufferAttribute(b.triangles, 1));
-      const m = new THREE.Mesh(g, this.ghostMat);
-      m.renderOrder = 6; m.raycast = () => {};
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(g, 30), new THREE.LineBasicMaterial({ color: this.colors.pick, transparent: true, opacity: 0.9, depthTest: false }));
-      edges.renderOrder = 7; edges.raycast = () => {};
+      const m = new THREE.Mesh(g, b.hover ? this.pieceMat : this.ghostMat);
+      m.renderOrder = b.hover ? 8 : 6; m.raycast = () => {};
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(g, 30), new THREE.LineBasicMaterial({ color: b.hover ? 0xff6a00 : this.colors.pick, transparent: true, opacity: 0.9, depthTest: false }));
+      edges.renderOrder = b.hover ? 9 : 7; edges.raycast = () => {};
       m.add(edges);
       this.ghosts.add(m);
     }
@@ -568,6 +570,17 @@ export class Viewport {
       box.expandByPoint(tmpV.set(...e.data.bbox[0])); box.expandByPoint(tmpV.set(...e.data.bbox[1]));
     }
     return box;
+  }
+
+  /** How far the picked objects reach from c, in any direction. It stays the same while they turn (a box around them
+   * grows and shrinks as they turn), so the turning rings keep one size. */
+  selectionReach(c, ids = this.selection) {
+    let r = 0;
+    for (const id of ids) {
+      const s = this.bodies.get(id)?.mesh.geometry.boundingSphere; if (!s) continue;
+      r = Math.max(r, s.center.distanceTo(c) + s.radius);
+    }
+    return r;
   }
 
   // ---------------- handles ----------------
@@ -821,7 +834,7 @@ export class Viewport {
         }
       }
     }
-    return { box, r, c, rect, lrAx, lrSign, depth, move, faces, rot: this.gizmoMode === 'rotate' ? this.ringLayout(c, Math.max(diag * 0.5, 2), rect) : null };
+    return { box, r, c, rect, lrAx, lrSign, depth, move, faces, rot: this.gizmoMode === 'rotate' ? this.ringLayout(c, Math.max((this.selectionReach(c) || diag * 0.5) * 1.12, 2), rect) : null };
   }
 
   updateHud() {
@@ -832,9 +845,10 @@ export class Viewport {
     const place = (el, x, y, rot = 0) => { el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${rot}rad)`; };
     const pts = (arr) => arr.map((q) => `${q.x},${q.y}`).join(' ');
     for (const { el, data } of this.hudItems) {
-      // green for the active axis, blue for the others (the split plane's own arrow stays green)
+      // the direction being worked on (its box in the bar is picked, or its arrow was used) is green, like that box's
+      // underline; the other directions are blue
       const ax = this.handleAxis(data, L);
-      if (ax !== undefined) el.style.color = '#1ea0ff'; // all handles blue (no green for the last direction used)
+      if (ax !== undefined) el.style.color = ax === this.activeAxis ? '#7ed321' : '#1ea0ff';
       if (data.type === 'rings') {
         const { ball, z, a, b } = L.rot;
         const ci = el.querySelector('.ball'); ci.setAttribute('cx', ball.x); ci.setAttribute('cy', ball.y); ci.setAttribute('r', ball.r);

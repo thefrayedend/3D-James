@@ -1,10 +1,12 @@
 import initOC from '../node_modules/replicad-opencascadejs/dist/replicad_single.js';
 import ManifoldModule from 'manifold-3d';
-import { evaluate, setManifoldModule, R, exportMeshOf, solidOf, parseSTLToMf, hasStep, registerStep, countSolids, solidBounds, surfacePlane, unionLoops, offsetLoops } from './engine.js';
+import { evaluate, setManifoldModule, R, exportMeshOf, solidOf, parseSTLToMf, hasStep, registerStep, countSolids, solidBounds, surfacePlane, unionLoops, offsetLoops, outlineOf } from './engine.js';
 import { zipStore } from './zip.js';
+import { convertAndCheck } from './stlconvert.js';
 
 const fonts = new Set();
 let ready = false;
+let MFmod = null;
 const files = {}; // imported file bytes by id, sent once by the page
 async function readStep(bytes) {
   try {
@@ -28,6 +30,7 @@ async function init(assets) {
   const mf = await ManifoldModule({ wasmBinary: assets.manifold, locateFile: (f) => f });
   mf.setup();
   setManifoldModule(mf);
+  MFmod = mf;
   for (const name of ['sans', 'round']) {
     try { await R.loadFont(assets[name], name); fonts.add(name); } catch (err) { console.warn('font', name, err); }
   }
@@ -106,6 +109,17 @@ async function doExport({ format, items, base, project, extra }) {
   return { zip: zipStore(files), files, skipped: format === 'step' ? items.length - files.length : 0 };
 }
 
+/**
+ * Make an imported mesh editable: rebuild it as sketches and steps (src/stlconvert.js), build those in a trial
+ * run and measure them against the mesh. msg.feature is the import step (it says where the mesh sits).
+ */
+function convertImport({ feature, name, seq, body, detail }) {
+  const trial = evaluate({ vars: [], bodies: {}, features: [{ ...feature, id: 'f0', body: 'b0' }] }, fonts, { files, scratch: true });
+  const mesh = trial.meshes.get('b0');
+  if (!mesh) throw new Error(Object.values(trial.errors)[0] || 'The mesh could not be read.');
+  return convertAndCheck(MFmod, mesh, { name, seq, body, detail }, (doc) => evaluate(doc, fonts, { scratch: true }));
+}
+
 async function handleMessage(e) {
   const msg = e.data;
   try {
@@ -122,14 +136,19 @@ async function handleMessage(e) {
           try { registerStep(f.p.file, await readStep(files[f.p.file])); } catch (err) { console.warn('step', err); }
         }
       }
-      const res = evaluate(msg.doc, fonts, { files, ghostOf: msg.ghostOf });
-      self.postMessage({ type: 'built', id: msg.id, revision: msg.revision, previewId: msg.previewId, ...res });
+      const res = evaluate(msg.doc, fonts, { files, ghostOf: msg.ghostOf, show: msg.show || [], preview: msg.preview || null });
+      self.postMessage({ type: 'built', id: msg.id, revision: msg.revision, ...res });
     } else if (msg.type === 'surfacePlane') {
       self.postMessage({ type: 'surfacePlane', id: msg.id, plane: surfacePlane(msg.body, msg.face, msg.point) });
+    } else if (msg.type === 'outline') {
+      self.postMessage({ type: 'outline', id: msg.id, polys: outlineOf(msg.ids || [], msg.m) });
     } else if (msg.type === 'unionLoops') {
       self.postMessage({ type: 'unionLoops', id: msg.id, loops: unionLoops(msg.loops || []) });
     } else if (msg.type === 'offsetLoops') {
       self.postMessage({ type: 'offsetLoops', id: msg.id, loops: offsetLoops(msg.loops || [], +msg.dist || 0, msg.corners) });
+    } else if (msg.type === 'convertImport') {
+      const res = convertImport(msg);
+      self.postMessage({ type: 'converted', id: msg.id, ...res });
     } else if (msg.type === 'export') {
       const res = await doExport(msg);
       self.postMessage({ type: 'exported', id: msg.id, data: res.zip, files: res.files });

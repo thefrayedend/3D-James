@@ -137,4 +137,3 @@ export function showHelp(on) {
     render();
   } else dock(false);
 }
-export const helpOpen = () => !!view;

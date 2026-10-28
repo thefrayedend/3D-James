@@ -15,7 +15,6 @@ export function bindExamples(body) {
     }
     const open = async () => {
       const F = await import('../files.js');
-      if (app.preview) throw new Error('Apply or cancel the modeling preview before opening an example.');
       if (document.body.classList.contains('sketching')) throw new Error('Finish or cancel your sketch before opening an example.');
       F.loadProject(JSON.parse(JSON.stringify(example.doc)), null);
       app.dirty = true; F.updateTitle();

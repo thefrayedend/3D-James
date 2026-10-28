@@ -1,0 +1,123 @@
+[
+  {
+    "name": "status",
+    "description": "Is 3DJames open, and what is in it: project name, file, unsaved changes, number of steps and objects, what the user has selected, and whether they are busy (sketch board open, or making a model editable). Does not open 3DJames.",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "how_to_write_steps",
+    "description": "The guide to 3DJames project JSON: units and coordinates, every shape kind and its numbers, sketches, combine/move/fillet/pattern steps, variables, colours, and how to name steps so the user can edit them. Read it once before adding or changing steps.",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "list_projects",
+    "description": "List the projects (and meshes) in the user's 3DJames Projects folder, newest first.",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "open_project",
+    "description": "Open a project in the 3DJames window: a name from list_projects (\".3dj\" may be left out) or a full path to a .3dj, .3mf, .json, .stl, .obj or .step file. Returns the project JSON and the build result. Refuses when the open project has unsaved changes, unless discard_changes is true (ask the user first).",
+    "inputSchema": { "type": "object", "properties": {
+      "name": { "type": "string", "description": "Project name in the Projects folder, or a full path" },
+      "discard_changes": { "type": "boolean", "description": "Throw away unsaved changes in the open project (only after the user said so)" }
+    }, "required": ["name"] }
+  },
+  {
+    "name": "new_project",
+    "description": "Start a new, empty project in the 3DJames window. Refuses when the open project has unsaved changes, unless discard_changes is true (ask the user first).",
+    "inputSchema": { "type": "object", "properties": {
+      "name": { "type": "string", "description": "Name of the new project" },
+      "discard_changes": { "type": "boolean", "description": "Throw away unsaved changes in the open project (only after the user said so)" }
+    } }
+  },
+  {
+    "name": "get_project",
+    "description": "The open project as JSON (vars, bodies, features: the same as project.json in a .3dj), plus the build result.",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "build",
+    "description": "Build the open project and report: problems (step id, step name, message), each object's size_mm [x,y,z], position (from_mm, to_mm), volume_cm3 and whether it is a solid, and the overall size and volume. Every change tool already returns this.",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "add_steps",
+    "description": "Add steps to the open project as one Undo step, then build and report. Steps use the same JSON as features in a .3dj (see how_to_write_steps). Leave \"id\" out to get a free one (f12...); a shape without \"body\" gets a new object id. Give every new object a name and colour in \"objects\".",
+    "inputSchema": { "type": "object", "properties": {
+      "steps": { "type": "array", "description": "Steps in build order, e.g. {\"type\":\"shape\",\"kind\":\"box\",\"name\":\"Base plate\",\"body\":\"b5\",\"p\":{\"w\":\"plateW\",\"d\":60,\"h\":4},\"pos\":[0,0,0],\"rot\":[0,0,0]}", "items": { "type": "object" } },
+      "objects": { "type": "object", "description": "Object (body) entries by id, e.g. {\"b5\":{\"name\":\"Base plate\",\"color\":\"#22B14C\"},\"b6\":{\"name\":\"Corner hole\",\"color\":\"#8b96a3\",\"hole\":true}}" },
+      "vars": { "type": "array", "description": "Variables to add or change first, e.g. [{\"name\":\"plateW\",\"expr\":\"80\"}]", "items": { "type": "object" } },
+      "after": { "type": "string", "description": "Put the steps after this step id (default: at the end)" }
+    }, "required": ["steps"] }
+  },
+  {
+    "name": "change_step",
+    "description": "Change one step as one Undo step, then build and report. Only the fields given change; \"p\" is merged (so {\"p\":{\"h\":30}} changes only the height). A field set to null is removed.",
+    "inputSchema": { "type": "object", "properties": {
+      "id": { "type": "string", "description": "Step id, e.g. f7" },
+      "changes": { "type": "object", "description": "Fields to change, e.g. {\"p\":{\"d\":\"holeD\"},\"pos\":[10,0,0],\"name\":\"Bolt hole\",\"suppressed\":true}" }
+    }, "required": ["id", "changes"] }
+  },
+  {
+    "name": "delete_steps",
+    "description": "Delete steps as one Undo step, then build and report (it names later steps that used them).",
+    "inputSchema": { "type": "object", "properties": {
+      "ids": { "type": "array", "items": { "type": "string" }, "description": "Step ids, e.g. [\"f7\",\"f8\"]" }
+    }, "required": ["ids"] }
+  },
+  {
+    "name": "set_vars",
+    "description": "Add, change or remove project variables as one Undo step, then build and report. Changing a variable is the best way to change a size used in several places.",
+    "inputSchema": { "type": "object", "properties": {
+      "vars": { "type": "array", "items": { "type": "object" }, "description": "e.g. [{\"name\":\"wall\",\"expr\":\"3\"},{\"name\":\"pitch\",\"expr\":\"slotW + wall\"}]" },
+      "remove": { "type": "array", "items": { "type": "string" }, "description": "Names of variables to remove" }
+    } }
+  },
+  {
+    "name": "set_objects",
+    "description": "Change objects (bodies) as one Undo step: name, color (Paint palette, e.g. #00A2E8), hole (true makes it a hole), hidden. A field set to null is removed.",
+    "inputSchema": { "type": "object", "properties": {
+      "objects": { "type": "object", "description": "By id, e.g. {\"b1\":{\"name\":\"Lid\",\"color\":\"#00A2E8\"}}" }
+    }, "required": ["objects"] }
+  },
+  {
+    "name": "replace_project",
+    "description": "Replace the whole open project with new JSON (vars, bodies, features, name) as one Undo step, then build and report. Use it for a model designed from scratch; use add_steps / change_step for changes.",
+    "inputSchema": { "type": "object", "properties": {
+      "project": { "type": "object", "description": "The same JSON as project.json in a .3dj: {\"name\", \"vars\", \"bodies\", \"features\"}" }
+    }, "required": ["project"] }
+  },
+  {
+    "name": "undo",
+    "description": "Undo the last change(s) in 3DJames (like Ctrl+Z), then build and report.",
+    "inputSchema": { "type": "object", "properties": {
+      "steps": { "type": "integer", "description": "How many changes to undo (default 1)" }
+    } }
+  },
+  {
+    "name": "picture",
+    "description": "A picture (PNG) of the model in the 3DJames window, to check it looks right. The view also changes in the user's window.",
+    "inputSchema": { "type": "object", "properties": {
+      "view": { "type": "string", "enum": ["home", "front", "back", "left", "right", "top", "bottom", "current"], "description": "Which way to look (default home: from the front left, above)" },
+      "width": { "type": "integer", "description": "Picture width in pixels, 200 to 1600 (default 900)" }
+    } }
+  },
+  {
+    "name": "make_editable",
+    "description": "Make editable: rebuild an STL/OBJ/3MF mesh as editable sketches and steps. Give \"file\" (a full path, or a name in the Projects folder) to bring it into the open project first, or \"object\" for a mesh already in it. Can take a few minutes. Reports how close it came (percent the same, largest gap) and which parts stayed meshes.",
+    "inputSchema": { "type": "object", "properties": {
+      "file": { "type": "string", "description": "Mesh file to bring in: full path or a name in Projects" },
+      "object": { "type": "string", "description": "Id of an imported mesh object already in the project, e.g. b3" },
+      "detail": { "type": "string", "enum": ["simple", "balanced", "precise"], "description": "How much detail to keep: simple (fewest, plainest steps; may differ by a few tenths of a mm), balanced (far fewer steps, about as close as a printer makes), precise (as close as it gets, more steps). Default: the user's last choice in 3DJames." }
+    } }
+  },
+  {
+    "name": "save_project",
+    "description": "Save the open project into the user's Projects folder: format 3dj (default, the editable project), or stl / step / 3mf. Refuses to replace an existing file unless overwrite is true, and then the user is asked in 3DJames.",
+    "inputSchema": { "type": "object", "properties": {
+      "name": { "type": "string", "description": "File name without folder, e.g. \"Bracket v2\" (default: the project name)" },
+      "format": { "type": "string", "enum": ["3dj", "stl", "step", "3mf"], "description": "File type (default 3dj)" },
+      "overwrite": { "type": "boolean", "description": "Replace a file of that name (the user is asked to confirm)" }
+    } }
+  }
+]

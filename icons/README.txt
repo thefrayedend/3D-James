@@ -13,7 +13,7 @@ In dark mode 3DJames turns black into white for you. Keep the exact file name.
 File                           Used for
 ------------------------------ -------------------------------------------------------
 crosshair.svg                  Center, Center on it (left-right and front-back), Center on it in every direction
-pen-line.svg                   Edit picked sketches together, Sketch, Edit sketches together, Edit sketch
+pen-line.svg                   Edit picked sketches together, Sketch, Edit sketches together, Make editable, Edit sketch
 square.svg                     (small buttons and lists)
 mouse-pointer-2.svg            (small buttons and lists)
 align-center-horizontal.svg    Up-down only
@@ -78,7 +78,7 @@ rotate-3d.svg                  Turned copy: ¼ turn left (90°), Turned copy: ½
 ruler.svg                      Measure
 ruler-dimension-line.svg       Ruler
 save.svg                       Save
-save-all.svg                   Save as…, Export…, Save as
+save-all.svg                   Save as…, Save as
 scale-3d.svg                   (small buttons and lists)
 scan-eye.svg                   Look at face
 scissors.svg                   Split
@@ -98,3 +98,4 @@ type.svg                       Emboss, Text
 undo-2.svg                     Undo
 ungroup.svg                    Ungroup
 x.svg                          Select none
+bot.svg                        (small buttons and lists)

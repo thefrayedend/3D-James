@@ -5,7 +5,10 @@ draw your own outlines with exact sizes, and everything stays editable. Runs off
 
 ## Use it
 
-Download **3DJames.html** and open it in Edge or Chrome (or double-click **Open 3DJames.cmd** on Windows).
+On Windows: download **[3DJames-Setup.exe](3DJames-Setup.exe)** (click it, then the download button) and run it. It installs 3DJames
+with a Start menu entry and lets AI apps (Claude, Antigravity) work in the open window.
+
+Or without installing: download **3DJames.html** and open it in Edge or Chrome (or double-click **Open 3DJames.cmd**).
 **Make desktop shortcut.cmd** puts an icon on your desktop. Everything you need to know is in the app's Help tab.
 
 ## The source

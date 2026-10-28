@@ -3,7 +3,7 @@
 The shipped `3DJames.html` works offline without installing development tools.
 
 To rebuild the source, use Node.js 20 or newer and Python 3. Install the JavaScript
-dependencies with `pnpm install --frozen-lockfile`, then run:
+dependencies with `npm ci` (or double-click `Build 3DJames.cmd`, which does it the first time), then run:
 
 ```text
 python build.py
@@ -17,11 +17,15 @@ Browser tests need Playwright and its Chromium browser:
 ```text
 python -m pip install playwright
 python -m playwright install chromium
-python tests/features.py
-python tests/ui_features.py
-python tests/reliability.py
-python tests/run.py
+python tests/all.py
 ```
+
+`tests/all.py` runs every suite below one after the other and ends with a summary (about half an hour).
+Name suites to run just those (`python tests/all.py features sketch_lines`), or leave some out
+(`python tests/all.py --skip link`: the link suite needs the AI link's port free).
+
+Shipping (`python tools/ship.py`) raises the last part of the version number by itself when the build
+differs from the one already shipped, so every shipped app has its own number.
 
 The reliability suite tests saving during edits, failed imports, pending geometry
 exports, missing files, invalid project and mesh data, ZIP limits and CRC checks,
@@ -29,7 +33,7 @@ cyclic 3MF components, backup errors, close warnings, worker recovery, and dialo
 keyboard behavior. The main suite also exercises modeling tools and real mouse
 interactions. Test screenshots are written to `dist/`.
 
-Run lint with `pnpm lint`. The source has no lint warnings or errors.
+Run lint with `npm run lint`. The source has no lint warnings or errors.
 
 The feature suite checks emboss/engrave geometry, SVG holes, read-only measurements,
 portable version records and imports, dependency-aware history, boolean previews,
@@ -83,7 +87,8 @@ the model only after Keep visible (until Close), then closes it before continuin
 
 Putting a build where it is used: `python tools/ship.py` copies `local/3DJames.html` to the 3DJames folder
 (the one you open) and `single/`, updates the version in the shipped README, remakes `icons/originals`, and
-writes `Share/3DJames.zip`. The 3DJames folder above `source` is the master copy of everything that ships.
+builds and copies the AI link. (There is no share zip: 3DJames is shared as the installer that
+`Installation\Make 3DJames Installer.cmd` makes.) The 3DJames folder above `source` is the master copy of everything that ships.
 
 Code map (the parts most changes touch):
 - `src/sketchgeom.js`: sketch loop geometry shared by the board and the engine (closed outlines, circles, helper
@@ -122,3 +127,23 @@ More sketch tools (Trim, Slot, Polygon, Offset, Pattern, helper <-> drawn line, 
 `python tests/sketch_tools.py` (real mouse and keys). Where lines cross and cutting sides is in `src/sketchcut.js`,
 reading DXF / SVG in `src/sketchimport.js`, the tools on the board in `src/ui/sketchmore.js`; Offset runs in the
 geometry engine (`offsetLoops` in `src/engine.js`). Help pictures: `python help/shots/tools_shots.py`.
+
+Make editable (STL to sketches): `src/stlconvert.js` rebuilds a mesh as sketches pushed up (layers between flat
+faces, holes through several layers as one cutter), profiles spun around, or outlines seen from two or three sides
+pushed through each other, then works out what that misses the same way (cut out or merged in). Outlines become
+lines, true arcs, circles and rounded corners. It runs in the geometry worker (`convertImport` in `src/worker.js`),
+which also builds the result in a trial run and measures it against the mesh (retrying more simply when the CAD
+kernel cannot build it); `src/editable.js` puts the steps in place of the import step (one Undo).
+`node tests/stl_convert.mjs [file.stl ...]` converts STLs with the real engine (no browser) and prints steps,
+how much differs and the largest gap; with no files it uses `tests/fixtures/stl` (made by
+`node tests/make_stl_fixtures.mjs`) and fails when one is not close. `python tests/stl_editable.py` opens them in
+the app with the mouse: Make editable, change a sketch, Undo back to the mesh, save and reopen. Help pictures:
+`python help/shots/editable_shots.py`.
+
+The AI link (Gemini / Claude work in the open window): `src/bridge.js` (the page side, only for files on this
+computer) and `windows-desktop/link/` (`3DJamesLink.exe`, an MCP server; `python windows-desktop/link/build_link.py`
+builds it with the Windows C# compiler into `local/`). `python tests/link.py` drives every tool through the real exe
+and app. `tools/ship.py` builds it and puts it, `GEMINI.md`, `Ask Gemini.cmd`, `.gemini/settings.json` and `.mcp.json`
+(from `windows-desktop/link/ai/`) next to `3DJames.html`. When the tools change, update `windows-desktop/link/tools.json`
+and the Help page `help/pages/ai.html` (pictures: `python help/shots/link_shots.py`). Plan and later steps (desktop app,
+the box): `docs/mcp-plan.md`.

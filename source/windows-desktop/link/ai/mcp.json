@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "3djames": {
+      "command": "./3DJamesLink.exe",
+      "args": []
+    }
+  }
+}

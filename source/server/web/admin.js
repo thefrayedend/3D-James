@@ -42,7 +42,7 @@ async function start() {
   await load();
 }
 function setupPage(st) {
-  const u = input({ value: '', placeholder: 'james', autocapitalize: 'none' }), n = input({ placeholder: 'James' }), p1 = input({ type: 'password' }), p2 = input({ type: 'password' });
+  const u = input({ value: '', placeholder: 'alex', autocapitalize: 'none' }), n = input({ placeholder: 'Alex' }), p1 = input({ type: 'password' }), p2 = input({ type: 'password' });
   $('main').replaceChildren(h('div', { class: 'card narrow' }, h('h2', {}, 'Welcome to your 3DJames box'),
     h('p', { class: 'muted' }, 'First, make the admin account (that\'s you). You can add more people afterwards.'),
     field('Sign-in name', u, 'Short, lower-case, no spaces.'), field('Your name', n), field('Password', p1), field('Password again', p2),

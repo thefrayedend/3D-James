@@ -55,6 +55,7 @@ export function installDraw(sb) {
       }
     });
     for (const sgm of sb.ref?.segs || []) for (let k = 0; k + 1 < sgm.length; k++) out.push([sgm[k], sgm[k + 1], sgm.length === 2, sgm.length === 2 ? { fixed: [sgm[0], sgm[1]] } : null]);
+    for (const o of sb.ref?.outline || []) o.forEach((p, k) => out.push([p, o[(k + 1) % o.length], false, null]));
     return out;
   };
   sb.nearestOn = (p, [A, B]) => { const d = [B[0] - A[0], B[1] - A[1]], L2 = d[0] * d[0] + d[1] * d[1] || 1e-12; const t = Math.max(0, Math.min(1, ((p[0] - A[0]) * d[0] + (p[1] - A[1]) * d[1]) / L2)); return [A[0] + d[0] * t, A[1] + d[1] * t]; };
@@ -143,7 +144,8 @@ export function installDraw(sb) {
     const r = sb.rect();
     const all = [...sb.loops]; if (sb.current?.type === 'poly' && sb.current.pts.length) all.push({ type: 'poly', pts: sb.current.pts });
     let b = all.length ? SG.loopsBounds(all) : null;
-    if (sb.ref?.segs?.length) { const rb = SG.loopsBounds(sb.ref.segs.map((s) => ({ type: 'poly', pts: s }))); b = b ? [Math.min(b[0], rb[0]), Math.min(b[1], rb[1]), Math.max(b[2], rb[2]), Math.max(b[3], rb[3])] : rb; }
+    const refLines = [...(sb.ref?.segs || []), ...(sb.ref?.outline || [])];
+    if (refLines.length) { const rb = SG.loopsBounds(refLines.map((s) => ({ type: 'poly', pts: s }))); b = b ? [Math.min(b[0], rb[0]), Math.min(b[1], rb[1]), Math.max(b[2], rb[2]), Math.max(b[3], rb[3])] : rb; }
     if (!b || !Number.isFinite(b[0])) { sb.view.s = 6; sb.view.ox = r.width / 2; sb.view.oy = r.height / 2; sb.draw(); return; }
     const w = Math.max(b[2] - b[0], 10), hh = Math.max(b[3] - b[1], 10);
     sb.view.s = Math.min(r.width / w, r.height / hh) * 0.7;
@@ -171,6 +173,8 @@ export function installDraw(sb) {
     gg.append(svgEl('line', { x1: 0, y1: axy, x2: r.width, y2: axy, class: 'axis x' }), svgEl('line', { x1: axx, y1: 0, x2: axx, y2: r.height, class: 'axis y' }));
     sb.drawPhoto(); // a photo to trace over: under the grid lines
     sb.svg.append(gg);
+    // the objects seen straight on (light), then the edges lying on the sketch plane (dashed)
+    if (sb.ref?.outline?.length) sb.svg.append(svgEl('path', { d: sb.ref.outline.map((o) => sb.pathOf(o)).join(' '), class: 'sk-outline', 'fill-rule': 'evenodd' }));
     // the face being sketched on
     if (sb.ref?.segs) for (const s of sb.ref.segs) sb.svg.append(svgEl('path', { d: sb.pathOf(s, false), class: 'sk-ref' }));
     // shapes: filled with even-odd so holes show as holes

@@ -47,8 +47,10 @@ jobs:
 
       - name: Get the 3DJames app (so the box is ready to use without uploading it)
         run: |
-          curl -fsSL --retry 3 -o "$GITHUB_WORKSPACE/3DJames.html" "https://raw.githubusercontent.com/${{ inputs.app_repo || 'thefrayedend/3D-James' }}/main/3DJames.html"
+          # through the GitHub API (always the newest commit; raw.githubusercontent.com can serve a cached older copy)
+          curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw"             -o "$GITHUB_WORKSPACE/3DJames.html" "https://api.github.com/repos/${{ inputs.app_repo || 'thefrayedend/3D-James' }}/contents/3DJames.html?ref=main"
           grep -aq 'window.__3DJ_VERSION=' "$GITHUB_WORKSPACE/3DJames.html" || { echo "::error::That is not the 3DJames app"; exit 1; }
+          echo "3DJames app: $(grep -ao 'window.__3DJ_VERSION="[^"]*"' "$GITHUB_WORKSPACE/3DJames.html" | head -1 || true)"
 
       - name: Install image tools
         run: |

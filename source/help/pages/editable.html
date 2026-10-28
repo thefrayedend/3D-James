@@ -1,0 +1,50 @@
+<h1>Make an STL editable</h1>
+<p>An STL (or OBJ, or a 3MF from another program) is a <b>mesh</b>: a shell of thousands of small triangles. 3DJames can move, size, paint and combine a mesh, but you can't change its shape: there is no "hole Ø5" or "10 mm tall" in it to change. <b>Make editable</b> rebuilds the mesh as normal 3DJames steps: <b>sketches pushed up</b>, <b>profiles spun around</b>, and <b>cut-outs</b> taken away, so you can open a sketch, change a size, and the model follows.</p>
+<h2>Start</h2>
+<ul>
+<li>Open the STL: <b>≡</b> &gt; <b>Open…</b> (Ctrl+O), or drop it on the window. 3DJames asks <b>Make it editable?</b> Click <b>Make editable</b>. (<b>Keep as a mesh</b> opens it as before.)</li>
+<li>Already in your project (from Insert, or an older project)? Select the mesh object: <b>Properties</b> shows a <b>Make editable</b> box. Click <b>Make editable</b>.</li>
+</ul>
+<h2>How much detail</h2>
+<p>Before you click Make editable, the <b>Detail</b> slider (2) picks between fewer steps and closer to the file. 3DJames remembers your choice for next time.</p>
+<ul>
+<li><b>Simplest</b> (left): the fewest, plainest steps. Small details and fine curves are left out or drawn straight; the shape may differ by a few tenths of a mm. Good when you want to change the main sizes and don't care about the fine detail.</li>
+<li><b>Balanced</b> (middle, the first time): far fewer steps than Most precise, still about as close as a printer can make (about a tenth of a mm). A good place to start.</li>
+<li><b>Most precise</b> (right): as close to the file as it gets (a few hundredths of a mm), with more steps, some of them very thin.</li>
+</ul>
+<p>Some models can't be rebuilt with less detail (the result wouldn't hold together). Then 3DJames quietly uses Most precise for that part instead, so you still get an editable result. Not happy with what you got? Undo (Ctrl+Z) gives the mesh back: move the slider and click Make editable again.</p>
+<figure><img src="editable-1.jpg" alt="3DJames with an STL bracket just opened and the question Make it editable?, with the Detail slider set to Balanced and the buttons Keep as a mesh and Make editable"><figcaption>Opening an STL: the question comes up. Pick how much detail to keep (2), then Make editable (1) rebuilds it as steps.</figcaption></figure>
+<p>It takes a few seconds for a simple part, up to a minute or two for a big detailed one. A note at the bottom says it is working.</p>
+<h2>What you get</h2>
+<p>When it is done, a window says how many steps it made and how close the result is to the STL, for example <i>"Rebuilt as 4 steps (3 sketches): over 99.9% the same as the STL, surfaces at most 0.01 mm apart."</i> The object keeps its name and colour. Select it and open <b>History</b>: the steps read like a recipe, for example:</p>
+<ul>
+<li><b>outline pushed up 6 mm</b>: the outline seen from above, with its holes, as one sketch. Parts that change height get one sketch per level (<b>level 2 at 6 mm, pushed up 4 mm</b>), merged together.</li>
+<li><b>Hole Ø5 at 0 mm, 6 mm deep</b> or <b>4 holes</b>: holes that run through several levels become one cutting sketch (grey).</li>
+<li><b>profile spun around</b>: round parts (knobs, cups, bottle caps) become one profile, the shape of half a cut through the middle, spun around the green line.</li>
+<li><b>outline seen from the top / from the front, pushed through</b> and <b>keep where the views overlap</b>: some parts are drawn like a technical drawing, two outlines pushed through each other.</li>
+<li><b>cut away</b> and <b>merge the added parts</b>: what the first steps miss (a hole from the side, a notch, a handle) is drawn the same way and cut out or merged in.</li>
+</ul>
+<figure><img src="editable-2.jpg" alt="The bracket after Make editable: History shows outline pushed up 6 mm, join the levels with level 2 at 6 mm merged in, and cut the holes with 3 holes and Hole Ø10 cut out"><figcaption>The bracket after Make editable: its steps in History (1). The Properties tab has an Edit sketch button for each sketch.</figcaption></figure>
+<h2>Example: make a hole bigger</h2>
+<ol>
+<li>Open <code>bracket.stl</code> and click <b>Make editable</b>.</li>
+<li>Select the bracket. In Properties, click <b>Edit sketch: bracket 3 holes 1</b> (the sketch with the holes). Not sure which sketch is which? Point at an Edit sketch button (don't click): its piece lights up orange in the 3D view, even when it is inside the object or was cut out of it.
+<figure><img src="editable-4.jpg" alt="Properties of the bracket with the mouse on the Edit sketch button of the holes sketch; the three hole cylinders show in orange in the 3D view"><figcaption>Pointing at <b>Edit sketch: bracket 3 holes 1</b>: the three holes it cuts show in orange.</figcaption></figure></li>
+<li>Click the hole's circle and type a new size, for example 6 mm instead of 5 mm. Click <b>Done</b>.</li>
+<li>The bracket is rebuilt with the bigger hole. Save it as a 3DJames project (.3dj) to keep the steps.</li>
+</ol>
+<figure><img src="editable-3.jpg" alt="The sketch board with the three hole circles of the bracket, each a true circle with its diameter in the Shapes box, with the bracket's outline in grey around them"><figcaption>A sketch made from the STL: the holes are true circles; type a new Diameter in the Shapes box, then Done. The grey is the bracket seen from above, so you can see where each hole sits.</figcaption></figure>
+<h2>Undo, or keep the mesh</h2>
+<ul>
+<li><b>Undo</b> (Ctrl+Z) right after gives the mesh back, exactly as it was.</li>
+<li>Outlines become lines, arcs and circles, with sizes rounded the way you would type them (9.9998 becomes 10). Rounded corners seen from above become rounded corners (a radius you can change).</li>
+</ul>
+<h2>Good to know</h2>
+<ul>
+<li>It works best on parts designed in a CAD program: flat faces, holes, slots, pockets, round parts. Those come out almost exactly the same.</li>
+<li>Rounded or sloped edges (fillets, chamfers, a rounded rim) are drawn as small <b>levels</b>, like stairs a fraction of a millimetre high. The shape is very close, but there can be many level sketches; changing the outline then means changing several of them.</li>
+<li>Figures, animals, sculpted or organic shapes cannot be drawn as sketches. They stay a mesh, and the window says so. A file with several separate parts gets one object per part; any part that can't be drawn stays a mesh of its own (grey, named "… (mesh)").</li>
+<li>Text engraved on a curved surface and other small details may be left out when they are a tiny part of the model; the window says how close the result is.</li>
+<li>Details too fine to print are left out or smoothed: slits narrower than about a quarter of a millimetre, ribs thinner than a few hundredths, and steps on a sloped wall lower than 0.1 mm (a V-groove becomes a few steps, not dozens). Outlines are drawn to within a few hundredths of a millimetre, so a wavy or not-quite-round edge becomes a few clean lines and arcs.</li>
+<li>The STL itself is not kept in the project after Make editable (the rebuilt steps replace it), so .3dj files stay small.</li>
+</ul>

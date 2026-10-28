@@ -3,7 +3,7 @@
 import { Vector3, Quaternion, Euler, Matrix4, MathUtils } from 'three';
 import { store, isSimplePrimitive } from './store.js';
 import { app, bodyData, scope } from './state.js';
-import { evalExpr } from './shared.js';
+import { evalExpr, r4 } from './shared.js';
 import { toast } from './ui/dom.js';
 import { vp } from './view.js';
 import { addShape, subtractFromAll, select } from './commands.js';
@@ -11,6 +11,7 @@ import { openSketch, askSolid, ruleRefs } from './ui/sketch.js';
 import { updateFeature } from './ui/fields.js';
 import { openPanel } from './ui/panels.js';
 import { setWorkplane } from './tools.js';
+import { workerCall } from './build.js';
 import * as SG from './sketchgeom.js';
 import { photoToSketch } from './ui/photowin.js';
 
@@ -53,20 +54,24 @@ function edgesOnPlane(d, P0, toLocal, onPlane) {
   return { segs, pts };
 }
 
-/** What to show under a sketch: the face's edges (on a face) or the footprints of everything on the floor. */
-function sketchRef(wp) {
+/** The turn and shift that put a world point onto a sketch board (the board's plane becomes z = 0). */
+function boardMatrix(wp) {
+  if (!wp) return new Matrix4();
+  return new Matrix4().makeRotationFromQuaternion(planeQuat(wp.n).invert()).multiply(new Matrix4().makeTranslation(-wp.P[0], -wp.P[1], -wp.P[2]));
+}
+/** What to show under a sketch: the edges lying on its plane (a face's edges, or the bottoms of everything on the floor). */
+function sketchRef(M, skip = []) {
   const ref = { segs: [], pts: [] };
-  const add = (r) => { ref.segs.push(...r.segs); ref.pts.push(...r.pts); };
-  if (wp) {
-    const q = planeQuat(wp.n).invert(), P = new Vector3(...wp.P), N = new Vector3(...wp.n).normalize();
-    const toLocal = (v) => v.clone().sub(P).applyQuaternion(q);
-    const onPlane = (v) => Math.abs(v.clone().sub(P).dot(N)) < 0.02;
-    for (const id of app.results.bodies.keys()) if (!store.doc.bodies[id]?.hidden) add(edgesOnPlane(bodyData(id), P, toLocal, onPlane));
-  } else {
-    const toLocal = (v) => v; const onPlane = (v) => Math.abs(v.z) < 0.02;
-    for (const id of app.results.bodies.keys()) if (!store.doc.bodies[id]?.hidden) add(edgesOnPlane(bodyData(id), null, toLocal, onPlane));
-  }
+  const toLocal = (v) => v.clone().applyMatrix4(M), onPlane = (v) => Math.abs(toLocal(v).z) < 0.02;
+  for (const id of shownBodies(skip)) { const r = edgesOnPlane(bodyData(id), null, toLocal, onPlane); ref.segs.push(...r.segs); ref.pts.push(...r.pts); }
   return ref;
+}
+const shownBodies = (skip) => [...app.results.bodies.keys()].filter((id) => !store.doc.bodies[id]?.hidden && !skip.includes(id));
+/** Then, a moment later: every object seen straight on through the board, so it is clear where the drawing goes. */
+function addOutline(k, M, skip = []) {
+  const ids = shownBodies(skip);
+  if (!k?.setOutline || !ids.length) return;
+  workerCall({ type: 'outline', ids, m: M.elements.slice() }).then((r) => k.setOutline(r.polys || [])).catch((err) => console.warn('sketch outline:', err?.message || err));
 }
 
 /** Insert > Sketch: draw on the floor, or on the workplane's face when one is set. */
@@ -74,9 +79,12 @@ export function startSketch({ restoreWorkplane, start = [] } = {}) {
   const wp = app.workplane;
   const prev = restoreWorkplane;
   const done = () => { if (prev !== undefined) setWorkplane(prev); };
-  return openSketch(start, (loops, rules, extra = {}) => {
+  const M = boardMatrix(wp);
+  const k = openSketch(start, (loops, rules, extra = {}) => {
     askSolid((o) => { createSketch(loops, rules, o, wp, extra); done(); }, { onFace: !!wp, loops });
-  }, wp ? (wp.curved ? 'Sketch on a tangent plane: straight extrusion or cut, without wrapping' : 'Sketch on a face: the dotted lines are the face’s edges') : 'Sketch on the floor: dotted lines are the bottoms of your objects', { ref: sketchRef(wp), onCancel: done });
+  }, wp ? (wp.curved ? 'Sketch on a tangent plane: straight extrusion or cut, without wrapping' : 'Sketch on a face: dashed lines are the face’s edges, grey is your objects seen straight on') : 'Sketch on the floor: grey is your objects seen from above, dashed lines are their bottoms', { ref: sketchRef(M), onCancel: done });
+  addOutline(k, M);
+  return k;
 }
 /** Insert > Sketch > From a photo: size the photo, then trace it (or let 3DJames find the outline) on the board. */
 export function startPhotoSketch() {
@@ -200,8 +208,9 @@ export function sketchGroup(ids) {
 /** Properties (several sketches picked) > Edit sketches together: one board, each sketch in its own color. */
 export function editSketches(ids, title) {
   const g = sketchGroup(ids);
-  if (g.why) return toast(g.why, 'info', 5000);
-  if (ids.length < 2 && !title) return toast('Select two or more sketch objects (Ctrl+click to add to the selection).', 'info', 5000);
+  // refused: say why, and give back nothing (no board was opened)
+  if (g.why) { toast(g.why, 'info', 5000); return null; }
+  if (ids.length < 2 && !title) { toast('Select two or more sketch objects (Ctrl+click to add to the selection).', 'info', 5000); return null; }
   const { fs, frames, offs } = g;
   const names = ids.map((id) => store.doc.bodies[id]?.name || 'Sketch');
   // everything on the first sketch's board; each sketch shifted by where its drawing sits relative to the first
@@ -224,7 +233,12 @@ export function editSketches(ids, title) {
   });
   // one sketch alone: its photo comes along (moved like its outlines); several: photos stay as they are
   const photo0 = fs.length === 1 && fs[0].p.photo ? { ...fs[0].p.photo, x: r4(fs[0].p.photo.x + offs[0][0]), y: r4(fs[0].p.photo.y + offs[0][1]) } : null;
-  return openSketch({ loops, rules, photo: photo0 }, (out, outRules, extra = {}) => {
+  // what is around it: the board's plane in the world (Push up only: a Spin around board stands up through its axis)
+  const Mb = frames[0].up ? null : new Matrix4().makeTranslation(0, 0, -frames[0].O.clone().applyMatrix4(frames[0].R.clone().invert()).z).multiply(frames[0].R.clone().invert());
+  // a sketch object on its own is left out (it is what's being drawn); one that other steps were joined into stays,
+  // as the whole object around the drawing
+  const skip = fs.map((f) => f.body).filter((id) => isSimplePrimitive(store.doc, id) && !store.doc.features.some((x) => x.src === id));
+  const k = openSketch({ loops, rules, photo: photo0 }, (out, outRules, extra = {}) => {
     // back into each sketch, in its own drawing coordinates; rules that link two sketches can't be kept
     const parts = fs.map(() => ({ loops: [], map: new Map() }));
     out.forEach((l, i) => { const k = l.owner ?? 0, P = parts[k]; P.map.set(i, P.loops.length); const c = JSON.parse(JSON.stringify(l)); delete c.owner; P.loops.push(c); });
@@ -264,9 +278,10 @@ export function editSketches(ids, title) {
     if (dropped) msg.push(`${dropped} rule${dropped === 1 ? '' : 's'} linking different sketches ${dropped === 1 ? 'was' : 'were'} removed (each sketch keeps its own rules).`);
     if (msg.length) toast(msg.join(' '), 'info', 6000);
     if (ids.length > 1) select(ids.filter((id) => store.doc.bodies[id]));
-  }, title || `Editing ${fs.length} sketches together`, { owners: names.map((name, k) => ({ name, color: OWNER_COLORS[k % OWNER_COLORS.length] })) });
+  }, title || `Editing ${fs.length} sketches together`, { owners: names.map((name, k) => ({ name, color: OWNER_COLORS[k % OWNER_COLORS.length] })), ref: Mb ? sketchRef(Mb, skip) : null });
+  if (Mb) addOutline(k, Mb, skip);
+  return k;
 }
-const r4 = (v) => Math.round(v * 1e4) / 1e4;
 /** Every loop reference in a rule (points, sides, corners, whole shapes). */
 function refsOfRule(r) {
   const R = ruleRefs(r);

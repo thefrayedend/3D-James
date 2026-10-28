@@ -1,7 +1,7 @@
 # Pictures for setting up storage on a 3DJames box: nas-1 (Add a NAS share, filled in), nas-2 (the Storage list,
 # connected, with a USB drive plugged in), nas-3 (a person's folder on the NAS), box-usb (the USB drives card). Uses the
 # box's real admin page, started here with a throw-away data folder. The NAS and the USB drive are filled in as the box
-# shows them (this PC has no USB helper, and the pictures shouldn't depend on a NAS being there). Values: \\192.168.1.50\Alex, folder "3D Objects".
+# shows them (this PC has no USB helper, and the pictures shouldn't depend on a NAS being there). Values: \\192.168.1.50\James, folder "3D Objects".
 # Run after build.py:  python help/shots/nas_shots.py
 import asyncio, json, os, socket, subprocess, sys, tempfile, time, urllib.request
 from pathlib import Path
@@ -33,7 +33,7 @@ async def main():
             await ins.nth(0).fill('james'); await ins.nth(1).fill('James'); await ins.nth(2).fill('secret1'); await ins.nth(3).fill('secret1')
             await pg.click('text=Create the admin account'); await pg.wait_for_selector('nav >> text=Storage')
 
-            # 1: Storage tab > Add a NAS share, filled in for \\192.168.1.50\Alex
+            # 1: Storage tab > Add a NAS share, filled in for \\192.168.1.50\James
             await pg.wait_for_timeout(1000)
             await pg.click('#tabs button[data-tab=storage]')
             await pg.wait_for_function("()=>document.querySelector('main h2')?.textContent==='Where files are kept'")
@@ -62,7 +62,7 @@ async def main():
             # (this PC can't mount the share, so the box refuses to save it here: it is shown as the box lists it once saved)
             async def connected(route):
                 resp = await route.fetch(); j = await resp.json()
-                j['config']['places']['nas'] = {'label': 'NAS', 'type': 'smb', 'server': '192.168.1.50', 'share': 'Alex', 'username': '',
+                j['config']['places']['nas'] = {'label': 'NAS', 'type': 'smb', 'server': '192.168.1.50', 'share': 'James', 'username': '',
                                                 'connected': True, 'space': None, 'problem': '', 'used': []}
                 j['usb'] = [{'uuid': '1A2B-3C4D', 'fstype': 'exfat', 'label': '', 'name': 'SanDisk Ultra', 'size': 64.1e9, 'dev': '/dev/sda1', 'place': None}]
                 await route.fulfill(response=resp, body=json.dumps(j), headers={**resp.headers, 'content-type': 'application/json'})

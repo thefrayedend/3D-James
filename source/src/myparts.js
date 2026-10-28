@@ -125,8 +125,6 @@ export async function refreshMyParts(ask = false) {
 }
 /** At start: show the parts if the folder is already allowed (no questions asked). */
 export const loadMyParts = () => refreshMyParts(false).catch(() => myParts);
-/** True when parts would go into a folder that isn't chosen yet. */
-export const needsFolder = async () => canUseFolders() && !(await savedFolder());
 
 /** Save the object to My parts. */
 export async function saveToMyParts(id) {

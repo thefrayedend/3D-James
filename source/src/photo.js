@@ -4,6 +4,7 @@
 // A photo in a sketch: p.photo = { file, x, y, w, h, opacity, hidden }   (mm; x, y = its lower-left corner on the board)
 // The picture itself is a JPEG kept like an imported model file (saved inside the project).
 import { bulgeFrom3 } from './sketchgeom.js';
+import { r3 } from './shared.js';
 
 /** Load a picture file (photo) into an <img>, smaller if huge (the long side at most maxSide pixels). */
 export async function loadPicture(file, maxSide = 3000) {
@@ -305,7 +306,6 @@ function asCircle(pts, tol) {
   const dev = Math.max(...rs.map((v) => Math.abs(v - r)));
   return dev <= Math.max(tol, r * 0.04) ? { type: 'circle', c: c.map(r3), r: r3(r) } : null;
 }
-const r3 = (v) => Math.round(v * 1000) / 1000;
 
 /** Runs of short sides along a curve become one arc each (bulge), so a curved edge is a few arcs, not 40 lines. */
 function withArcs(simple, tol) {

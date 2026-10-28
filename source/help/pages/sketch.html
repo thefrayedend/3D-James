@@ -9,7 +9,7 @@
 <li><b>From a photo…</b>: trace a photo of a real part, or let 3DJames find its outline. See <a data-help-topic="sketchphoto">Sketch from a photo</a>.</li>
 <li><b>From a DXF / SVG file…</b>: a drawing made in another program. See <a data-help-topic="sketchimport">Import a DXF or SVG drawing</a>.</li>
 </ul>
-<p>To change a sketch you made earlier: pick it and click <b>Edit sketch</b> in Properties. The board opens with everything as you left it.</p>
+<p>To change a sketch you made earlier: pick it and click <b>Edit sketch</b> in Properties. The board opens with everything as you left it. When an object was made from several sketches, Properties has an Edit sketch button for each: point at one to see its piece in orange in the 3D view.</p>
 
 <h2>The board</h2>
 <img src="sketch.jpg" alt="The sketch board: the drawing tools at the top, the Rules row under them, the drawing in the middle and the panel on the right">
@@ -69,12 +69,15 @@
 </ul>
 <p><b>Live mirror</b> (right): everything you draw is mirrored across the green or red line as you draw. Draw half an outline from the line and back to it, and you get the whole symmetric outline.</p>
 
-<h2>Dotted outlines on the board</h2>
+<h2>Your objects on the board</h2>
+<p>The board shows what is already in your project, so you can see where your drawing goes:</p>
 <ul>
-<li><b>On the floor:</b> the gray dotted lines are the bottoms of the objects already in your scene (a cylinder shows as a dotted circle). Objects that don't touch the floor have none.</li>
-<li><b>On a face:</b> the dotted lines are the edges of the face.</li>
-<li>Your lines snap to their corners, middles and centers. They are only guides: they don't become part of your sketch.</li>
+<li><b>Grey:</b> every object seen straight through the board. On the floor, that is everything seen from above, even objects that don't touch the floor. On a face, it is everything seen looking straight at that face. A sphere or cylinder shows as a grey circle, a box as a grey rectangle.</li>
+<li><b>Dashed lines:</b> edges that lie right on the board: the bottoms of objects that stand on the floor, or the edges of the face you are sketching on.</li>
+<li><b>Edit sketch</b> shows them too: the objects around the sketch you are changing (not that sketch's own object).</li>
+<li>Your lines snap to them: to their corners, middles and centers, and onto the grey edges. They are only guides: they don't become part of your sketch. Hidden objects are left out.</li>
 </ul>
+<figure><img src="sketch-outline.jpg" alt="A sketch on the floor: a box shows as a grey square with a dashed edge, and a cylinder lifted 15 mm off the floor shows as a grey circle"><figcaption>Sketching on the floor: the box stands on the floor (grey, dashed edge); the cylinder floats 15 mm up (grey only).</figcaption></figure>
 
 <h2>Next</h2>
 <p>Click <b>Done</b> and choose how it becomes solid: <a data-help-topic="solid">Make the sketch solid</a>. Or read on: <a data-help-topic="sketchlines">Unfinished lines and changing outlines</a>.</p>

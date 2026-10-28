@@ -1,10 +1,11 @@
 {
   "name": "3djames",
-  "version": "0.17.11",
+  "version": "0.17.15",
   "description": "3DJames: a local, 3D Builder-style parametric 3D modeler",
   "scripts": {
     "build": "python build.py",
-    "test": "python tests/run.py",
+    "test": "python tests/all.py",
+    "test:suite": "python tests/run.py",
     "test:reliability": "python tests/reliability.py",
     "lint": "eslint src",
     "test:features": "python tests/features.py",

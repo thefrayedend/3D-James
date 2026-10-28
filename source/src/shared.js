@@ -1,6 +1,10 @@
 // Shared definitions used by both the UI and the geometry worker.
 import { PART_SHAPES } from './catalog.js';
 
+/** Rounded to 3 or 4 decimals (thousandths, ten-thousandths of a mm): how numbers are stored and shown. */
+export const r3 = (v) => Math.round(v * 1000) / 1000;
+export const r4 = (v) => Math.round(v * 1e4) / 1e4;
+
 // ---------- Expression evaluator (no eval; small recursive-descent parser) ----------
 const FUNCS = {
   sin: (d) => Math.sin((d * Math.PI) / 180), cos: (d) => Math.cos((d * Math.PI) / 180),

@@ -26,6 +26,11 @@ async def main():
     async def clicks(*pts):
       for q in pts: x, y = await at(*q); await pg.mouse.click(x, y)
     L = lambda: ev("()=>JSON.parse(JSON.stringify(__k.loops))")
+    async def done():
+      # finishing can take a moment (closing lines asks the engine to join them): wait for the result, up to 15 s
+      try: await pg.wait_for_function("()=>!!window.__done", timeout=15000)
+      except Exception: return None
+      return await ev("()=>JSON.parse(JSON.stringify(window.__done.l))")
 
     # 1. a line from point to point, stopped with Esc: it stays open (no side back to the start)
     await board()
@@ -63,14 +68,14 @@ async def main():
     check('Done with an unfinished line asks first', await ev("()=>!!document.querySelector('dialog.modal') && !window.__done"))
     check('no closed outline yet: no "Finish without them"', not await ev("()=>[...document.querySelectorAll('dialog.modal button')].some(b=>b.textContent==='Finish without them')"))
     await ev("()=>[...document.querySelectorAll('dialog.modal button')].find(b=>b.textContent==='Close with straight lines').click()")
-    d = await ev("()=>window.__done && JSON.parse(JSON.stringify(window.__done.l))")
+    d = await done()
     check('closing with straight lines makes a triangle and finishes', d and len(d) == 1 and d[0]['type'] == 'poly' and len(d[0]['pts']) == 3, d)
     # with a closed outline as well: finish without the open line keeps it (not solid) for later
     await board('[{type:"poly",pts:[[0,0],[60,0],[60,40],[0,40]]}]')
     await clicks((20, 10), (40, 10), (40, 30)); await pg.keyboard.press('Escape')
     await ev("()=>__k.finish()")
     await ev("()=>[...document.querySelectorAll('dialog.modal button')].find(b=>b.textContent==='Finish without them').click()")
-    d = await ev("()=>window.__done && JSON.parse(JSON.stringify(window.__done.l))")
+    d = await done()
     check('finish without them: the outline and the kept open line both go back', d and len(d) == 2 and sorted(l['type'] for l in d) == ['open', 'poly'], d)
     # "Keep drawing" leaves the board open
     await board()

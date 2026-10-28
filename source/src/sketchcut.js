@@ -86,12 +86,6 @@ export function crossings(s, o) {
   }
   return out;
 }
-/** Cut an arc's bulge at t: the bulges of the two parts. */
-export function splitBulge(b, t) {
-  if (Math.abs(b) < EPS) return [0, 0];
-  const sweep = 4 * Math.atan(b);
-  return [Math.tan((sweep * t) / 4), Math.tan((sweep * (1 - t)) / 4)];
-}
 /** The bulge of the part of an arc from t0 to t1. */
 export function partBulge(b, t0, t1) { return Math.abs(b) < EPS ? 0 : Math.tan((4 * Math.atan(b) * (t1 - t0)) / 4); }
 /** The exact box around loops [x0, y0, x1, y1]: arcs reach their outermost points (not just their ends). */

@@ -50,16 +50,11 @@ async def main():
   await page.set_viewport_size({'width':1440,'height':960});await setup()
   await page.evaluate("const B=window.__3dj;window.__uiSecond=B.commands.addShape('box',{w:60,d:30,h:20});")
   await built()
-  await page.evaluate("const B=window.__3dj;B.app.sel=[window.__uiBody,window.__uiSecond];B.vp.setSelection(B.app.sel);B.commands.previewCombine('union')")
-  await page.wait_for_selector('[data-action="apply-preview"]:enabled',timeout=120000)
-  before=await page.evaluate('window.__3dj.vp.camera.position.toArray()')
-  await page.mouse.move(250,180);await page.mouse.down();await page.mouse.move(320,220,steps=8);await page.mouse.up()
-  after=await page.evaluate('window.__3dj.vp.camera.position.toArray()')
-  assert before!=after,'preview prevents orbiting'
-  await page.screenshot(path=str(ROOT/'dist/preview-ui.png'))
-  await page.keyboard.press('Escape');await built()
-  assert await page.evaluate('!window.__3dj.app.preview && !document.body.classList.contains("operation-preview")'),'Escape did not cancel'
-  results.append({'name':'boolean preview permits actual orbit and Escape cancellation','ok':True})
+  await page.evaluate("const B=window.__3dj;B.app.sel=[window.__uiBody,window.__uiSecond];B.vp.setSelection(B.app.sel);B.commands.combine('union')")
+  await built()
+  assert await page.evaluate('window.__3dj.app.results.bodies.size===1 && !document.querySelector("dialog[open]")'),'merge did not happen in one click'
+  await page.evaluate('window.__3dj.store.undo()');await built()
+  results.append({'name':'merge happens in one click, no preview to apply','ok':True})
   out={'tests':results,'pageErrors':errors};print(json.dumps(out,indent=2),flush=True)
   (ROOT/'dist/ui-features-results.json').write_text(json.dumps(out,indent=2))
   await b.close();assert not errors,errors
