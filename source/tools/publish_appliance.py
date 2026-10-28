@@ -40,7 +40,7 @@ with open(os.path.join(REPO, '.gitignore'), 'w', newline='\n') as f:
 git('add', '-A')
 if git('diff', '--cached', '--quiet', check=False).returncode:
     v = open(os.path.join(SRC, 'server', 'VERSION')).read().strip()
-    git('-c', 'user.name=Jon', '-c', 'user.email=78568423+thefrayedend@users.noreply.github.com', 'commit', '-m', f'3DJames box: server {v}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>')
+    git('-c', 'user.name=thefrayedend', '-c', 'user.email=78568423+thefrayedend@users.noreply.github.com', 'commit', '-m', f'3DJames box: server {v}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>')
     print('committed', git('log', '--oneline', '-1').stdout.strip())
 else:
     print('nothing changed')

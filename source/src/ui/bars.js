@@ -117,7 +117,9 @@ export function renderObjBar(force) {
   bar.append(mode('translate', 'Move3d', 'Move', 'M'), mode('rotate', 'Rotate3d', 'Rotate', 'R'), mode('scale', 'Scale3d', 'Scale', 'S'),
     ...fields,
     app.gizmo === 'rotate' ? h('span', { class: 'bunit static' }, '°') : h('button', { class: 'bunit', title: 'Change units', onclick: (e) => pickMenu(e.currentTarget, 'Units', [['mm', 'Millimeters (mm)'], ['cm', 'Centimeters (cm)'], ['in', 'Inches (in)']], app.settings.unit || 'mm', (v) => { app.settings.unit = v; saveSettings(); renderObjBar(true); }) }, unit),
-    ...(scaleMode ? [h('button', { class: 'mb' + (app.settings.lock ? ' on' : ''), title: app.settings.lock ? 'Scaling evenly (click to size each side on its own)' : 'Sizing each side on its own (click to scale evenly)', 'aria-label': 'Lock proportions', onclick: () => { app.settings.lock = !app.settings.lock; vp.lockScale = app.settings.lock; saveSettings(); renderObjBar(true); } }, ic(app.settings.lock ? 'Lock' : 'LockOpen'))] : []));
+    ...(scaleMode ? [h('button', { class: 'mb' + (app.settings.lock ? ' on' : ''), title: app.settings.lock ? 'Scaling evenly (click to size each side on its own)' : 'Sizing each side on its own (click to scale evenly)', 'aria-label': 'Lock proportions', onclick: () => { app.settings.lock = !app.settings.lock; vp.lockScale = app.settings.lock; saveSettings(); renderObjBar(true); } }, ic(app.settings.lock ? 'Lock' : 'LockOpen'))] :
+      // an empty place for it in the other modes: the bar keeps one width, so Move / Rotate / Scale never slide sideways
+      [h('span', { class: 'mb', style: 'visibility:hidden', 'aria-hidden': 'true' })]));
 }
 /** Green underline under the active axis's box, blue under the others (like 3D Builder). */
 export function markActiveAxis(ax) {
@@ -152,7 +154,8 @@ export function renderStatus() {
   }
   else {
     const nErr = Object.keys(app.results.errors).length;
-    el.append(`${app.results.bodies.size} object${app.results.bodies.size === 1 ? '' : 's'} · ${app.results.ms < 1000 ? app.results.ms + ' ms' : (app.results.ms / 1000).toFixed(1) + ' s'}`);
+    el.append(`${app.results.bodies.size} object${app.results.bodies.size === 1 ? '' : 's'}`);
+    el.title = `Last rebuild: ${app.results.ms < 1000 ? app.results.ms + ' ms' : (app.results.ms / 1000).toFixed(1) + ' s'}`;
     if (nErr) el.append(h('button', { class: 'linkish', title: 'Show the problems', onclick: () => { app.historyAll = true; openPanel('history'); } }, `· ${nErr} problem${nErr === 1 ? '' : 's'}`));
   }
 }

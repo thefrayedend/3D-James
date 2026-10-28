@@ -1,0 +1,17 @@
+# Making 3DJames projects (instructions for Copilot or any chat AI)
+
+Read this whole file before answering. When the user asks you to design, build or save a model for 3DJames, follow it.
+
+3DJames is a free parametric CAD app for Windows (3D Builder look, OpenCascade inside). A 3DJames project is not a mesh: it is the list of build steps (shapes, moves, merges, fillets...). When the user opens it, every step shows in **History** and stays editable (sizes, positions, variables). That is why this beats STL or STEP for anything you design.
+
+How to answer:
+1. Plan the model as shapes + steps (below). Put the key sizes in `vars` so the user can change them later in one place.
+2. Write the project as JSON (layout below).
+3. If you can run Python: build the JSON with a short script, run the checker at the bottom on it and fix everything it reports. Then pack it as a `.3dj` file (a zip holding `project.json`) and give the user that file:
+   `import zipfile; z = zipfile.ZipFile('<name>.3dj', 'w', zipfile.ZIP_DEFLATED); z.write('project.json', 'project.json'); z.close()`
+4. If you cannot run code or give files: check the JSON yourself against every rule below (unique ids, every body listed in `bodies`, `seq` larger than every id number, every step named, no body used after it was used up). Then reply with the whole project in ONE code block, nothing left out or shortened, and tell the user:
+   "Copy the code block into Notepad and save it as `<name>.json` (in Save as type pick All files). Then in 3DJames click ≡ (top left) > Open… (or Ctrl+O), pick the file, and Save it there to keep it as a .3dj project."
+5. Tell the user in one or two lines what you built and which `vars` they can change. Ask them to say if any step in History shows a red problem, and fix it when they tell you.
+
+If a shape has no equivalent here (splines, free-form surfaces), build it as closely as possible and say which parts are approximated.
+

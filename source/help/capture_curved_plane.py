@@ -47,9 +47,7 @@ async def main():
   await shot('plane-result')
   await page.get_by_role('button',name='File menu',exact=True).click();await shot('tools-file-menu')
   await page.keyboard.press('Escape')
-  await page.evaluate('window.__3dj.commands.exportDialog()');await shot('tools-export')
-  await page.get_by_role('button',name='Cancel',exact=True).click()
   assert not errors,errors
-  (shots/'capture.json').write_text(json.dumps({'pageErrors':errors,'cutVolume':before-result['volume'],'screenshots':7},indent=2))
+  (shots/'capture.json').write_text(json.dumps({'pageErrors':errors,'cutVolume':before-result['volume'],'screenshots':6},indent=2))
   await browser.close()
 asyncio.run(main())

@@ -1,0 +1,9 @@
+# Installed packages (pnpm install puts them back)
+node_modules/
+# Built app and test output (python build.py and the tests make them again)
+local/
+dist/
+testdata/
+out/
+__pycache__/
+*.pyc

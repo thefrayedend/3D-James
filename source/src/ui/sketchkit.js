@@ -2,7 +2,8 @@
 
 export const NS = 'http://www.w3.org/2000/svg';
 export const svgEl = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
-export const r3 = (v) => Math.round(v * 1000) / 1000;
+import { r3 } from '../shared.js';
+export { r3 };
 export const fmtN = (v) => String(r3(v));
 export const EPS = 1e-9;
 /** Two points this close are the same point (line ends join, a line that ends where it started closes). */

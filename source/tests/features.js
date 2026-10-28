@@ -97,8 +97,8 @@ window.__runFeatureTests = async () => {
     S.undo(); await built(); assert(S.doc.features[0].p.w === 35, 'restore Undo failed');
     const id = S.doc.versions[0].id; C.deleteVersion(id); assert(S.doc.versions.length === 1, 'delete failed'); S.undo(); await built(); assert(S.doc.versions.length === 2, 'version deletion Undo failed');
   });
-  await test('versions survive JSON and editable 3MF exports', async () => {
-    for (const fmt of ['json', '3mf']) {
+  await test('versions survive .3dj and editable 3MF saves', async () => {
+    for (const fmt of ['3dj', '3mf']) {
       const bytes = await C.buildFileData(fmt);
       await C.openFile(new File([bytes], 'versions.' + fmt), null); await built(); noErr();
       assert(S.doc.versions.length === 2, fmt + ' lost versions');
@@ -133,33 +133,32 @@ window.__runFeatureTests = async () => {
     assert(!C.canMoveFeature(S.doc, combined.id, -1), 'combine moved before its input');
     C.editStep(combined.id); C.openPanel('props'); assert(document.querySelector('[aria-label="Step name"]'), 'history naming control missing');
   });
-  await test('boolean preview is reversible and Apply is one undo step', async () => {
+  await test('Merge and Subtract happen in one click, each one undo step', async () => {
     const a = await fresh({ w: 20, d: 20, h: 20 });
     const b = C.addShape('box', { w: 20, d: 20, h: 20 }); await built();
     S.commit((d) => { d.features.find((f) => f.body === b).pos = [10, 0, 0]; }); await built();
     app.sel = [a, b]; vp.setSelection(app.sel);
     const before = JSON.stringify(S.doc), undos = S.undoStack.length;
-    await C.previewCombine('union'); await built();
-    assert(app.preview && JSON.stringify(S.doc) === before && S.undoStack.length === undos, 'preview changed history');
-    assert(app.results.bodies.size === 1 && Math.abs(body(a).volume - 12000) < 0.1, 'merge preview wrong');
-    let blocked = false; try { await C.buildFileData('3dj'); } catch { blocked = true; } assert(blocked, 'preview exported as saved model');
-    app.preview.cancel(); await built(); assert(app.results.bodies.size === 2 && JSON.stringify(S.doc) === before, 'cancel failed');
-    await C.previewCombine('subtract'); await built();
-    assert(Math.abs(body(a).volume - 4000) < 0.1, 'subtract preview wrong');
-    document.querySelector('[data-action="apply-preview"]').click(); await built(); noErr();
-    assert(!app.preview && S.undoStack.length === undos + 1 && S.doc.features.at(-1).op === 'subtract', 'apply not one commit');
-    S.undo(); await built(); assert(app.results.bodies.size === 2, 'preview apply undo failed');
+    // one click and it is done: one step in History, one Undo
+    C.combine('union'); await built(); noErr();
+    assert(app.results.bodies.size === 1 && Math.abs(body(a).volume - 12000) < 0.1 && S.undoStack.length === undos + 1, 'merge wrong');
+    S.undo(); await built(); assert(app.results.bodies.size === 2 && JSON.stringify(S.doc) === before, 'merge undo failed');
+    app.sel = [a, b]; vp.setSelection(app.sel);
+    C.combine('subtract'); await built(); noErr();
+    assert(Math.abs(body(a).volume - 4000) < 0.1 && S.undoStack.length === undos + 1 && S.doc.features.at(-1).op === 'subtract', 'subtract wrong');
+    S.undo(); await built(); assert(app.results.bodies.size === 2, 'subtract undo failed');
   });
-  await test('export leaves dirty state and project identity unchanged', async () => {
-    await fresh(); const before = JSON.stringify(app.file), dirty = app.dirty; let bytes;
+  await test('Save as STL writes the shape and leaves the project file and unsaved state unchanged', async () => {
+    await fresh(); const before = JSON.stringify(app.file), dirty = app.dirty; let bytes, offered;
     const original = window.showSaveFilePicker;
-    window.showSaveFilePicker = async () => ({ name: 'output.stl', createWritable: async () => ({ write: async (data) => { bytes = data; }, close: async () => {} }) });
+    window.showSaveFilePicker = async (o) => { offered = o.types.map((t) => Object.values(t.accept).flat()[0]); return { name: 'output.stl', createWritable: async () => ({ write: async (data) => { bytes = data; }, close: async () => {} }) }; };
     try {
-      await C.exportDialog(); const form = document.querySelector('dialog form'); form.requestSubmit();
+      await C.saveAs();
       for (let i = 0; i < 1000 && !bytes; i++) await sleep(20);
-      assert(bytes?.length > 84, 'export did not write');
-      assert(app.dirty === dirty && JSON.stringify(app.file) === before, 'export changed project save state');
-    } finally { window.showSaveFilePicker = original; document.querySelector('dialog')?.closest('.modal-back')?.remove(); }
+      assert(JSON.stringify(offered) === JSON.stringify(['.3dj', '.3mf', '.stl', '.step']), 'Save as types: ' + JSON.stringify(offered));
+      assert(bytes?.length > 84, 'Save as STL did not write');
+      assert(app.dirty === dirty && JSON.stringify(app.file) === before, 'Save as STL changed the project save state');
+    } finally { window.showSaveFilePicker = original; }
   });
   await fresh({ w: 32 }); C.createVersion('Session marker');
   await C.idb.put('kv', JSON.stringify(S.doc), 'current');

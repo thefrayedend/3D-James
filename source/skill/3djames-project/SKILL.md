@@ -1,25 +1,25 @@
 ---
 name: "3djames-project"
-description: "Save a 3D model as a 3DJames project (.3dj) that opens fully editable in Jon's 3DJames CAD app, instead of a STEP/STL. Use when Jon asks to export, save or build a model for 3DJames."
+description: "Save a 3D model as a 3DJames project (.3dj) that opens fully editable in the 3DJames CAD app, instead of a STEP/STL. Use when the user asks to export, save or build a model for 3DJames."
 ---
 
 # Saving models as 3DJames projects
 
-3DJames is Jon's local parametric CAD app (3D Builder look, OpenCascade inside). A 3DJames project (`.3dj`) is not a mesh: it is the list of build steps (shapes, moves, merges, fillets...). When he opens it, every step shows in **History** and stays editable (sizes, positions, variables). That is why this format beats STEP for anything you design: STEP only carries the finished solid.
+3DJames is a local parametric CAD app (3D Builder look, OpenCascade inside). A 3DJames project (`.3dj`) is not a mesh: it is the list of build steps (shapes, moves, merges, fillets...). When the user opens it, every step shows in **History** and stays editable (sizes, positions, variables). That is why this format beats STEP for anything you design: STEP only carries the finished solid.
 
 Workflow:
-1. Plan the model as primitives + steps (below). Put key sizes in `vars` so Jon can change them later in one place.
+1. Plan the model as primitives + steps (below). Put key sizes in `vars` so the user can change them later in one place.
 2. Build the project as a Python dict with a short script (no hand-typing huge files) and save it as `project.json`.
 3. Run the checker at the bottom on `project.json`. Fix everything it reports.
 4. Pack it: a `.3dj` file is a zip holding `project.json` (plus `files/<id>` for any imported STL/STEP and an optional `preview.png`):
    `python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED); z.write(sys.argv[1],'project.json'); z.close()" project.json "<name>.3dj"`
    (Older `.json` projects still open too, but `.3dj` is the format now.)
-5. Deliver: if his computer is linked, write it to `C:\Users\thefr\Documents\3DJames\Projects\<name>.3dj` (create the folder if needed); otherwise send the file. Tell him: open 3DJames, click **≡** (top left) > **Open…** (or Ctrl+O), pick the file. Save in 3DJames keeps it as a project.
+5. Deliver: if you can write to the user's computer, save it in their `Documents\3DJames\Projects` folder as `<name>.3dj` (create the folder if needed); otherwise send the file. Tell them: open 3DJames, click **≡** (top left) > **Open…** (or Ctrl+O), pick the file. Save in 3DJames keeps it as a project.
 
-If a model came from code (CadQuery, OpenSCAD, replicad), translate its operations into these steps. Custom 2D profiles, revolves, lofts and sweeps are `sketch` shapes (see **Sketches** below). If a shape still has no equivalent (splines, free-form surfaces), build it as closely as possible and tell Jon which parts are approximated. If that is impossible, say so and offer STEP instead.
+If a model came from code (CadQuery, OpenSCAD, replicad), translate its operations into these steps. Custom 2D profiles, revolves, lofts and sweeps are `sketch` shapes (see **Sketches** below). If a shape still has no equivalent (splines, free-form surfaces), build it as closely as possible and tell the user which parts are approximated. If that is impossible, say so and offer STEP instead.
 
-## Make it easy for Jon to edit (important)
-Jon edits these files by hand. In 3DJames, selecting an object shows how it was made as a tree in History (its steps, with the shapes cut out of it or merged into it listed under each cut/merge), so the steps must read like a recipe, not a pile of parts.
+## Make it easy to edit (important)
+The user edits these files by hand. In 3DJames, selecting an object shows how it was made as a tree in History (its steps, with the shapes cut out of it or merged into it listed under each cut/merge), so the steps must read like a recipe, not a pile of parts.
 - **Name every step** (`"name"` on every feature) and **every body specifically**: "Post 1 groove (front)", "Tray T2 M4 hole, rear left" — never just "slot", "hole", "strip". Someone scanning History must see what each cut is for.
 - **Keep each object's steps together, in order**: its base shape, then its cutting/adding shapes, then the combine, then fillets. Finish one object before starting the next.
 - **One cutter + array, not many copies.** Four identical grooves = one groove shape + `array` (or `mirror` copy), then one subtract. Then changing the groove once changes all of them.
@@ -34,7 +34,7 @@ Jon edits these files by hand. In 3DJames, selecting an object shows how it was 
 ## File layout (`project.json` inside the .3dj)
 ```json
 {
-  "v": 1, "name": "Space Pi rack", "seq": 200, "counters": {},
+  "v": 1, "name": "Wall bracket", "seq": 200, "counters": {},
   "vars": [ {"name": "wall", "expr": "4"}, {"name": "pitch", "expr": "slotW + wall"} ],
   "bodies": { "b1": {"name": "Base", "color": "#22B14C"},
               "b3": {"name": "Screw hole", "color": "#8b96a3", "hole": true} },
@@ -71,19 +71,19 @@ Jon edits these files by hand. In 3DJames, selecting an object shows how it was 
 | sketch | a drawn profile made solid: `loops` (outlines, below), `h` 10, `mode` (leave out = push up; `revolve`, `loft`, `sweep`), `angle` 360 (revolve) |
 
 ### Sketches (`kind: "sketch"`)
-A sketch is a 2D drawing (mm, x right, y up) that Jon can reopen and edit in 3DJames' sketch board (Properties > Edit sketch). Use it for any custom profile instead of approximating with primitives.
+A sketch is a 2D drawing (mm, x right, y up) that the user can reopen and edit in 3DJames' sketch board (Properties > Edit sketch). Use it for any custom profile instead of approximating with primitives.
 - `p.loops` is a list of:
   - closed outline `{"type":"poly","pts":[[x,y],...],"bulge":[...],"round":[...]}` (at least 3 points). `bulge[i]` makes side i (point i to point i+1, the last side back to point 0) an arc: `bulge = tan(sweep/4)`, positive bends counter-clockwise, 0 = straight; `1` is a half circle. `round[i]` rounds corner i with that radius (leave out `bulge`/`round` when not used).
   - circle `{"type":"circle","c":[x,y],"r":5}`
   - helper line `{"type":"line","pts":[[x,y],[x,y]]}`: a guide, never solid (and the path for `sweep`).
-  - unfinished line `{"type":"open","pts":[[x,y],...],"bulge":[...]}`: lines Jon still has to close. Never solid; the sketch board shows its loose ends in orange so he can carry on drawing from them and close them. Only write these when Jon asks for a partly drawn sketch; everything else should be closed `poly` outlines.
+  - unfinished line `{"type":"open","pts":[[x,y],...],"bulge":[...]}`: lines the user still has to close. Never solid; the sketch board shows its loose ends in orange so they can carry on drawing from them and close them. Only write these when the user asks for a partly drawn sketch; everything else should be closed `poly` outlines.
 - Outlines inside other outlines are holes (inside a hole again: solid). Outlines that overlap are joined.
 - Push up (no `mode`): extruded `h` mm.
 - `"mode":"revolve"`: spun 360° (or `angle`) around the drawing's y axis (the green line). Draw it at x ≥ 0: x is the radius, y the height. Example cup wall: `pts [[20,0],[22,0],[22,40],[20,40]]`.
 - `"mode":"loft"`: exactly two closed outlines, first = bottom, second = top, `h` apart. `"ruled": true` for straight sides.
 - `"mode":"sweep"`: one profile (closed outline, holes allowed) carried along a path of `line` helper lines joined end to end (a line with `"bulge":[b]` bends).
 - Placement: the solid is centered (X/Y) on the middle of its closed outlines with its bottom at Z = 0, then `pos`/`rot` like any shape. For a revolve the axis stays at the shape's X/Y centre.
-- Leave out `rules` (Jon adds rules like Flat or Parallel himself in 3DJames).
+- Leave out `rules` (the user adds rules like Flat or Parallel themselves in 3DJames).
 
 For the hardware kinds always give every number (copy the standard values above from the size), and mark screwhole / nuttrap / insert bodies `"hole": true`.
 A shape may also have `"stretch": [sx, sy, sz]` (multipliers along its own axes) to make ovals; leave it out normally.
@@ -163,4 +163,4 @@ dup = [n for n, c in collections.Counter(b['name'] for b in d['bodies'].values()
 if dup: errs.append('body names used more than once, make them specific: ' + ', '.join(dup[:8]))
 print('\n'.join(errs) or f"OK: {len(ids)} steps, {len(alive)} objects at the end")
 ```
-The checker catches structure mistakes only. Geometry problems (a fillet too big, objects not touching) show in 3DJames as a red problem on that step in History, which Jon can click to edit. If his computer is linked, ask him to open the file and say whether anything is flagged.
+The checker catches structure mistakes only. Geometry problems (a fillet too big, objects not touching) show in 3DJames as a red problem on that step in History, which the user can click to edit. If you can reach the user's computer, ask them to open the file and say whether anything is flagged.

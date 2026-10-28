@@ -26,7 +26,8 @@ import { installMore } from './sketchmore.js';
  * Open the sketch board.
  * start: the outlines to begin with: an array of loops, or { loops, rules }.
  * onDone(loops, rules) is called with the result; closing without Done changes nothing.
- * opts.ref: lines to show underneath (and snap to) when sketching on a face: { segs: [[[x,y],...]], pts: [{p, kind}] }.
+ * opts.ref: lines to show underneath (and snap to): the edges on the sketch plane { segs: [[[x,y],...]], pts: [{p, kind}] };
+ *   setOutline() on the result adds the objects seen straight on.
  */
 export function openSketch(start, onDone, title = 'Sketch', opts = {}) {
   const sb = { start, onDone, title, opts };
@@ -131,6 +132,19 @@ export function openSketch(start, onDone, title = 'Sketch', opts = {}) {
   sb.ensureAnchor();
   requestAnimationFrame(() => { sb.fit(); });
   return {
+    /** The objects seen straight on (closed outlines in board mm), shown light under the drawing and snapped to. */
+    setOutline: (polys) => {
+      if (!sb.root.isConnected) return;
+      const corners = [];
+      for (const o of polys) o.forEach((p, k) => {
+        // a real corner (not one of the many small steps around something round)
+        const a = o[(k + o.length - 1) % o.length], b = o[(k + 1) % o.length];
+        const u = [p[0] - a[0], p[1] - a[1]], v = [b[0] - p[0], b[1] - p[1]], lu = Math.hypot(...u), lv = Math.hypot(...v);
+        if (lu > 1e-6 && lv > 1e-6 && Math.abs(u[0] * v[1] - u[1] * v[0]) / (lu * lv) > 0.4 && Math.max(lu, lv) > 0.5) corners.push({ p, kind: 'corner' });
+      });
+      sb.ref = { segs: sb.ref?.segs || [], pts: [...(sb.ref?.pts || []), ...corners], outline: polys };
+      if (!sb.loops.length && !sb.current) sb.fit(); else sb.draw();
+    },
     close: sb.close, finish: sb.finish, get loops() { return sb.loops; }, get rules() { return sb.rules; },
     pickEdge: (l, i) => { sb.selEdge = { l, i }; sb.sel = l; sb.draw(); }, pickCorner: (l, i) => { sb.selCorner = { l, i }; sb.sel = l; sb.draw(); },
     lineOp: sb.lineOp, setLength: (l, i, v) => { sb.setLength(l, i, v, true); sb.draw(); }, center: sb.center, mirror: sb.mirror, pick: (i) => { sb.sel = i; sb.draw(); },

@@ -65,7 +65,7 @@ def main():
                 urllib.request.urlopen(admin.base + '/api/state', timeout=1); break
             except Exception:
                 time.sleep(0.2)
-        st, j, _ = admin.call('POST', '/api/setup', {'user': 'jon', 'name': 'Jon', 'password': 'secret1'})
+        st, j, _ = admin.call('POST', '/api/setup', {'user': 'alex', 'name': 'Alex', 'password': 'secret1'})
         check('setup', st == 200, j)
         st, j, _ = admin.call('POST', '/api/place/save', {'type': 'smb', 'label': 'NAS', 'server': 'nobody-here.invalid', 'share': a.share})
         check('a NAS that is not there is refused with a plain message', st == 400 and 'NAS' in j.get('message', ''), j)
@@ -78,14 +78,14 @@ def main():
         st, j, _ = admin.call('GET', '/api/overview')
         p = j['config']['places'][pid]
         check('the Storage list shows it connected, without the password', p['connected'] and 'password' not in json.dumps(j), p)
-        st, j, _ = admin.call('POST', '/api/user/save', {'isNew': False, 'user': 'jon', 'name': 'Jon', 'admin': True, 'shared': False,
+        st, j, _ = admin.call('POST', '/api/user/save', {'isNew': False, 'user': 'alex', 'name': 'Alex', 'admin': True, 'shared': False,
                                                         'folders': [{'label': '3D Objects (NAS)', 'place': pid, 'path': path, 'write': True}]})
-        check('the admin gives Jon a folder on the NAS', st == 200, j)
+        check('the admin gives Alex a folder on the NAS', st == 200, j)
 
-        # ---------------------------------------------------------------- Jon, in the app
-        st, _, _ = app.call('POST', '/login', b'user=jon&password=secret1', {'Content-Type': 'application/x-www-form-urlencoded'}, raw=True)
+        # ---------------------------------------------------------------- Alex, in the app
+        st, _, _ = app.call('POST', '/login', b'user=alex&password=secret1', {'Content-Type': 'application/x-www-form-urlencoded'}, raw=True)
         st, me, _ = app.call('GET', '/api/me')
-        check('Jon signs in and has the NAS folder', st == 200 and [f['label'] for f in me['folders']] == ['3D Objects (NAS)'], me)
+        check('Alex signs in and has the NAS folder', st == 200 and [f['label'] for f in me['folders']] == ['3D Objects (NAS)'], me)
         st, j, _ = app.call('GET', '/api/list?folder=f0&path=')
         check('the NAS folder lists (empty, made for him)', st == 200 and j['entries'] == [], j)
         body = os.urandom(300000) + b'3dj'
@@ -102,7 +102,7 @@ def main():
         st, j, _ = app.call('PUT', '/api/file?folder=f0&path=bracket.3dj', body2, {'If-Match': tag})
         check('Save again (the version he opened): saved', st == 200 and j.get('etag'), j)
         st, j, _ = app.call('PUT', '/api/file?folder=f0&path=bracket.3dj', body, {'If-Match': tag})
-        check('Save from an older version: "someone else saved it", naming who', st == 409 and j.get('error') == 'conflict' and j.get('by') == 'Jon', j)
+        check('Save from an older version: "someone else saved it", naming who', st == 409 and j.get('error') == 'conflict' and j.get('by') == 'Alex', j)
         st, got, _ = app.call('GET', '/api/file?folder=f0&path=bracket.3dj', raw=True)
         check('the newer version is still there', got == body2)
         st, j, _ = app.call('PUT', '/api/file?folder=f0&path=bracket.3dj', body, {'If-Match': 'any'})

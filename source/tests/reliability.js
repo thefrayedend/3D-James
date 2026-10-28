@@ -19,9 +19,9 @@ window.__runReliability = async () => {
   };
   await test('an edit during saving stays dirty and survives', async () => {
     await fresh(); let saved;
-    app.file = { name: 'save-race.json', fmt: 'json', handle: { createWritable: async () => ({
+    app.file = { name: 'save-race.3dj', fmt: '3dj', handle: { createWritable: async () => ({
       write: async (bytes) => {
-        saved = JSON.parse(new TextDecoder().decode(bytes));
+        saved = JSON.parse(new TextDecoder().decode((await C.readZip(new Uint8Array(bytes))).get('project.json')));
         S.commit((d) => { d.name = 'Later edit'; d.features[0].p.w = 73; });
       }, close: async () => {},
     }) } };
@@ -33,7 +33,7 @@ window.__runReliability = async () => {
   });
   await test('a document opened during saving keeps its file identity', async () => {
     await fresh();
-    app.file = { name: 'old.json', fmt: 'json', handle: { createWritable: async () => ({
+    app.file = { name: 'old.3dj', fmt: '3dj', handle: { createWritable: async () => ({
       write: async () => { C.newProject(); }, close: async () => {},
     }) } };
     await C.saveDoc();
@@ -67,7 +67,7 @@ window.__runReliability = async () => {
   await test('missing imported bytes prevent incomplete project saves', async () => {
     C.loadProject({ features: [{ id: 'f1', body: 'b1', type: 'shape', kind: 'import', p: { file: 'missing', fmt: 'stl' } }] }, null);
     let error;
-    try { await C.buildFileData('json'); } catch (e) { error = e; }
+    try { await C.buildFileData('3dj'); } catch (e) { error = e; }
     assert(error?.message.includes('missing'), 'incomplete project was saved');
     await built(); await fresh();
   });

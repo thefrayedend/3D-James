@@ -10,7 +10,7 @@ export function showAbout() {
   const box = modal('About 3DJames', [
     h('p', { style: 'margin:0' }, h('b', {}, `Version ${window.__3DJ_VERSION || '?'}`)),
     h('p', { style: 'margin:0' }, '3DJames is a parametric 3D modeler for 3D printing. Everything runs on your computer; nothing is sent online.'),
-    h('details', { class: 'lic' }, h('summary', {}, h('b', {}, '3DJames itself'), h('span', {}, ' · GPL 3.0 or later'), h('small', {}, 'Free software: you may use, share and change it. Copies you share, changed or not, must stay under the same license with their source code. Copyright © 2026 Jon.')),
+    h('details', { class: 'lic' }, h('summary', {}, h('b', {}, '3DJames itself'), h('span', {}, ' · GPL 3.0 or later'), h('small', {}, 'Free software: you may use, share and change it. Copies you share, changed or not, must stay under the same license with their source code. Copyright © 2026 the 3DJames authors.')),
       h('pre', { class: 'lic-text' }, L.own || '')),
     h('p', { class: 'muted', style: 'margin:0' }, 'Built on these open-source projects. Click one to read its license.'),
     h('div', { class: 'lic-list' }, rows),

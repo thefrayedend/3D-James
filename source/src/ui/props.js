@@ -7,15 +7,16 @@ import { editSketch, editSketches, sketchGroup } from '../sketchcmd.js';
 import { app, scope, bodyData, bodyName } from '../state.js';
 import { $, h, ic, fmt, r2, r4, isPlainNumber } from './dom.js';
 import { vp } from '../view.js';
-import { duplicateSel, deleteSel, setBodyProp, translateSel, rotateSel, editStep } from '../commands.js';
+import { duplicateSel, deleteSel, setBodyProp, translateSel, rotateSel, editStep, combine } from '../commands.js';
 import { endTool, applyTool, quickEdges, ONE_CLICK, toolPreview, toolPreviewDone } from '../tools.js';
 import { exprField, selectField, checkField, trioField, updateFeature, liveFeature } from './fields.js';
 import { openPanel, deleteFeature } from './panels.js';
-import { previewCombine } from '../boolean-preview.js';
 import { historyDependencies, dependentSteps, canMoveFeature, moveFeature } from '../history.js';
 import { renderMeasurePanel } from '../measure.js';
 import { embossFields } from './emboss.js';
 import { saveToMyParts } from '../myparts.js';
+import { canMakeEditable, makeEditable, detailPicker } from '../editable.js';
+import { showPiece, refreshToolPreview } from '../build.js';
 
 export function shapeFields(f) {
   const def = SHAPES[f.kind]; if (!def) return [];
@@ -101,7 +102,7 @@ export function renderProps() {
     el.append(
       h('div', { class: 'card' }, h('h3', {}, 'Combine'),
         h('div', { class: 'muted', style: 'margin-bottom:8px' }, 'Merge joins them. Subtract cuts the others out of the first one you clicked. Intersect keeps only the overlap. Objects marked as holes are cut out when you merge.'),
-        h('div', { class: 'btns' }, h('button', { class: 'btn', onclick: () => previewCombine('union') }, ic('SquaresUnite'), 'Merge'), h('button', { class: 'btn', onclick: () => previewCombine('subtract') }, ic('SquaresSubtract'), 'Subtract'), h('button', { class: 'btn', onclick: () => previewCombine('intersect') }, ic('SquaresIntersect'), 'Intersect'))),
+        h('div', { class: 'btns' }, h('button', { class: 'btn', onclick: () => combine('union') }, ic('SquaresUnite'), 'Merge'), h('button', { class: 'btn', onclick: () => combine('subtract') }, ic('SquaresSubtract'), 'Subtract'), h('button', { class: 'btn', onclick: () => combine('intersect') }, ic('SquaresIntersect'), 'Intersect'))),
       h('div', { class: 'card' }, h('h3', {}, 'Color'), swatches(app.sel)),
       h('div', { class: 'btns' }, h('button', { class: 'btn', onclick: duplicateSel }, ic('Copy'), 'Duplicate'), h('button', { class: 'btn danger', onclick: deleteSel }, ic('Trash2'), 'Delete')));
     return;
@@ -131,8 +132,18 @@ export function renderObjectPanel(el, id) {
   el.append(h('div', {}, nameIn, h('div', { class: 'sub' }, `${d?.solid ? 'Solid' : 'Mesh'}${cf?.type === 'shape' ? ' · ' + SHAPES[cf.kind]?.label : ''}${d ? ` · ${fmt(d.volume / 1000)} cm³` : ''}`)));
   // every sketch that went into this object (its own, and any merged into it or cut out of it): one click to edit
   const sketches = sketchesIn(doc, id);
-  if (sketches.length) el.append(h('div', { class: 'btns' }, ...sketches.map((f) => h('button', { class: 'btn', title: 'Open this sketch on the drawing board to change its outline', onclick: () => editSketch(f) }, ic('PenLine'),
+  // pointing at a button shows that sketch's own piece in orange
+  if (sketches.length) el.append(h('div', { class: 'btns sketch-list', onmouseleave: () => showPiece(null) }, ...sketches.map((f) => h('button', {
+    class: 'btn', title: 'Open this sketch on the drawing board to change its outline. Pointing at it shows its piece in orange.',
+    onmouseenter: () => showPiece(f.body), onfocus: () => showPiece(f.body), onblur: () => showPiece(null),
+    onclick: () => { showPiece(null); editSketch(f); } }, ic('PenLine'),
     f.body === id ? 'Edit sketch' : `Edit sketch: ${doc.bodies[f.body]?.name || f.name || 'Sketch'}`))));
+  if (canMakeEditable(doc, id)) {
+    el.append(h('div', { class: 'card' }, h('h3', {}, 'Make editable'),
+      h('div', { class: 'muted', style: 'margin-bottom:8px' }, 'This is a mesh: it can be moved, sized and combined, but not changed. Make editable rebuilds it as sketches pushed up or spun around, so you can change its sizes.'),
+      detailPicker(),
+      h('button', { class: 'btn primary', disabled: !!app.converting, onclick: () => makeEditable(id) }, ic('PenLine'), 'Make editable')));
+  }
   if (cf?.type === 'shape') {
     const fields = shapeFields(cf);
     if (fields.length) el.append(h('div', { class: 'card' }, h('h3', {}, simple ? 'Size' : 'Starting shape'), errorBox(cf.id), fields));
@@ -170,11 +181,13 @@ export function renderFeaturePanel(el, f, { inline = false } = {}) {
   const eb = errorBox(f.id); if (eb) el.append(eb);
   const deps = historyDependencies(doc).get(f.id) || [];
   const dependents = dependentSteps(doc, f.id);
-  el.append(h('label', { class: 'field' }, h('span', {}, 'Step name'), h('input', { class: 'in', value: f.name || '', placeholder: dsc.title, 'aria-label': 'Step name', onchange: (e) => store.commit((d) => { const step = d.features.find((x) => x.id === f.id); if (step) step.name = e.target.value.trim().slice(0, 128); }, 'ui') })),
-    h('div', { class: 'muted' }, `${f.suppressed ? 'Turned off' : 'Active'} · ${dependents.length} later dependent step(s)`),
-    deps.length ? h('div', { class: 'chip-row' }, h('span', { class: 'muted' }, 'Depends on:'), deps.map((id) => { const step = doc.features.find((x) => x.id === id); return h('button', { class: 'chip', onclick: () => { editStep(id); openPanel('history'); } }, step.name || describeFeature(doc, step).title); })) : null,
+  // the bookkeeping (name, what uses it, its place in the list) goes under the step's own settings, so its sizes come first
+  const n = dependents.length;
+  const meta = [h('label', { class: 'field' }, h('span', {}, 'Step name'), h('input', { class: 'in', value: f.name || '', placeholder: dsc.title, 'aria-label': 'Step name', onchange: (e) => store.commit((d) => { const step = d.features.find((x) => x.id === f.id); if (step) step.name = e.target.value.trim().slice(0, 128); }, 'ui') })),
+    h('div', { class: 'muted' }, `${f.suppressed ? 'Turned off' : 'On'}${n ? ` · ${n} later step${n === 1 ? ' uses' : 's use'} it` : ''}`),
+    deps.length ? h('div', { class: 'chip-row' }, h('span', { class: 'muted' }, 'Uses:'), deps.map((id) => { const step = doc.features.find((x) => x.id === id); return h('button', { class: 'chip', onclick: () => { editStep(id); openPanel('history'); } }, step.name || describeFeature(doc, step).title); })) : '',
     h('div', { class: 'btns' }, h('button', { class: 'btn', disabled: !canMoveFeature(doc, f.id, -1), title: 'Move earlier when dependencies allow it', onclick: () => moveFeature(f.id, -1) }, '↑ Earlier'),
-      h('button', { class: 'btn', disabled: !canMoveFeature(doc, f.id, 1), title: 'Move later when dependencies allow it', onclick: () => moveFeature(f.id, 1) }, '↓ Later')));
+      h('button', { class: 'btn', disabled: !canMoveFeature(doc, f.id, 1), title: 'Move later when dependencies allow it', onclick: () => moveFeature(f.id, 1) }, '↓ Later'))];
   const card = h('div', { class: 'card' });
   // every number of a step gets a slider too (live preview while dragging), unless it is given its own
   const num = (label, key, opts = {}) => exprField(label, f[key], (v) => updateFeature(f.id, (x) => { x[key] = v; }), { slider: 'auto', int: opts.step === 1 && /count|sides/i.test(label), ...opts, onLive: (v) => liveFeature(f.id, (x) => { x[key] = v; }) });
@@ -242,6 +255,7 @@ export function renderFeaturePanel(el, f, { inline = false } = {}) {
       card.append(h('div', { class: 'muted' }, `${bodyName(f.body)} is removed at this step. Delete the step to bring it back.`)); el.append(card); break;
     default: break;
   }
+  el.append(h('div', { class: 'card' }, h('h3', {}, 'Step'), ...meta));
   el.append(h('div', { class: 'btns' },
     h('button', { class: 'btn', onclick: () => updateFeature(f.id, (x) => { x.suppressed = !x.suppressed; }) }, ic(f.suppressed ? 'Eye' : 'EyeOff'), f.suppressed ? 'Turn on' : 'Turn off'),
     h('button', { class: 'btn danger', onclick: () => deleteFeature(f.id) }, ic('Trash2'), 'Delete step')));
@@ -264,8 +278,9 @@ export function renderToolPanel(el) {
       exprField('Wall thickness', t.t, (v) => { t.t = v; }, { step: 0.2 }),
       h('div', { class: 'stat' }, h('span', {}, 'Open faces'), h('b', {}, String(t.items.length))));
   } else if (t.type === 'emboss') {
-    card.append(h('div', { class: 'muted', role: 'status' }, t.face ? 'Face selected. Set the artwork and dimensions, then Apply.' : 'Click a flat face to place text or a logo.'),
-      ...embossFields(t, (values) => { Object.assign(t, values); renderProps(); }));
+    card.append(h('div', { class: 'muted', role: 'status' }, t.face ? 'Face selected. The orange shows where the artwork goes: set it up, then Apply.' : 'Click a flat face to place text or a logo.'),
+      ...(t.face && app.results.previewError ? [h('div', { class: 'err-box' }, app.results.previewError)] : []),
+      ...embossFields(t, (values) => { Object.assign(t, values); renderProps(); refreshToolPreview(); }));
   } else if (t.type === 'extrude') {
     card.append(h('div', { class: 'muted' }, 'Click a face. A 10 mm square appears on it, and you can then change its shape, size, depth, and whether it adds or cuts.'));
   } else if (t.type === 'insertpocket') {

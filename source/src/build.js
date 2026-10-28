@@ -76,7 +76,6 @@ function failWorker(err) {
 
 /** Resolve only when the display and engine describe the current document. */
 export async function waitForBuild() {
-  if (app.preview) throw new Error('Apply or cancel the operation preview before saving or exporting.');
   const deadline = Date.now() + ENGINE_TIMEOUT_MS;
   while (app.building || app.pending || app.builtRevision !== store.revision) {
     if (app.engineError || !workerReady) throw new Error(app.engineError || 'The geometry engine is not ready.');
@@ -91,7 +90,7 @@ function onMessage(e) {
   if (m.type === 'built') {
     clearTimeout(buildTimer); clearInterval(buildTick);
     app.building = false;
-    if (m.revision === store.revision && (m.previewId || null) === (app.preview?.id || null)) { app.builtRevision = m.revision; applyResults(m); }
+    if (m.revision === store.revision) { app.builtRevision = m.revision; applyResults(m); }
     else app.pending = true;
     if (app.pending) { app.pending = false; requestBuild(); }
     renderStatus();
@@ -122,7 +121,7 @@ export function requestBuild() {
   if (app.building) { app.pending = true; return; }
   app.building = true;
   renderStatus();
-  const doc = app.preview?.doc || store.doc;
+  const doc = store.doc;
   for (const id of referencedFiles(doc, { modelsOnly: true })) {
     if (sentFiles.has(id) || !fileStore.has(id)) continue;
     worker.postMessage({ type: 'addFile', fileId: id, data: fileStore.get(id).slice().buffer });
@@ -131,16 +130,40 @@ export function requestBuild() {
   app.buildStarted = Date.now();
   clearInterval(buildTick); buildTick = setInterval(renderStatus, 1000);
   buildTimer = setTimeout(() => failWorker(new Error(`The model took longer than ${minutes()} minutes to build. Restart the engine to continue.`)), ENGINE_TIMEOUT_MS);
-  worker.postMessage({ type: 'build', id: ++msgId, revision: store.revision, previewId: app.preview?.id || null, doc, ghostOf: app.feature });
+  worker.postMessage({ type: 'build', id: ++msgId, revision: store.revision, doc, ghostOf: app.feature, show: app.showPiece ? [app.showPiece] : [], preview: toolPreviewStep() });
+}
+/** An Emboss / engrave being set up, as the step it would make (shown in orange before Apply), or null. */
+function toolPreviewStep() {
+  const t = app.tool;
+  if (t?.type !== 'emboss' || !t.face || (t.source === 'logo' && !t.logo)) return null;
+  const { type, body, face, source, text, font, size, depth, angle, u, v, mode, logo } = t;
+  return { type, body, face, source, text, font, size, depth, angle, u, v, mode, ...(logo ? { logo } : {}) };
+}
+/** The tool's settings changed: show its preview again (after a short pause, so typing doesn't build every key). */
+let toolTimer = null;
+export function refreshToolPreview() {
+  clearTimeout(toolTimer);
+  toolTimer = setTimeout(requestBuild, 150);
+}
+
+/** Point out one object's own piece (hovering an Edit sketch button), or stop (null). Waits a moment, so moving the
+ * mouse across a list of buttons builds only for the one it stops on. */
+let pieceTimer = null;
+export function showPiece(id) {
+  clearTimeout(pieceTimer);
+  pieceTimer = setTimeout(() => {
+    if ((app.showPiece || null) === (id || null)) return;
+    app.showPiece = id || null;
+    requestBuild();
+  }, id ? 120 : 60);
 }
 
 const shownErrors = {};
 function applyResults(m) {
   const map = new Map(m.bodies.map((b) => [b.id, b]));
-  app.results = { bodies: map, errors: m.errors, heights: m.heights || {}, ghosts: m.ghosts || [], ms: m.ms };
-  vp.setBodies(m.bodies, (app.preview?.doc || store.doc).bodies);
+  app.results = { bodies: map, errors: m.errors, heights: m.heights || {}, ghosts: m.ghosts || [], previewError: m.previewError || null, ms: m.ms };
+  vp.setBodies(m.bodies, store.doc.bodies);
   vp.setGhosts(app.results.ghosts);
-  if (app.preview) { vp.clearHandles(); app.preview.onBuilt?.(m); renderAll(); return; }
   app.sel = app.sel.filter((id) => map.has(id));
   vp.setSelection(app.sel);
   // tell about each new problem once
@@ -177,7 +200,7 @@ function applyResults(m) {
   }
   // a shape with leftover Move steps (moved, turned or evenly sized by an older version): taken into the shape, so its
   // own numbers (Height...) are its real size again. It looks exactly the same.
-  if (!app.preview && !app.scrubbing) {
+  if (!app.scrubbing) {
     const ids = foldableBodies(store.doc).filter((id) => { const f = store.doc.features.find((x) => x.body === id && x.type === 'shape'); return app.results.heights?.[f.id] != null && !app.results.errors?.[f.id]; });
     if (ids.length) {
       const test = JSON.parse(JSON.stringify(store.doc)), ok = ids.filter((id) => foldMoves(test, id));

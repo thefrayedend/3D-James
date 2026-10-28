@@ -59,10 +59,12 @@ def save(im, name, w=1100, crop=None):
     im = im.convert('RGB'); im = im.resize((w, int(im.height * w / im.width)), Image.LANCZOS)
     im.save(os.path.join(OUT, name), quality=80, optimize=True); print('wrote', name)
 
-async def open_app(p, width=1280, height=720):
-    """Start the built app (local/3DJames.html) at 1.5x and wait for the geometry engine."""
+async def open_app(p, width=1280, height=720, init=None):
+    """Start the built app (local/3DJames.html) at 1.5x and wait for the geometry engine. init: a script run first."""
     b = await p.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
-    pg = await (await b.new_context(viewport={'width': width, 'height': height}, device_scale_factor=S)).new_page()
+    ctx = await b.new_context(viewport={'width': width, 'height': height}, device_scale_factor=S)
+    if init: await ctx.add_init_script(init)
+    pg = await ctx.new_page()
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.goto(APP)
     await pg.wait_for_function('window.__3dj && document.getElementById("loading").hidden', timeout=120000)

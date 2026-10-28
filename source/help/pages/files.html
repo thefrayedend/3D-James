@@ -1,23 +1,26 @@
-<h1>Saving, opening and exporting</h1>
-<p>Save your project to keep it editable; export it to print it or use it in another program. All in the <b>File menu (☰)</b> at the top left.</p>
+<h1>Saving and opening</h1>
+<p>Everything is in the <b>File menu (☰)</b> at the top left. Saving makes every kind of file: your editable project, or a file for your slicer or another CAD program.</p>
 
 <h2>Save and open projects</h2>
 <ul>
 <li><b>Save</b> (Ctrl+S) keeps your project as a <b>.3dj</b> file: every step stays editable, with its versions and imported files.</li>
-<li><b>Save as…</b> (Ctrl+Shift+S): save under another name, or as an editable <b>3MF</b> (opens in slicers and back in 3DJames with its history) or <b>JSON</b>.</li>
-<li><b>Open…</b> (Ctrl+O): 3DJames projects, STEP, 3MF, OBJ and STL. You can also drop a file on the window. <b>New</b> starts an empty project.</li>
+<li><b>Save as…</b> (Ctrl+Shift+S): pick the place, the name and the type: a <b>3DJames project</b> (.3dj), <b>3MF</b>, <b>STL</b> or <b>STEP</b> (see below).</li>
+<li><b>Open…</b> (Ctrl+O): 3DJames projects, STEP, 3MF, OBJ and STL. You can also drop a file on the window. <b>New</b> starts an empty project. An STL, OBJ or 3MF mesh can be rebuilt as sketches you can change: see <a data-help-topic="editable">Make an STL editable</a>.</li>
 <li><b>Insert a model…</b> (or <b>Add</b> on the Insert tab) adds a model from a file into the current project instead of opening it.</li>
 <li><b>Projects folder…</b>: the folder Open and Save start in (on this computer; not on a 3DJames box).</li>
 <li>The name of the project and whether it has unsaved changes show at the top of the window.</li>
 </ul>
 
-<h2>Export for printing and other programs</h2>
-<p><b>☰</b> &gt; <b>Export…</b> makes a file for another program: <b>STL</b> or <b>3MF</b> for your slicer, <b>STEP</b> for other CAD programs (needs solids, not imported meshes). Export doesn't change where your project is saved, and doesn't count as saving it.</p>
-<figure><img src="tools-export.jpg" alt="The Export window, separate from saving the editable project"><figcaption>Export makes a file for another program. Save keeps the editable project.</figcaption></figure>
+<h2>Saving for printing and other programs</h2>
+<p>In <b>Save as…</b>, pick the type (in the "Save as type" list):</p>
 <ul>
-<li><b>3MF</b> keeps colors and separate objects, and also carries the editable project, so 3DJames can open it again with its history. <b>STL</b> is the finished shape only.</li>
-<li>Finish or cancel a Merge / Subtract / Intersect preview first: Save and Export wait for it.</li>
+<li><b>3DJames project (.3dj)</b>: everything stays editable. The one to keep.</li>
+<li><b>3MF</b>: for your slicer, with colors and separate objects. It also carries the editable project, so 3DJames opens it again with its history.</li>
+<li><b>STL</b>: the finished shape only, for any slicer.</li>
+<li><b>STEP</b>: exact solids for other CAD programs (imported meshes and threads are left out).</li>
+<li>STL and STEP keep only the shape: after saving one, your project is still open as before, and <b>Save</b> (Ctrl+S) still saves your project file. If you haven't saved the project yet, 3DJames still reminds you.</li>
 <li>Check that it fits your printer with <b>View</b> &gt; <b>Printer area</b>, and turn the side that should lie on the bed down with <b>Lay flat on a face</b> (Object &gt; Faces).</li>
+<li>Older 3DJames projects saved as .json still open; save them again as .3dj.</li>
 </ul>
 
 <h2>Backups and versions</h2>

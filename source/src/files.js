@@ -4,7 +4,7 @@ import { app, bodyData, bodyName } from './state.js';
 import { $, h, toast, modal } from './ui/dom.js';
 import { vp } from './view.js';
 import { workerCall, markSent, waitForBuild } from './build.js';
-import { keepFile, newFileId, absorbFiles, absorbVersions, versionDataForSave, filesForSave, toB64, rememberOpenFile, rememberFolder } from './storage.js';
+import { keepFile, newFileId, absorbFiles, absorbVersions, versionDataForSave, filesForSave, rememberOpenFile, rememberFolder } from './storage.js';
 import { drive } from './drive/index.js';
 import { select, placeNew } from './commands.js';
 import { endTool, setWorkplane } from './tools.js';
@@ -12,20 +12,24 @@ import { readZip, parse3mf, parseObj, meshToStl } from './formats.js';
 import { modelSnapshot } from './versions.js';
 import { idb } from './storage.js';
 import { zipStore } from './zip.js';
+import { canMakeEditable, makeEditable, detailPicker } from './editable.js';
 
 // ---------------------------------------------------------------- file types
 const TYPES = {
   '3dj': { description: '3DJames project (.3dj)', accept: { 'application/x-3djames': ['.3dj'] } },
   '3mf': { description: '3MF model (keeps the editable history)', accept: { 'model/3mf': ['.3mf'] } },
-  json: { description: '3DJames project (.json)', accept: { 'application/json': ['.json'] } },
-  stl: { description: 'STL mesh', accept: { 'model/stl': ['.stl'] } },
-  step: { description: 'STEP solid', accept: { 'model/step': ['.step', '.stp'] } },
+  json: { description: 'Old 3DJames project (.json)', accept: { 'application/json': ['.json'] } }, // opens; no longer saved
+  stl: { description: 'STL (finished shape, for slicers)', accept: { 'model/stl': ['.stl'] } },
+  step: { description: 'STEP (exact solids, for other CAD programs)', accept: { 'model/step': ['.step', '.stp'] } },
   obj: { description: 'OBJ mesh', accept: { 'model/obj': ['.obj'] } },
 };
 const allOf = (keys, description) => ({ description, accept: Object.assign({}, ...keys.map((k) => TYPES[k].accept)) });
-const OPEN_TYPES = [allOf(['3dj', '3mf', 'json', 'step', 'stl', 'obj'], '3D files and 3DJames projects'), ...['3dj', 'json', '3mf', 'step', 'stl', 'obj'].map((k) => TYPES[k])];
+const OPEN_TYPES = [allOf(['3dj', '3mf', 'json', 'step', 'stl', 'obj'], '3D files and 3DJames projects'), ...['3dj', '3mf', 'step', 'stl', 'obj'].map((k) => TYPES[k])];
 const INSERT_TYPES = [allOf(['step', 'stl', '3mf', 'obj'], '3D models'), ...['step', 'stl', '3mf', 'obj'].map((k) => TYPES[k])];
-const SAVE_TYPES = ['3dj', '3mf', 'json'].map((k) => TYPES[k]);
+// Save as makes every kind of file: projects (all editable) and the finished shape for slicers / other CAD programs.
+const PROJECT = ['3dj', '3mf'];
+const SAVE_FMTS = ['3dj', '3mf', 'stl', 'step'];
+const SAVE_TYPES = SAVE_FMTS.map((k) => TYPES[k]);
 
 const extOf = (name) => (String(name).toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || '');
 export const fmtOf = (name) => ({ '3dj': '3dj', '3mf': '3mf', json: 'json', stl: 'stl', step: 'step', stp: 'step', obj: 'obj' }[extOf(name)] || null);
@@ -60,16 +64,16 @@ function exportItems() {
     .map((id) => ({ id, name: bodyName(id), color: store.doc.bodies[id]?.color || '#C3C3C3' }));
 }
 
-/** The bytes of the project in a file format. .3dj, 3MF and .json keep the full step history (and imported files). */
+/** The bytes of the project in a file format. .3dj and 3MF keep the full step history (and imported files). */
 export async function buildFileData(fmt, onSnapshot) {
-  if (app.preview) throw new Error('Apply or cancel the preview before saving or exporting.');
+  if (!SAVE_FMTS.includes(fmt)) throw new Error(`3DJames can't save ${fmt} files.`);
   if (['3mf', 'stl', 'step'].includes(fmt)) {
     await waitForBuild();
-    if (Object.keys(app.results.errors).length) throw new Error('Fix the model problems before exporting geometry.');
+    if (Object.keys(app.results.errors).length) throw new Error('Fix the model problems before saving the shape.');
   }
   const source = store.doc, revision = store.revision;
   const doc = JSON.parse(JSON.stringify(source));
-  const portable = ['3dj', '3mf', 'json'].includes(fmt);
+  const portable = PROJECT.includes(fmt);
   const versions = portable ? versionDataForSave(doc) : {};
   const files = portable ? filesForSave(doc) : {};
   onSnapshot?.({ source, revision, model: modelSnapshot(doc) });
@@ -83,10 +87,6 @@ export async function buildFileData(fmt, onSnapshot) {
     if (png) parts.push({ name: 'preview.png', data: png });
     if (parts.reduce((total, p) => total + p.data.byteLength + 256, 22) > 400 * 1048576) throw new Error('This project exceeds 400 MB. Delete older versions or reduce imported model size before saving.');
     return zipStore(parts);
-  }
-  if (fmt === 'json') {
-    const embedded = Object.fromEntries(Object.entries(files).map(([k, v]) => [k, toB64(v)]));
-    return new TextEncoder().encode(JSON.stringify({ ...doc, ...(Object.keys(embedded).length ? { files: embedded } : {}), ...(Object.keys(versions).length ? { versionData: versions } : {}) }));
   }
   const items = exportItems();
   if (fmt === '3mf') {
@@ -102,14 +102,7 @@ export async function buildFileData(fmt, onSnapshot) {
   return r.files[0].data;
 }
 
-const lossyShown = new Set();
-function lossyNote(fmt) {
-  if ((fmt !== 'stl' && fmt !== 'step') || lossyShown.has(fmt)) return;
-  lossyShown.add(fmt);
-  toast(`${fmt.toUpperCase()} files keep only the finished shape, not the step history. Save as 3MF or a 3DJames project to keep everything editable.`, 'info', 7000);
-}
-
-function markSaved(name, fmt, handle, snapshot) {
+export function markSaved(name, fmt, handle, snapshot) {
   // A project opened while this save was writing must keep its own identity.
   if (snapshot.source !== store.doc) return;
   app.file = { name, fmt, handle: handle || null };
@@ -123,12 +116,11 @@ function markSaved(name, fmt, handle, snapshot) {
   toast(app.dirty ? `Saved ${name}. Newer changes still need saving.` : `Saved ${name}`, 'info', app.dirty ? 5000 : 2200);
 }
 
-/** Save: back into the file that is open, in its own format. */
+/** Save: back into the file that is open, in its own format (a project: .3dj or 3MF). */
 export async function saveDoc() {
   const f = app.file;
-  if (!f?.handle || !['3dj', '3mf', 'json'].includes(f.fmt)) return saveAs();
+  if (!f?.handle || !PROJECT.includes(f.fmt)) return saveAs();
   try {
-    lossyNote(f.fmt);
     let snapshot;
     const data = await buildFileData(f.fmt, (s) => { snapshot = s; });
     if (!(await writeChecked(f.handle, data))) return;
@@ -136,20 +128,24 @@ export async function saveDoc() {
   } catch (err) { toast(`Could not save: ${err.message}`, 'err', 7000); }
 }
 
-/** Save as: pick the place, the name and the type. */
+/** Save as: pick the place, the name and the type: a 3DJames project, 3MF, or the finished shape as STL or STEP. */
 export async function saveAs() {
-  const handle = await drive.pickSave({ suggestedName: `${safeName()}.${['json', '3mf'].includes(app.file?.fmt) ? app.file.fmt : '3dj'}`, types: SAVE_TYPES });
+  const handle = await drive.pickSave({ suggestedName: `${safeName()}.${app.file?.fmt === '3mf' ? '3mf' : '3dj'}`, types: SAVE_TYPES });
   if (!handle) return;
   if (handle === 'download') return saveAsDownload();
-  const fmt = fmtOf(handle.name) || '3dj';
-  if (!['3dj', '3mf', 'json'].includes(fmt)) return toast('Save preserves an editable project. Use File → Export for STL or STEP.', 'err');
+  const fmt = SAVE_FMTS.includes(fmtOf(handle.name)) ? fmtOf(handle.name) : '3dj';
   try {
-    lossyNote(fmt);
     let snapshot;
     const data = await buildFileData(fmt, (s) => { snapshot = s; });
     if (!(await writeChecked(handle, data))) return;
-    markSaved(handle.name, fmt, handle, snapshot);
+    if (PROJECT.includes(fmt)) markSaved(handle.name, fmt, handle, snapshot);
+    else { if (drive.mode === 'local') rememberFolder(handle); shapeSaved(handle.name, fmt); }
   } catch (err) { toast(`Could not save: ${err.message}`, 'err', 7000); }
+}
+
+/** An STL or STEP file was saved: it keeps only the finished shape, so the project itself stays as it was. */
+function shapeSaved(name, fmt) {
+  toast(`Saved ${name}. ${fmt.toUpperCase()} keeps only the finished shape: to keep everything editable, also save it as a 3DJames project${app.file && PROJECT.includes(app.file.fmt) ? ` (Ctrl+S saves ${app.file.name})` : ''}.`, 'info', 7000);
 }
 
 function saveAsDownload() {
@@ -160,7 +156,8 @@ function saveAsDownload() {
     h('div', { style: 'display:grid;gap:6px' },
       opt('3dj', '3DJames project (.3dj)', 'Everything: full step history and any imported files.', true),
       opt('3mf', '3MF', 'Opens in slicers and keeps the full step history for 3DJames.'),
-      opt('json', '3DJames project (.json)', 'Full step history, as text (older format).')));
+      opt('stl', 'STL', 'The finished shape for your slicer (not editable in 3DJames).'),
+      opt('step', 'STEP', 'Exact solids for other CAD programs (not editable in 3DJames).')));
   const close = modal('Save as', form, (done) => [h('button', { class: 'btn', onclick: done }, 'Cancel'), h('button', { class: 'btn primary', onclick: () => form.requestSubmit() }, 'Save')]);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -168,45 +165,15 @@ function saveAsDownload() {
     const name = `${(nameIn.value || 'model').trim()}.${fmt}`;
     close();
     try {
-      lossyNote(fmt);
       let snapshot;
       const blob = new Blob([await buildFileData(fmt, (s) => { snapshot = s; })]);
       const a = h('a', { href: URL.createObjectURL(blob), download: name });
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-      markSaved(name, fmt, null, snapshot);
+      if (PROJECT.includes(fmt)) markSaved(name, fmt, null, snapshot); else shapeSaved(name, fmt);
     } catch (err) { toast(err.message, 'err', 7000); }
   });
   nameIn.focus(); nameIn.select();
-}
-
-/** Export never changes the project's save location or clears its unsaved state. */
-export async function exportDialog() {
-  const format = h('select', { class: 'in', 'aria-label': 'Export format' }, [['stl', 'STL — finished mesh'], ['step', 'STEP — exact solids'], ['3mf', '3MF — model and editable project']].map(([value, label]) => h('option', { value }, label)));
-  const name = h('input', { class: 'in', value: safeName(), 'aria-label': 'Export name' });
-  const form = h('form', { style: 'display:grid;gap:12px' }, h('label', {}, 'Format', format), h('label', {}, 'File name', name), h('p', { class: 'muted' }, 'Export creates an output file. Your editable project still needs to be saved separately.'));
-  const close = modal('Export model', form, (done) => [h('button', { class: 'btn', onclick: done }, 'Cancel'), h('button', { class: 'btn primary', onclick: () => form.requestSubmit() }, 'Export')]);
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault(); const fmt = format.value;
-    try {
-      // Request the picker before geometry work to preserve the browser's user activation.
-      let handle = null;
-      if (drive.mode === 'server') {
-        close();
-        handle = await drive.pickSave({ suggestedName: `${name.value || 'model'}.${fmt}`, types: [TYPES[fmt]], title: 'Export to' });
-        if (!handle) return;
-        if (handle === 'download') handle = null;
-      } else if (window.showSaveFilePicker) handle = await window.showSaveFilePicker({ suggestedName: `${name.value || 'model'}.${fmt}`, types: [TYPES[fmt]], excludeAcceptAllOption: true });
-      close();
-      const data = await buildFileData(fmt);
-      if (handle) { await drive.write(handle, data); if (drive.mode === 'local') rememberFolder(handle); }
-      else {
-        const url = URL.createObjectURL(new Blob([data]));
-        const a = h('a', { href: url, download: `${name.value || 'model'}.${fmt}` }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
-      }
-      toast('Exported model. Your project save location and unsaved changes are unchanged.');
-    } catch (err) { if (err.name !== 'AbortError') toast(`Could not export: ${err.message}`, 'err', 7000); }
-  });
 }
 
 function rememberSavedModel() {
@@ -230,6 +197,8 @@ export function loadProject(doc, file) {
 export function newProject() {
   loadProject(emptyDoc(), null);
   vp.view('home');
+  // again once the old objects are gone from the view (until then Home frames them, not the empty floor)
+  app.afterBuild = { fn: () => vp.view('home') };
 }
 
 export async function openFile(file, handle) {
@@ -263,6 +232,7 @@ export async function openFile(file, handle) {
         for (const m of parse3mf(zip)) await addMeshBody(m.name || baseName(file.name), meshToStl(m.verts, m.tris), stage);
         loadProject({ name: baseName(file.name) }, { name: file.name, fmt: '3mf', handle });
         for (const add of stage) add();
+        offerEditable();
       }
     } else if (fmt === 'stl' || fmt === 'obj' || fmt === 'step') {
       const stage = [];
@@ -270,6 +240,7 @@ export async function openFile(file, handle) {
       if (ok === false) return;
       loadProject({ name: baseName(file.name) }, { name: file.name, fmt, handle });
       for (const add of stage) add();
+      if (fmt !== 'step') offerEditable();
     } else { toast('3DJames opens 3MF, STEP, STL, OBJ and 3DJames project files.', 'err'); return; }
     app.savedModel = modelSnapshot(store.doc); app.savedAt = file.lastModified || Date.now(); rememberSavedModel();
     toast(`Opened ${file.name}`, 'info', 2200);
@@ -354,6 +325,20 @@ async function addStep(name, bytes, partsChoice, stage) {
   };
   if (stage) stage.push(add); else add();
   return true;
+}
+
+/** A mesh was just opened: offer to rebuild it as sketches (Make editable) or keep it as it is. */
+function offerEditable() {
+  const ids = Object.keys(store.doc.bodies).filter((id) => canMakeEditable(store.doc, id));
+  if (!ids.length) return;
+  const close = modal('Make it editable?', h('div', {},
+    h('p', {}, 'This file is a mesh: a shell of triangles. 3DJames can move, size and combine it, but not change its shape.'),
+    h('p', {}, 'Make editable rebuilds it as sketches pushed up or spun around (with holes and cut-outs as steps), so you can change its sizes later in History. It works best on parts designed in a CAD app; figures and sculpted shapes stay meshes.'),
+    detailPicker()),
+  () => [
+    h('button', { class: 'btn', onclick: () => close() }, 'Keep as a mesh'),
+    h('button', { class: 'btn primary', onclick: async () => { close(); for (const id of ids) await makeEditable(id); } }, 'Make editable'),
+  ]);
 }
 
 export function updateTitle() {

@@ -209,10 +209,10 @@
       B.app.feature = null; sel([a]); C.openPanel('props'); assert(document.querySelector('#props input'), 'object panel');
     });
 
-    await t('save/open project (.json)', async () => {
-      await fresh(); a = await add('box'); b = await add('torus'); const bytes = await C.buildFileData('json');
-      const doc = JSON.parse(new TextDecoder().decode(bytes)); assert(doc.features.length === 2, 'json features');
+    await t('old .json projects still open (they are no longer saved)', async () => {
+      await fresh(); a = await add('box'); b = await add('torus'); const bytes = new TextEncoder().encode(JSON.stringify(S.doc));
       await C.openFile(new File([bytes], 'p.json'), null); await built(); noErr(); assert(bodies().length === 2, 'json reopen');
+      let err; try { await C.buildFileData('json'); } catch (e) { err = e; } assert(err, '.json can still be saved');
     });
     await t('save/open 3MF with history', async () => {
       const bytes = await C.buildFileData('3mf'); const zip = await C.readZip(new Uint8Array(bytes));
@@ -232,7 +232,7 @@
     });
     await t('imported files stay out of the project', async () => {
       assert(!S.doc.files || !Object.keys(S.doc.files).length, 'files inside doc'); assert(JSON.stringify(S.doc).length < 5000, 'doc too big');
-      const bytes = await C.buildFileData('json'); await C.openFile(new File([bytes], 'q.json'), null); await built(); noErr();
+      const bytes = await C.buildFileData('3dj'); await C.openFile(new File([bytes], 'q.3dj'), null); await built(); noErr();
       assert(bodies().length >= 3, 'reopen with imports ' + bodies().length);
     });
     await t('.3dj project: zip with the project, imported files and a preview', async () => {
@@ -336,13 +336,29 @@
       C.showAbout(); const n = document.querySelectorAll('.modal .lic').length; document.querySelector('.modal-back').remove();
       assert(n >= 11, 'about rows ' + n);
     });
-    await t('handles: always blue (no green arrows, by request); the bar still marks the axis being used', async () => {
-      await fresh(); a = await add('box'); sel([a]); B.commands.setGizmo('scale'); B.vp.setActiveAxis(null); B.vp.render();
-      const cols = () => [...document.querySelectorAll('.hud svg.tri')].map((e) => e.style.color);
-      assert(cols().length === 6 && cols().every((c) => c === 'rgb(30, 160, 255)' || c === '#1ea0ff'), 'not all blue: ' + cols());
-      B.vp.setActiveAxis(2); B.vp.render();
-      assert(cols().every((c) => c === 'rgb(30, 160, 255)' || c === '#1ea0ff'), 'an arrow turned another colour: ' + cols());
-      assert(document.querySelectorAll('#objbar .bf')[2].classList.contains('on'), 'Z box not green');
+    await t('the direction being worked on is green in the bar and on its arrows, the others blue (both ways)', async () => {
+      const BLUE = ['rgb(30, 160, 255)', '#1ea0ff'], GREEN = ['rgb(126, 211, 33)', '#7ed321'];
+      for (const mode of ['scale', 'translate']) {
+        await fresh(); a = await add('box'); sel([a]); B.commands.setGizmo(mode); B.vp.setActiveAxis(null); B.vp.render();
+        const arrows = () => B.vp.hudItems.filter((it) => ['face', 'lift', 'slide'].includes(it.data.type));
+        const colorOf = (ax) => arrows().filter((it) => it.data.ax === ax).map((it) => it.el.style.color);
+        assert(arrows().length === 6 && arrows().every((it) => BLUE.includes(it.el.style.color)), mode + ': not all blue at first');
+        // clicking into the Z box: Z box and Z arrows green, the rest blue
+        document.querySelectorAll('#objbar .bf input')[2].focus(); B.vp.render();
+        assert(colorOf(2).length === 2 && colorOf(2).every((c) => GREEN.includes(c)), mode + ': Z arrows not green: ' + colorOf(2));
+        assert([0, 1].every((ax) => colorOf(ax).every((c) => BLUE.includes(c))), mode + ': X/Y arrows not blue');
+        assert(document.querySelectorAll('#objbar .bf')[2].classList.contains('on'), mode + ': Z box not green');
+        document.activeElement.blur();
+        // pressing an X arrow: X box and X arrows green, Z back to blue
+        const xa = arrows().find((it) => it.data.ax === 0);
+        xa.el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, clientX: 10, clientY: 10 }));
+        xa.el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerId: 1, clientX: 10, clientY: 10 }));
+        await sleep(50); B.vp.render();
+        assert(!B.vp.handleDrag && !app.dragging, mode + ': the arrow press did not end');
+        const bf = document.querySelectorAll('#objbar .bf');
+        assert(bf[0].classList.contains('on') && !bf[2].classList.contains('on'), mode + ': X box did not turn green from its arrow');
+        assert(colorOf(0).every((c) => GREEN.includes(c)) && colorOf(2).every((c) => BLUE.includes(c)), mode + ': arrow colours after pressing X: ' + colorOf(0) + ' / ' + colorOf(2));
+      }
       B.commands.setGizmo('translate'); B.vp.setActiveAxis(null);
     });
     await t('parts: screws, nuts, bearings, pins, rods, magnets, standoffs', async () => {
@@ -444,7 +460,7 @@
       assert(Math.abs(top[1]) < 1e-3 * Math.hypot(...top), 'top not parallel ' + JSON.stringify(P()));
       k.finish(); assert(out && out.r.filter((r) => r.t !== 'anchor').length === 3, 'rules returned ' + JSON.stringify(out?.r));
     });
-    await t('sketch: measure between any two points, radius and smooth join (Jon\'s bracket)', async () => {
+    await t('sketch: measure between any two points, radius and smooth join (Alex\'s bracket)', async () => {
       await fresh();
       let out = null;
       const k = C.openSketch([{ type: 'poly', pts: [[0, 0], [85, 0], [85, 12], [62, 22], [62, 30], [40, 30], [10, 63], [0, 63]], bulge: [0, 0, 0, 0, 0, 0.3, 0, 0] }], (l, r) => { out = { l, r }; });
@@ -808,9 +824,9 @@
       assert(near(data(boxId).bbox[0][2], 0), 'not on the floor');
     });
     await t('imported files get unique names on open', async () => {
-      const bytes = await C.buildFileData('json');
-      await C.openFile(new File([bytes], 'a.json'), null); await built(); const f1 = S.doc.features.find((f) => f.kind === 'import').p.file;
-      await C.openFile(new File([bytes], 'b.json'), null); await built(); const f2 = S.doc.features.find((f) => f.kind === 'import').p.file;
+      const bytes = await C.buildFileData('3dj');
+      await C.openFile(new File([bytes], 'a.3dj'), null); await built(); const f1 = S.doc.features.find((f) => f.kind === 'import').p.file;
+      await C.openFile(new File([bytes], 'b.3dj'), null); await built(); const f2 = S.doc.features.find((f) => f.kind === 'import').p.file;
       noErr(); assert(f1 !== f2 && f1.startsWith('file-'), `names ${f1} ${f2}`);
     });
     await t('Z shows the middle of the object, like 3D Builder (bar and Properties)', async () => {

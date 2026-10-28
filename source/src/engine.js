@@ -82,7 +82,7 @@ function freeValue(v) {
   try { if (v.mf) v.mf.delete(); else if (v.shape) v.shape.delete(); else if (v.parts) { freeValue(v.parts[0]); freeValue(v.parts[1]); } } catch { /* already gone */ }
 }
 
-function mfFromArrays(vertices, triangles) {
+export function mfFromArrays(vertices, triangles) {
   // merge coincident vertices so the mesh is closed
   const map = new Map(); const out = []; const remap = new Uint32Array(vertices.length / 3);
   for (let i = 0; i < vertices.length / 3; i++) {
@@ -119,6 +119,16 @@ function asMf(v, key) {
   return m;
 }
 
+function fineMf(shape) {
+  const bb = solidBounds(shape);
+  const me = shape.mesh({ tolerance: Math.max(0.002, len3(sub(bb[1], bb[0])) / 20000), angularTolerance: 0.1 });
+  const mesh = new MF.Mesh({ numProp: 3, vertProperties: new Float32Array(me.vertices), triVerts: new Uint32Array(me.triangles) });
+  mesh.merge();
+  const m = new MF.Manifold(mesh);
+  scratchMfs.push(m);
+  return m;
+}
+const scratchMfs = []; // finer trial meshes, freed at the next trial build
 function needSolid(v, what) {
   if (!v.shape) fail(`${what} only works on solid shapes. This object became a mesh when it was combined with a thread or an imported model. Do the ${what.toLowerCase()} before combining.`);
   return v.shape;
@@ -620,12 +630,66 @@ function matchRefs(items, refs, bb, dirKey, what) {
 // ---------- evaluation ----------
 export let lastState = new Map();
 
+/** The across direction on a flat face with normal n (artwork and shapes on the face are drawn along it): X on a
+ * face that points up or down, else level and square to n. */
+function faceXDir(n) {
+  if (Math.abs(n[2]) > 0.9) return [1, 0, 0];
+  const x = [-n[1], n[0], 0], l = len3(x);
+  return x.map((v) => v / l);
+}
+/** The artwork of an Emboss / engrave step as a solid of its own (the caller deletes it), and whether it cuts. */
+function embossPiece(shape, v, f, num, fonts) {
+  const [hit] = matchRefs(faceInfo(shape), [f.face], bbOf(v), 'n', 'faces');
+  if (hit.f.geomType !== 'PLANE') fail('Emboss / engrave needs a flat face.');
+  const depth = num(f.depth), size = num(f.size);
+  if (!(depth > 0 && size > 0)) fail('Artwork size and depth must be above 0.');
+  let drawing;
+  if (f.source === 'logo') {
+    if (!f.logo?.shapes?.length || f.logo.shapes.length > 1000) fail('Choose a valid filled SVG logo.');
+    let points = 0;
+    const outline = (pts) => {
+      if (!Array.isArray(pts) || pts.length < 3 || (points += pts.length) > 20000 || pts.some((p) => !Array.isArray(p) || p.length !== 2 || p.some((v) => !Number.isFinite(v)))) fail('The logo outline is invalid or too complex.');
+      let pen = R.draw(pts[0].map((v) => v * size));
+      for (const p of pts.slice(1)) pen = pen.lineTo(p.map((v) => v * size));
+      return pen.close();
+    };
+    for (const s of f.logo.shapes) {
+      let part = outline(s.outer);
+      for (const hole of s.holes || []) part = part.cut(outline(hole));
+      drawing = drawing ? drawing.fuse(part) : part;
+    }
+  } else {
+    const text = String(f.text || '').trim(); if (!text) fail('Type some text.');
+    if (text.length > 500) fail('Use 500 characters or fewer.');
+    drawing = R.drawText(text, { fontFamily: fonts.has(f.font) ? f.font : 'sans', fontSize: size * 1.37 });
+    const center = drawing.boundingBox.center;
+    drawing = drawing.translate(-center[0], -center[1]);
+  }
+  drawing = drawing.rotate(num(f.angle ?? 0)).translate(num(f.u ?? 0), num(f.v ?? 0));
+  const n = hit.n, cut = f.mode === 'cut', lift = cut ? 0.01 : -0.01;
+  const xDir = faceXDir(n);
+  const plane = new R.Plane(hit.c.map((v, i) => v + n[i] * lift), xDir, n);
+  let prism, slab;
+  try {
+    prism = drawing.sketchOnPlane(plane).extrude((cut ? -1 : 1) * (depth + 0.01));
+    const direction = cut ? -1 : 1;
+    slab = R.basicFaceExtrusion(hit.f, new R.Vector(n.map((v) => v * direction * (depth + 0.02)))).translate(n.map((v) => -v * direction * 0.01));
+    const clipped = prism.intersect(slab);
+    if (!(R.measureVolume(clipped) > 1e-8)) { clipped.delete(); fail('The artwork misses the face. Reduce its shift or size.'); }
+    return { piece: clipped, cut };
+  } finally {
+    for (const s of new Set([slab, prism])) { try { s?.delete(); } catch { /* kernel owns a shared result */ } }
+  }
+}
+
 /**
  * Rebuild every body from the step list.
  * files: imported file bytes by id. ghostOf: id of the step being edited; objects that step uses
  * but that no longer exist at the end (like a groove shape cut out of a post) come back as see-through "ghosts".
+ * show: objects to point out (hovering an Edit sketch button): each as it was before anything was merged into it or
+ * cut out of it, returned among the ghosts with hover: true.
  */
-export function evaluate(doc, fonts, { files = {}, ghostOf = null } = {}) {
+export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = false, show = [], preview = null } = {}) {
   const scope = varScope(doc.vars);
   const scopeKey = JSON.stringify(scope);
   const num = (v) => evalExpr(v, scope);
@@ -644,6 +708,7 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null } = {}) {
   const gf = ghostOf && (doc.features || []).find((x) => x.id === ghostOf);
   const ghostIds = new Set(!gf ? [] : gf.type === 'combine' ? gf.tools : [gf.body, gf.body2].filter(Boolean));
   const ghostVals = new Map();
+  const showIds = new Set(show), showVals = new Map(), shown = new Set(); // shown: combined with something, kept as it was
   const state = new Map(); // body -> {v, key}
   const errors = {};
   const touched = new Set();
@@ -671,8 +736,9 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null } = {}) {
   for (const f of doc.features || []) {
     if (f.suppressed) continue;
     curId = f.id;
+    if (f.type === 'combine' && showIds.has(f.body) && showVals.has(f.body)) shown.add(f.body);
     try {
-      const fj = JSON.stringify({ ...f, name: undefined, suppressed: undefined, id: undefined });
+      const fj =JSON.stringify({ ...f, name: undefined, suppressed: undefined, id: undefined });
       switch (f.type) {
         case 'shape': {
           const key = hash('S' + fj + scopeKey);
@@ -884,47 +950,8 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null } = {}) {
           const key = hash('emboss' + fj + b.key + scopeKey);
           set(f.body, cached(key, () => {
             const shape = needSolid(b.v, 'Emboss / engrave');
-            const [hit] = matchRefs(faceInfo(shape), [f.face], bbOf(b.v), 'n', 'faces');
-            if (hit.f.geomType !== 'PLANE') fail('Emboss / engrave needs a flat face.');
-            const depth = num(f.depth), size = num(f.size);
-            if (!(depth > 0 && size > 0)) fail('Artwork size and depth must be above 0.');
-            let drawing;
-            if (f.source === 'logo') {
-              if (!f.logo?.shapes?.length || f.logo.shapes.length > 1000) fail('Choose a valid filled SVG logo.');
-              let points = 0;
-              const outline = (pts) => {
-                if (!Array.isArray(pts) || pts.length < 3 || (points += pts.length) > 20000 || pts.some((p) => !Array.isArray(p) || p.length !== 2 || p.some((v) => !Number.isFinite(v)))) fail('The logo outline is invalid or too complex.');
-                let pen = R.draw(pts[0].map((v) => v * size));
-                for (const p of pts.slice(1)) pen = pen.lineTo(p.map((v) => v * size));
-                return pen.close();
-              };
-              for (const s of f.logo.shapes) {
-                let part = outline(s.outer);
-                for (const hole of s.holes || []) part = part.cut(outline(hole));
-                drawing = drawing ? drawing.fuse(part) : part;
-              }
-            } else {
-              const text = String(f.text || '').trim(); if (!text) fail('Type some text.');
-              if (text.length > 500) fail('Use 500 characters or fewer.');
-              drawing = R.drawText(text, { fontFamily: fonts.has(f.font) ? f.font : 'sans', fontSize: size * 1.37 });
-              const center = drawing.boundingBox.center;
-              drawing = drawing.translate(-center[0], -center[1]);
-            }
-            drawing = drawing.rotate(num(f.angle ?? 0)).translate(num(f.u ?? 0), num(f.v ?? 0));
-            const n = hit.n, cut = f.mode === 'cut', lift = cut ? 0.01 : -0.01;
-            const xDir = Math.abs(n[2]) > 0.9 ? [1, 0, 0] : (() => { const x = [-n[1], n[0], 0], l = len3(x); return x.map((v) => v / l); })();
-            const plane = new R.Plane(hit.c.map((v, i) => v + n[i] * lift), xDir, n);
-            let prism, slab, clipped;
-            try {
-              prism = drawing.sketchOnPlane(plane).extrude((cut ? -1 : 1) * (depth + 0.01));
-              const direction = cut ? -1 : 1;
-              slab = R.basicFaceExtrusion(hit.f, new R.Vector(n.map((v) => v * direction * (depth + 0.02)))).translate(n.map((v) => -v * direction * 0.01));
-              clipped = prism.intersect(slab);
-              if (!(R.measureVolume(clipped) > 1e-8)) fail('The artwork misses the face. Reduce its shift or size.');
-              return { shape: cut ? shape.clone().cut(clipped) : shape.clone().fuse(clipped) };
-            } finally {
-              for (const s of new Set([clipped, slab, prism])) { try { s?.delete(); } catch { /* kernel owns a shared result */ } }
-            }
+            const { piece, cut } = embossPiece(shape, b.v, f, num, fonts);
+            try { return { shape: cut ? shape.clone().cut(piece) : shape.clone().fuse(piece) }; } finally { try { piece.delete(); } catch { /* */ } }
           }), key);
           break;
         }
@@ -935,7 +962,7 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null } = {}) {
             const shape = needSolid(b.v, 'Extrude on face');
             const [hit] = matchRefs(faceInfo(shape), [f.face], bbOf(b.v), 'n', 'faces');
             const n = hit.n, c = hit.c;
-            const xDir = Math.abs(n[2]) > 0.9 ? [1, 0, 0] : (() => { const v = [-n[1], n[0], 0]; const l = len3(v); return v.map((x) => x / l); })();
+            const xDir = faceXDir(n);
             const depth = num(f.depth); if (!(depth > 0)) fail('Depth must be above 0');
             const cut = f.mode === 'cut';
             const lift = cut ? 0.02 : -0.01;
@@ -975,11 +1002,35 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null } = {}) {
         case 'delete': consume(f.body); break;
         default: fail(`Unknown step type ${f.type}`);
       }
+      if (showIds.has(f.body) && !shown.has(f.body) && state.has(f.body)) showVals.set(f.body, state.get(f.body));
     } catch (err) {
       errors[f.id] = err instanceof UserError ? err.message : `Failed: ${err?.message || err}`;
     }
   }
 
+  if (scratch) {
+    for (const m of scratchMfs.splice(0)) { try { m.delete(); } catch { /* */ } }
+    // a trial build (making an STL editable): leaves the open project's results alone. Its objects as meshes:
+    const meshes = new Map(), soups = new Map();
+    for (const [id, b] of state) {
+      try { meshes.set(id, asMf(b.v, b.key)); } catch (err) {
+        // the quick mesh can come out with gaps on small details: try once more, finer, joining near points
+        try { meshes.set(id, fineMf(b.v.shape)); } catch {
+          // a solid the CAD kernel finds valid is fine; only its triangles do not close up: measure from those
+          let ok = false;
+          try { const an = new (R.getOC().BRepCheck_Analyzer)(b.v.shape.wrapped, true, false); ok = typeof an.IsValid_1 === 'function' ? an.IsValid_1() : an.IsValid(); an.delete(); } catch (e2) { if (globalThis.DEBUG_CONV) console.log('check failed', e2?.message || e2); }
+          if (globalThis.DEBUG_CONV) console.log('kernel says valid:', ok);
+          if (ok) {
+            try {
+              const bb = solidBounds(b.v.shape), me = b.v.shape.mesh({ tolerance: Math.max(0.002, len3(sub(bb[1], bb[0])) / 20000), angularTolerance: 0.1 });
+              soups.set(id, { vertices: me.vertices, triangles: me.triangles, volume: R.measureVolume(b.v.shape) });
+            } catch { errors['body:' + id] = err?.message || 'This model could not be turned into triangles.'; } // (the CAD kernel failed on it after all)
+          } else errors['body:' + id] = err.message;
+        }
+      }
+    }
+    return { errors, meshes, soups };
+  }
   lastState = state;
   for (const [k, v] of shapeCache) if (!touched.has(k)) { freeValue(v); shapeCache.delete(k); }
   for (const [k, m] of mfConvCache) {
@@ -997,9 +1048,21 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null } = {}) {
   };
   const bodies = [...state].map(([id, b]) => display(id, b)).filter(Boolean);
   const ghosts = [...ghostVals].filter(([id]) => !state.has(id)).map(([id, b]) => display(id, b)).filter(Boolean);
+  for (const [id, b] of showVals) { const g = display(id, b); if (g) ghosts.push({ ...g, hover: true }); }
+  // an Emboss / engrave being set up (not a step yet): its artwork alone, shown like a hovered piece
+  let previewError = null; // not a problem with the model: only shown in the tool's panel
+  if (preview?.type === 'emboss' && state.has(preview.body)) {
+    const b = state.get(preview.body);
+    let piece = null;
+    try {
+      ({ piece } = embossPiece(needSolid(b.v, 'Emboss / engrave'), b.v, preview, num, fonts));
+      const g = display('emboss-preview', { v: { shape: piece }, key: hash('embossPreview' + JSON.stringify(preview) + b.key + scopeKey) });
+      if (g) ghosts.push({ ...g, hover: true });
+    } catch (err) { previewError = err?.message || String(err); } finally { try { piece?.delete(); } catch { /* */ } }
+  }
   const live = new Set([...bodies, ...ghosts].map((b) => b.key));
   for (const k of meshCache.keys()) if (!live.has(k)) meshCache.delete(k);
-  return { bodies, ghosts, errors, ms: Date.now() - t0, timings, heights };
+  return { bodies, ghosts, errors, previewError, ms: Date.now() - t0, timings, heights };
 }
 
 function meshSolid(shape) {
@@ -1289,5 +1352,36 @@ export function offsetLoops(loops, dist, corners = 'sharp') {
   }
   return out;
 }
+/** The finished object as a mesh (Manifold) for measuring. Owned by the engine: do not delete it. */
+export function manifoldOf(id) { const b = lastState.get(id); return b ? asMf(b.v, b.key) : null; }
 export function solidOf(id) { return lastState.get(id)?.v.shape || null; }
+/**
+ * The outline of these objects seen straight on, for the sketch board: m (a column-major 4x4) turns the world into the
+ * board, which is looked at from above. Returns closed outlines as [[x, y], ...] (outer edges and holes alike).
+ */
+export function outlineOf(ids, m) {
+  const parts = [];
+  try {
+    for (const id of ids) {
+      let mf = null; try { mf = manifoldOf(id); } catch { /* not watertight: from its triangles below */ }
+      if (mf) { const t = mf.transform(m); try { parts.push(t.project()); } finally { t.delete(); } continue; }
+      const me = exportMeshOf(id); if (!me) continue;
+      // every triangle laid flat on the board (turned the same way round), filled together
+      const v = me.vertices, tr = me.triangles, P = (i) => [m[0] * v[3 * i] + m[4] * v[3 * i + 1] + m[8] * v[3 * i + 2] + m[12], m[1] * v[3 * i] + m[5] * v[3 * i + 1] + m[9] * v[3 * i + 2] + m[13]];
+      const tris = [];
+      for (let k = 0; k < tr.length; k += 3) {
+        const a = P(tr[k]), b = P(tr[k + 1]), c = P(tr[k + 2]);
+        const area = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+        if (Math.abs(area) < 1e-9) continue;
+        tris.push(area > 0 ? [a, b, c] : [a, c, b]);
+      }
+      if (tris.length) parts.push(new MF.CrossSection(tris, 'NonZero'));
+    }
+    if (!parts.length) return [];
+    const all = MF.CrossSection.union(parts), s = all.simplify(0.01);
+    const out = s.toPolygons().map((p) => p.map((q) => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4]));
+    s.delete(); all.delete();
+    return out.filter((p) => p.length >= 3);
+  } finally { for (const p of parts) p.delete(); }
+}
 export { R };

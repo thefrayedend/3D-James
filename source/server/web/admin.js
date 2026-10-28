@@ -42,7 +42,7 @@ async function start() {
   await load();
 }
 function setupPage(st) {
-  const u = input({ value: '', placeholder: 'jon', autocapitalize: 'none' }), n = input({ placeholder: 'Jon' }), p1 = input({ type: 'password' }), p2 = input({ type: 'password' });
+  const u = input({ value: '', placeholder: 'alex', autocapitalize: 'none' }), n = input({ placeholder: 'Alex' }), p1 = input({ type: 'password' }), p2 = input({ type: 'password' });
   $('main').replaceChildren(h('div', { class: 'card narrow' }, h('h2', {}, 'Welcome to your 3DJames box'),
     h('p', { class: 'muted' }, 'First, make the admin account (that\'s you). You can add more people afterwards.'),
     field('Sign-in name', u, 'Short, lower-case, no spaces.'), field('Your name', n), field('Password', p1), field('Password again', p2),
@@ -88,8 +88,8 @@ function users() {
 }
 function editUser(name) {
   const isNew = !name, u = isNew ? { folders: [], shared: true } : S.config.users[name];
-  const un = input({ value: name || '', disabled: !isNew, autocapitalize: 'none', placeholder: 'sarah' });
-  const dn = input({ value: u.name || '', placeholder: 'Sarah' });
+  const un = input({ value: name || '', disabled: !isNew, autocapitalize: 'none', placeholder: 'sam' });
+  const dn = input({ value: u.name || '', placeholder: 'Sam' });
   const pw = input({ type: 'password', placeholder: isNew ? '' : 'leave empty to keep it' });
   const [admL, admH, adm] = check('Admin (may use this admin page)', u.admin);
   const [shL, shH, sh] = check(`May use the shared folder ("${S.config.shared.label}")`, u.shared, S.config.shared.enabled ? '' : 'The shared folder is switched off (Shared folder tab).');
@@ -162,7 +162,7 @@ function editPlace(id, newType) {
     fields.password = input({ type: 'password', placeholder: id && p.username ? 'leave empty to keep it' : '' }); fields.domain = input({ value: p.domain || '', placeholder: '(usually empty)' });
     body.push(h('div', { class: 'row' }, field('NAS name or address', fields.server, 'Like 192.168.1.20. (In Windows it is the part after \\\\.)'), field('Share name', fields.share, 'The first folder under the NAS, like Files.')),
       h('div', { class: 'row' }, field('NAS user name', fields.username, 'Leave empty if the share needs no password.'), field('NAS password', fields.password), field('Domain / workgroup', fields.domain)),
-      h('p', { class: 'muted' }, 'Example: if Windows shows the folder as \\\\192.168.1.166\\Jon\\3D Objects, the NAS address is 192.168.1.166 and the share name is Jon. Pick the "3D Objects" folder inside it later, when you give someone a folder (Users tab). 3DJames keeps people out of each other\'s folders.'));
+      h('p', { class: 'muted' }, 'Example: if Windows shows the folder as \\\\192.168.1.50\\Alex\\3D Objects, the NAS address is 192.168.1.50 and the share name is Alex. Pick the "3D Objects" folder inside it later, when you give someone a folder (Users tab). 3DJames keeps people out of each other\'s folders.'));
   } else {
     fields.server = input({ value: p.server || '' }); fields.export = input({ value: p.export || '' });
     body.push(field('NAS name or address', fields.server), field('Exported folder', fields.export));

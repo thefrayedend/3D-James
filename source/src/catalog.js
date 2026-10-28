@@ -2,7 +2,6 @@
 // They are plain solids (no thread detail) so they are fast and easy to place; the Thread tool makes real threads.
 // Every number can still be changed in Properties after the part is added.
 
-export const METRIC = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8', 'M10'];
 const D = { M2: 2, 'M2.5': 2.5, M3: 3, M4: 4, M5: 5, M6: 6, M8: 8, M10: 10, M12: 12 };
 
 // screws: head diameter dk, head height k, hex key size s
@@ -19,7 +18,6 @@ export const SCREW_TYPES = {
   set: { label: 'Set screw / grub screw (ISO 4026)', sizes: Object.keys(SETSCREW) },
 };
 export const SCREW_LENGTHS = [3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80];
-const DEFAULT_LEN = { M2: 8, 'M2.5': 8, M3: 10, M4: 12, M5: 16, M6: 20, M8: 25, M10: 30 };
 function screwPreset(type, size) {
   const d = D[size];
   if (type === 'socket') { const [dk, k, s] = SOCKET[size]; return { d, dk, k, s }; }
@@ -107,4 +105,3 @@ export const PART_SHAPES = {
     fields: [['size', 'Size', 'select', sel(STANDOFF_SIZES)], ['len', 'Length', 'num'], ['af', 'Across flats', 'num'], ['d', 'Thread diameter', 'num'],
       ['male', 'Threaded stud on one end (male-female)', 'bool'], ['stud', 'Stud length', 'num', { show: (p) => !!p.male }]] },
 };
-export const PART_DEFAULT_LEN = DEFAULT_LEN;

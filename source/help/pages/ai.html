@@ -1,0 +1,42 @@
+<h1>Let an AI help (Gemini or Claude)</h1>
+<p>An AI helper on this computer, such as Google's <b>Antigravity</b> app (Gemini inside, free with a Google account) or <b>Claude</b>, can work in your open 3DJames window. You tell it what you want in plain words, and it opens the project, changes the steps, builds the model, checks the sizes and problems, looks at the result and saves it. You watch every change happen, and <b>Ctrl+Z</b> undoes any of them.</p>
+<p>It goes through <b>3DJames Link</b> (<code>3DJamesLink.exe</code>, in the 3DJames folder next to <code>3DJames.html</code>, or in the installed app's folder). The AI starts it by itself; you never need to open it. It only works on this computer: nothing on your network or the internet can use it.</p>
+<h2>Set up (once)</h2>
+<ol>
+<li>Install <b>Antigravity</b> from <code>antigravity.google</code> (Download) and sign in with your Google account. The free plan has a weekly limit.</li>
+<li>In the 3DJames folder, double-click <b>Connect Antigravity.cmd</b>. If you installed 3DJames with the installer, click <b>Connect Antigravity to 3DJames</b> in the Start menu's 3DJames folder instead. It tells Antigravity where 3DJames Link is. Close Antigravity and open it again.</li>
+<li>To check: in Antigravity click <b>Customizations</b>, then <b>Installed</b>. Under <b>MCP Servers</b> you should see <b>3djames</b> with a green dot.</li>
+</ol>
+<h2>Start</h2>
+<ol>
+<li>Open 3DJames as usual.</li>
+<li>In Antigravity, click <b>New Conversation</b>, type what you want, for example <i>"make a 90 × 60 × 5 mm mounting plate with a 5 mm screw hole in each corner, 8 mm in from the edges, in 3DJames"</i>, and press Enter. If Antigravity asks to use a 3djames tool, choose the answer that always allows it.</li>
+<li>The first time in a window, 3DJames asks <b>Let Gemini work in 3DJames?</b> The 3DJames window may be behind Antigravity: its name in the taskbar flashes <b>(!) Allow Gemini?</b>. Click it, then click <b>Allow</b>.</li>
+</ol>
+<figure><img src="ai-1.jpg" alt="3DJames asking Let Gemini work in 3DJames? with the buttons Don't allow and Allow"><figcaption>The first job in a window: 3DJames asks you. Allow (1) lets Gemini work in this window until you close it or click Stop.</figcaption></figure>
+<p>With <b>Claude</b> (the Claude app's Code tab, opened on the 3DJames folder) it is the same: Claude finds 3DJames Link by itself and asks once whether to use it.</p>
+<h2>What it looks like</h2>
+<p>While an AI may work in the window, a note at the top says so, with a <b>Stop</b> button. Each change it makes is one step in Undo and shows a short message, for example <i>"Gemini: added 3 steps"</i>. Its steps are normal 3DJames steps: you can open and change them in History like your own.</p>
+<figure><img src="ai-2.jpg" alt="3DJames with a blue mounting plate with four corner holes made by Gemini, the note Gemini can work here with a Stop button at the top, and the steps in History"><figcaption>Gemini made the plate: the note at the top with Stop (1), its messages at the right, and its named steps in History (2).</figcaption></figure>
+<h2>Things you can ask</h2>
+<ul>
+<li><i>"Open the Space Pi rack and make the slots 2 mm wider."</i></li>
+<li><i>"Why does step 14 fail?"</i> (it reads the real problem from 3DJames)</li>
+<li><i>"How much does this weigh in PETG?"</i> or <i>"Does it fit in 220 × 220 × 250?"</i> (it reads the volume and size)</li>
+<li><i>"Make bracket.stl from Downloads editable and tell me how close it came."</i> (runs <a data-help-topic="editable">Make editable</a>)</li>
+<li><i>"Save it as Bracket v2."</i> or <i>"Save it as an STL for printing."</i></li>
+</ul>
+<h2>Stop or undo</h2>
+<ul>
+<li><b>Ctrl+Z</b> undoes the AI's last change, like your own. You can also ask it to undo.</li>
+<li><b>Stop</b> (top of the window) stops it working in this window; if it tries again, 3DJames asks again. You can also click Antigravity's red stop button.</li>
+<li><b>Don't allow</b> when asked: the AI is told no and nothing changes.</li>
+</ul>
+<h2>Good to know</h2>
+<ul>
+<li>It saves only into the <b>Projects</b> folder: next to <code>3DJames.html</code>, or <b>Documents\3DJames\Projects</b> for the installed app. It never saves over a file unless you say so, and then 3DJames asks you first. It won't throw away unsaved changes unless you tell it to.</li>
+<li>It can't use the window while you have the sketch board or a preview open; it asks you to finish first.</li>
+<li>It works with 3DJames on this computer, opened from its folder or installed with the installer (not yet on the 3DJames box), and with AI helpers that run on this computer (Antigravity, Claude Code). Google's Gemini CLI no longer has a free sign-in. Gemini and Claude on a website or phone can't reach it.</li>
+<li>If something goes wrong, the AI is told to explain it and wait for you, not to go looking through files. If an AI starts asking you to allow lots of commands, click its stop button.</li>
+<li>The free Antigravity plan has a weekly limit. AI helpers can make mistakes: check the result and the sizes it reports before printing.</li>
+</ul>

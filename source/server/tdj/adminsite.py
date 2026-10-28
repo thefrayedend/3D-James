@@ -46,7 +46,7 @@ def make_handler(ctx):
         b = req.json()
         name = (b.get('user') or '').strip().lower()
         if not USERNAME.match(name):
-            return js({'ok': False, 'message': 'Use a short name: lower-case letters and numbers (like jon).'}, 400)
+            return js({'ok': False, 'message': 'Use a short name: lower-case letters and numbers (like alex).'}, 400)
         if len(b.get('password') or '') < 6:
             return js({'ok': False, 'message': 'Choose a password of at least 6 characters.'}, 400)
         with cfg.lock:
@@ -120,7 +120,7 @@ def make_handler(ctx):
         b = req.json()
         name = (b.get('user') or '').strip().lower()
         if not USERNAME.match(name):
-            raise ValueError('Use a short name: lower-case letters and numbers, no spaces (like sarah).')
+            raise ValueError('Use a short name: lower-case letters and numbers, no spaces (like sam).')
         with cfg.lock:
             u = cfg.data['users'].get(name)
             if b.get('isNew'):

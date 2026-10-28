@@ -53,6 +53,9 @@ async def main():
     await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': x0, 'y': y0}]})
     for k in range(1, 16):
       await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': x0 + (to[0] - x0) * k / 15, 'y': y0 + (to[1] - y0) * k / 15}]}); await pg.wait_for_timeout(25)
+    # the preview follows the finger a frame or two behind: give it a moment to arrive before reading where it is
+    try: await pg.wait_for_function("([x, y]) => { const g = __3dj.vp.dropGhost; return g && g.parent && Math.abs(g.position.x - x) <= 4 && Math.abs(g.position.y - y) <= 4; }", arg=[-30, -20], timeout=5000)
+    except Exception: pass
     fghost = await ev("()=>{ const g=__3dj.vp.dropGhost; return g && g.parent ? [g.position.x, g.position.y].map(v=>Math.round(v)) : null; }")
     await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []}); await W()
     c = (await bodies())[-1]

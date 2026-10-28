@@ -196,7 +196,7 @@ if [ -n "$UUIDU" ] && [ -e "/dev/disk/by-uuid/$UUIDU" ]; then
   r=$(echo "{\"type\": \"usb\", \"uuid\": \"$UUIDU\", \"fstype\": \"vfat\"}" | helper mount-place usbtest || true)
   echo "  get it ready: $r"
   echo "$r" | grep -q '"ok": true' && echo "$r" | grep -q 'can open and save' || { echo "[customize] ERROR: a USB drive could not be got ready"; exit 1; }
-  runuser -u threedjames -- sh -c 'mkdir -p "/mnt/3djames/usbtest/users/jon" && echo test > "/mnt/3djames/usbtest/users/jon/a b.3dj" && cat "/mnt/3djames/usbtest/users/jon/a b.3dj" >/dev/null' \
+  runuser -u threedjames -- sh -c 'mkdir -p "/mnt/3djames/usbtest/users/alex" && echo test > "/mnt/3djames/usbtest/users/alex/a b.3dj" && cat "/mnt/3djames/usbtest/users/alex/a b.3dj" >/dev/null' \
     || { echo "[customize] ERROR: the server can't save on a USB drive"; exit 1; }
   r=$(echo '{"reconnect": true}' | helper mount-place usbtest || true)
   echo "$r" | grep -q '"ok": true' || { echo "[customize] ERROR: a ready USB drive is not seen as ready: $r"; exit 1; }

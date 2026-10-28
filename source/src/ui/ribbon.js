@@ -5,10 +5,9 @@ import { SCREW_TYPES, NUT_TYPES, BEARINGS, BEARING_GROUPS, DOWELS, RODS, MAGNETS
 import { app, saveSettings } from '../state.js';
 import { $, h, ic, toast, popMenu, closeMenu, mi, pickMenu, subMenu } from './dom.js';
 import { vp } from '../view.js';
-import { centerOn, addShape, addShapeAt, mirrorSel, turnCopySel, addPattern, groupSel, ungroupSel, duplicateSel, dropSel, deleteSel, setBodyProp, selectAll, selectNone, select, editStep, copySel, paste } from '../commands.js';
+import { centerOn, addShape, addShapeAt, mirrorSel, turnCopySel, addPattern, groupSel, ungroupSel, duplicateSel, dropSel, deleteSel, setBodyProp, selectAll, selectNone, select, editStep, copySel, paste, combine } from '../commands.js';
 import { setWorkplane, startTool, endTool, applyTool } from '../tools.js';
-import { newProject, openDialog, saveDoc, saveAs, exportDialog, insertDialog, chooseProjectsFolder, updateTitle } from '../files.js';
-import { previewCombine } from '../boolean-preview.js';
+import { newProject, openDialog, saveDoc, saveAs, insertDialog, chooseProjectsFolder, updateTitle } from '../files.js';
 import { saveNewVersionDialog, versionsDialog } from '../versions.js';
 import { backupsDialog } from '../storage.js';
 import { saveToMyParts, insertMyPart, manageMyParts, myParts, refreshMyParts } from '../myparts.js';
@@ -113,7 +112,6 @@ export function fileMenu(anchor) {
     mi('SaveAll', 'Save as…', saveAs, 'Ctrl+Shift+S'),
     mi('History', 'Save as new version…', () => saveNewVersionDialog(saveDoc)),
     mi('History', 'Select version…', versionsDialog),
-    mi('SaveAll', 'Export…', exportDialog),
     h('hr'),
     mi('Plus', 'Insert a model…', insertDialog),
     h('hr'),
@@ -186,7 +184,7 @@ export function buildTabBar() {
     h('div', { class: 'tabs-row', role: 'tablist' }, TABS.map((t) => h('button', { class: 'tab' + (app.tab === t ? ' on' : ''), role: 'tab', onclick: () => { app.tab = t; buildTabBar(); renderCmdBar(); } }, t))),
     h('div', { style: 'flex:1' }),
     h('input', { id: 'docName', class: 'doc-name', value: store.doc.name || 'Untitled', 'aria-label': 'Project name', onfocus: (e) => { e.target.value = store.doc.name || 'Untitled'; }, onblur: () => updateTitle(), onchange: (e) => store.commit((d) => { d.name = e.target.value.trim().replace(/\s*\*$/, '') || 'Untitled'; }, 'ui') }),
-    h('button', { class: 'tb-text', title: 'Save an editable project (Ctrl+Shift+S). Use File → Export for STL or STEP.', onclick: saveAs }, ic('SaveAll'), 'Save as'),
+    h('button', { class: 'tb-text', title: 'Save as a 3DJames project, 3MF, STL or STEP (Ctrl+Shift+S)', onclick: saveAs }, ic('SaveAll'), 'Save as'),
     h('button', { class: 'tb-icon', title: 'Save (Ctrl+S)', onclick: saveDoc }, ic('Save')),
     h('span', { class: 'tb-sep' }),
     cmdButtons.undoTop = h('button', { class: 'tb-icon', title: 'Undo (Ctrl+Z)', onclick: doUndo }, ic('Undo2')),
@@ -245,9 +243,9 @@ export function renderCmdBar() {
       shapeCb('Type', 'Text', 'text', undefined, undefined, () => openPanel('props')), cb('', 'PenLine', 'Sketch', (b) => sketchMenu(b), { dd: true, title: 'Draw an outline (lines, arcs, rectangles, circles) with exact sizes, then push it up, spin it around, or cut it in. On the floor or on a face.' }), cb('', 'Package', 'Parts', (b) => partsMenu(b), { dd: true, title: 'Ready-made parts: hardware, aluminum extrusion and more' }), sepEl(),
       cb('workplane', 'Layers', 'Workplane', () => (app.workplane ? setWorkplane(null) : startTool('workplane')), { on: !!app.workplane || app.tool?.type === 'workplane', title: app.workplane ? 'New shapes go on the picked face. Click to go back to the floor.' : 'Click a flat or curved solid to place a sketch plane; click again to return to the floor' }));
   } else if (t === 'Object') {
-    bar.append(cb('union', 'SquaresUnite', 'Merge', () => previewCombine('union'), { title: 'Join the selected objects (holes get cut out)' }),
-      cb('subtract', 'SquaresSubtract', 'Subtract', () => previewCombine('subtract'), { title: 'Select the object to cut with and click Subtract: it is cut out of everything it passes through. (With several selected, the others are cut out of the first one you clicked.)' }),
-      cb('intersect', 'SquaresIntersect', 'Intersect', () => previewCombine('intersect'), { title: 'Keep only where they overlap' }), sepEl(),
+    bar.append(cb('union', 'SquaresUnite', 'Merge', () => combine('union'), { title: 'Join the selected objects (holes get cut out)' }),
+      cb('subtract', 'SquaresSubtract', 'Subtract', () => combine('subtract'), { title: 'Select the object to cut with and click Subtract: it is cut out of everything it passes through. (With several selected, the others are cut out of the first one you clicked.)' }),
+      cb('intersect', 'SquaresIntersect', 'Intersect', () => combine('intersect'), { title: 'Keep only where they overlap' }), sepEl(),
       cb('emboss', 'Type', 'Emboss', () => startTool('emboss'), { title: 'Add raised or recessed text / SVG artwork to a flat face' }),
       cb('fillet', 'SquareRoundCorner', 'Round edges', () => startTool('fillet'), { title: 'Round edges' }),
       cb('chamfer', 'Diamond', 'Bevel edges', () => startTool('chamfer'), { title: 'Bevel edges' }),

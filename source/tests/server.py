@@ -38,15 +38,15 @@ async def main():
             await ap_.goto(ADMIN + '/')
             await ap_.wait_for_selector('text=Welcome to your 3DJames box')
             ins = ap_.locator('main input')
-            await ins.nth(0).fill('jon'); await ins.nth(1).fill('Jon'); await ins.nth(2).fill('secret1'); await ins.nth(3).fill('secret1')
+            await ins.nth(0).fill('alex'); await ins.nth(1).fill('Alex'); await ins.nth(2).fill('secret1'); await ins.nth(3).fill('secret1')
             await ap_.click('text=Create the admin account')
             await ap_.wait_for_selector('text=People who can use 3DJames')
             check('setup makes the admin account and opens the admin page', await ap_.is_visible('nav >> text=Storage'))
             api = adm.request
             async def post(path, body):
                 r = await api.post(ADMIN + path, data=json.dumps(body), headers={'Content-Type': 'application/json'}); return r.status, await r.json()
-            st, j = await post('/api/user/save', {'isNew': True, 'user': 'sarah', 'name': 'Sarah', 'password': 'secret2', 'shared': True})
-            check('admin adds a person (Sarah)', st == 200, j)
+            st, j = await post('/api/user/save', {'isNew': True, 'user': 'sam', 'name': 'Sam', 'password': 'secret2', 'shared': True})
+            check('admin adds a person (Sam)', st == 200, j)
             st, j = await post('/api/shared/save', {'enabled': True, 'label': 'Shared', 'place': 'box', 'path': 'shared', 'write': True})
             check('admin switches on the shared folder', st == 200, j)
             st, j = await post('/api/user/save', {'isNew': True, 'user': 'Bad Name', 'password': 'secret3'})
@@ -54,7 +54,7 @@ async def main():
             r = await (await b.new_context()).request.get(ADMIN + '/api/overview')
             check('the admin API needs an admin sign-in', r.status == 401)
 
-            # ---------------------------------------------------------------- Jon signs in to the app
+            # ---------------------------------------------------------------- Alex signs in to the app
             async def signin(name, pw):
                 ctx = await b.new_context(viewport={'width': 1280, 'height': 800})
                 pg = await ctx.new_page(); pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -63,91 +63,91 @@ async def main():
                 await pg.wait_for_function('window.__3dj && document.getElementById("loading").hidden', timeout=180000)
                 return ctx, pg
             ctx0 = await b.new_context(); pg0 = await ctx0.new_page(); await pg0.goto(APP + '/')
-            await pg0.fill('#u', 'jon'); await pg0.fill('#p', 'wrong!'); await pg0.click('button[type=submit]')
+            await pg0.fill('#u', 'alex'); await pg0.fill('#p', 'wrong!'); await pg0.click('button[type=submit]')
             check('a wrong password is refused', 'not right' in await pg0.content())
-            jctx, jon = await signin('jon', 'secret1')
-            mode = await jon.evaluate("()=>fetch('/api/me').then(r=>r.json())")
-            check('after sign-in the app is served, with Jon\'s folders', [f['label'] for f in mode['folders']] == ['My files', 'Shared'], mode)
+            jctx, alex = await signin('alex', 'secret1')
+            mode = await alex.evaluate("()=>fetch('/api/me').then(r=>r.json())")
+            check('after sign-in the app is served, with Alex\'s folders', [f['label'] for f in mode['folders']] == ['My files', 'Shared'], mode)
             # Save as: the server's own window, into My files
-            await jon.evaluate("()=>{ __3dj.commands.newProject(); __3dj.commands.addShape('box'); }")
-            await jon.wait_for_timeout(1500)
-            await jon.keyboard.press('Control+Shift+S')
-            await jon.wait_for_selector('dialog.fb-dialog .fb-place'); await jon.wait_for_timeout(300)
-            check('Save as opens the server window with My files and Shared', await jon.locator('.fb-place').all_inner_texts() == ['My files', 'Shared'])
-            await jon.fill('dialog.fb-dialog input[aria-label="File name"]', 'bracket')
-            await jon.click('dialog.fb-dialog button:text-is("Save")')
-            f = data / 'files' / 'users' / 'jon' / 'bracket.3dj'
+            await alex.evaluate("()=>{ __3dj.commands.newProject(); __3dj.commands.addShape('box'); }")
+            await alex.wait_for_timeout(1500)
+            await alex.keyboard.press('Control+Shift+S')
+            await alex.wait_for_selector('dialog.fb-dialog .fb-place'); await alex.wait_for_timeout(300)
+            check('Save as opens the server window with My files and Shared', await alex.locator('.fb-place').all_inner_texts() == ['My files', 'Shared'])
+            await alex.fill('dialog.fb-dialog input[aria-label="File name"]', 'bracket')
+            await alex.click('dialog.fb-dialog button:text-is("Save")')
+            f = data / 'files' / 'users' / 'alex' / 'bracket.3dj'
             for _ in range(60):
                 if f.exists(): break
-                await jon.wait_for_timeout(250)
-            check('the project is saved on the box in Jon\'s folder (.3dj added)', f.exists() and f.stat().st_size > 1000)
+                await alex.wait_for_timeout(250)
+            check('the project is saved on the box in Alex\'s folder (.3dj added)', f.exists() and f.stat().st_size > 1000)
             # Open: the file is listed, and opens
-            await jon.evaluate("()=>__3dj.commands.newProject()")
-            await jon.keyboard.press('Control+o')
-            await jon.wait_for_selector('dialog.fb-dialog .fb-row')
-            await jon.dblclick('dialog.fb-dialog .fb-row:has-text("bracket.3dj")')
-            await jon.wait_for_function("()=>__3dj.app.file?.name==='bracket.3dj'", timeout=20000)
-            check('Open lists the saved file and opens it', await jon.evaluate("()=>__3dj.store.doc.features.length") >= 1)
+            await alex.evaluate("()=>__3dj.commands.newProject()")
+            await alex.keyboard.press('Control+o')
+            await alex.wait_for_selector('dialog.fb-dialog .fb-row')
+            await alex.dblclick('dialog.fb-dialog .fb-row:has-text("bracket.3dj")')
+            await alex.wait_for_function("()=>__3dj.app.file?.name==='bracket.3dj'", timeout=20000)
+            check('Open lists the saved file and opens it', await alex.evaluate("()=>__3dj.store.doc.features.length") >= 1)
             # Save (Ctrl+S) goes back to the same server file
-            await jon.evaluate("()=>__3dj.commands.addShape('cyl')")
-            await jon.wait_for_timeout(800)
+            await alex.evaluate("()=>__3dj.commands.addShape('cyl')")
+            await alex.wait_for_timeout(800)
             m0 = f.stat().st_mtime_ns
-            await jon.keyboard.press('Control+s')
+            await alex.keyboard.press('Control+s')
             for _ in range(40):
                 if f.stat().st_mtime_ns != m0: break
-                await jon.wait_for_timeout(250)
+                await alex.wait_for_timeout(250)
             check('Ctrl+S saves back into the same file on the box', f.stat().st_mtime_ns != m0)
 
             # ---------------------------------------------------------------- the shared folder: open by two, saved by both
-            await jon.keyboard.press('Control+Shift+S')
-            await jon.wait_for_selector('dialog.fb-dialog .fb-place')
-            await jon.click('dialog.fb-dialog .fb-place:has-text("Shared")')
-            await jon.wait_for_timeout(400)
-            await jon.fill('dialog.fb-dialog input[aria-label="File name"]', 'team-part')
-            await jon.click('dialog.fb-dialog button:text-is("Save")')
+            await alex.keyboard.press('Control+Shift+S')
+            await alex.wait_for_selector('dialog.fb-dialog .fb-place')
+            await alex.click('dialog.fb-dialog .fb-place:has-text("Shared")')
+            await alex.wait_for_timeout(400)
+            await alex.fill('dialog.fb-dialog input[aria-label="File name"]', 'team-part')
+            await alex.click('dialog.fb-dialog button:text-is("Save")')
             sf = data / 'files' / 'shared' / 'team-part.3dj'
             for _ in range(60):
                 if sf.exists(): break
-                await jon.wait_for_timeout(250)
-            check('Jon saves into the shared folder', sf.exists())
-            sctx, sarah = await signin('sarah', 'secret2')
-            names = await sarah.evaluate("()=>fetch('/api/me').then(r=>r.json()).then(j=>j.folders.map(f=>f.label))")
-            check('Sarah sees her own folder and the shared one', names == ['My files', 'Shared'], names)
-            await sarah.keyboard.press('Control+o')
-            await sarah.wait_for_selector('dialog.fb-dialog .fb-place')
-            await sarah.click('dialog.fb-dialog .fb-place:has-text("Shared")')
-            await sarah.dblclick('dialog.fb-dialog .fb-row:has-text("team-part.3dj")')
-            await sarah.wait_for_function("()=>__3dj.app.file?.name==='team-part.3dj'", timeout=20000)
-            await sarah.wait_for_timeout(500)
-            toasts = await sarah.locator('.toast').all_inner_texts()
-            check('Sarah is told that Jon has the file open too', any('Jon also has team-part.3dj open' in t for t in toasts), toasts)
-            await sarah.evaluate("()=>__3dj.commands.addShape('sphere')"); await sarah.wait_for_timeout(800)
-            await sarah.keyboard.press('Control+s')
-            await sarah.wait_for_function("()=>!__3dj.app.dirty", timeout=20000)
-            # now Jon saves his older copy: asked first
-            await jon.evaluate("()=>__3dj.commands.addShape('cone')"); await jon.wait_for_timeout(800)
-            await jon.keyboard.press('Control+s')
-            try: await jon.wait_for_selector('text=Someone else saved this file', timeout=20000)
-            except Exception: print('JON TOASTS', await jon.locator('.toast').all_inner_texts()); raise
-            txt = await jon.inner_text('dialog')
-            check('saving over a newer save asks first, and says who saved it', 'Sarah' in txt, txt)
-            await jon.click('text=Replace their version')
-            await jon.wait_for_function("()=>!__3dj.app.dirty", timeout=20000)
+                await alex.wait_for_timeout(250)
+            check('Alex saves into the shared folder', sf.exists())
+            sctx, sam = await signin('sam', 'secret2')
+            names = await sam.evaluate("()=>fetch('/api/me').then(r=>r.json()).then(j=>j.folders.map(f=>f.label))")
+            check('Sam sees her own folder and the shared one', names == ['My files', 'Shared'], names)
+            await sam.keyboard.press('Control+o')
+            await sam.wait_for_selector('dialog.fb-dialog .fb-place')
+            await sam.click('dialog.fb-dialog .fb-place:has-text("Shared")')
+            await sam.dblclick('dialog.fb-dialog .fb-row:has-text("team-part.3dj")')
+            await sam.wait_for_function("()=>__3dj.app.file?.name==='team-part.3dj'", timeout=20000)
+            await sam.wait_for_timeout(500)
+            toasts = await sam.locator('.toast').all_inner_texts()
+            check('Sam is told that Alex has the file open too', any('Alex also has team-part.3dj open' in t for t in toasts), toasts)
+            await sam.evaluate("()=>__3dj.commands.addShape('sphere')"); await sam.wait_for_timeout(800)
+            await sam.keyboard.press('Control+s')
+            await sam.wait_for_function("()=>!__3dj.app.dirty", timeout=20000)
+            # now Alex saves their older copy: asked first
+            await alex.evaluate("()=>__3dj.commands.addShape('cone')"); await alex.wait_for_timeout(800)
+            await alex.keyboard.press('Control+s')
+            try: await alex.wait_for_selector('text=Someone else saved this file', timeout=20000)
+            except Exception: print('ALEX TOASTS', await alex.locator('.toast').all_inner_texts()); raise
+            txt = await alex.inner_text('dialog')
+            check('saving over a newer save asks first, and says who saved it', 'Sam' in txt, txt)
+            await alex.click('text=Replace their version')
+            await alex.wait_for_function("()=>!__3dj.app.dirty", timeout=20000)
             check('"Replace their version" saves', True)
 
             # ---------------------------------------------------------------- My parts live in the user's folder
-            await jon.evaluate("async()=>{ const id=[...__3dj.app.results.bodies.keys()][0]; await __3dj.commands.saveToMyParts(id); }")
-            parts = list((data / 'files' / 'users' / 'jon' / '3DJames Parts').glob('*.3dj')) if (data / 'files' / 'users' / 'jon' / '3DJames Parts').exists() else []
-            check('Save to My parts writes a .3dj into "3DJames Parts" in Jon\'s folder', len(parts) == 1, parts)
-            n = await jon.evaluate("async()=>(await __3dj.commands.loadMyParts()).length")
+            await alex.evaluate("async()=>{ const id=[...__3dj.app.results.bodies.keys()][0]; await __3dj.commands.saveToMyParts(id); }")
+            parts = list((data / 'files' / 'users' / 'alex' / '3DJames Parts').glob('*.3dj')) if (data / 'files' / 'users' / 'alex' / '3DJames Parts').exists() else []
+            check('Save to My parts writes a .3dj into "3DJames Parts" in Alex\'s folder', len(parts) == 1, parts)
+            n = await alex.evaluate("async()=>(await __3dj.commands.loadMyParts()).length")
             check('My parts lists it', n == 1, n)
 
             # ---------------------------------------------------------------- nobody gets outside their folders
             async def get(pg, url):
                 return await pg.evaluate("async(u)=>{ const r = await fetch(u); return [r.status, (await r.text()).slice(0, 200)]; }", url)
-            s1 = await get(sarah, '/api/list?folder=f0&path=..')
-            s2 = await get(sarah, '/api/file?folder=f0&path=../jon/bracket.3dj')
-            s3 = await get(sarah, '/api/list?folder=f9&path=')
+            s1 = await get(sam, '/api/list?folder=f0&path=..')
+            s2 = await get(sam, '/api/file?folder=f0&path=../alex/bracket.3dj')
+            s3 = await get(sam, '/api/list?folder=f9&path=')
             check('"..", other people\'s folders and unknown folders are refused', s1[0] == 400 and s2[0] == 400 and s3[0] == 404, [s1, s2, s3])
             anon = await (await b.new_context()).request.get(APP + '/api/list?folder=f0&path=')
             check('the file API needs a sign-in', anon.status == 401)
@@ -172,9 +172,9 @@ async def main():
             check('the app is sent compressed', r.headers.get('content-encoding') == 'gzip')
 
             # ---------------------------------------------------------------- sign out
-            await jon.evaluate("()=>{ __3dj.app.dirty = false; }")
-            await jon.goto(APP + '/logout')
-            check('Sign out goes back to the sign-in page', '/login' in jon.url)
+            await alex.evaluate("()=>{ __3dj.app.dirty = false; }")
+            await alex.goto(APP + '/logout')
+            check('Sign out goes back to the sign-in page', '/login' in alex.url)
             check('no errors in the pages', not errs, errs)
             await b.close()
     finally:

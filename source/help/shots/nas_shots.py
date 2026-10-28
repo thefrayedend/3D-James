@@ -1,7 +1,7 @@
 # Pictures for setting up storage on a 3DJames box: nas-1 (Add a NAS share, filled in), nas-2 (the Storage list,
 # connected, with a USB drive plugged in), nas-3 (a person's folder on the NAS), box-usb (the USB drives card). Uses the
 # box's real admin page, started here with a throw-away data folder. The NAS and the USB drive are filled in as the box
-# shows them (this PC has no USB helper, and the pictures shouldn't depend on a NAS being there). Values: \\192.168.1.166\Jon, folder "3D Objects".
+# shows them (this PC has no USB helper, and the pictures shouldn't depend on a NAS being there). Values: \\192.168.1.50\James, folder "3D Objects".
 # Run after build.py:  python help/shots/nas_shots.py
 import asyncio, json, os, socket, subprocess, sys, tempfile, time, urllib.request
 from pathlib import Path
@@ -30,18 +30,18 @@ async def main():
             pg = await ctx.new_page()
             await pg.goto(ADMIN + '/'); await pg.wait_for_selector('text=Welcome to your 3DJames box')
             ins = pg.locator('main input')
-            await ins.nth(0).fill('jon'); await ins.nth(1).fill('Jon'); await ins.nth(2).fill('secret1'); await ins.nth(3).fill('secret1')
+            await ins.nth(0).fill('james'); await ins.nth(1).fill('James'); await ins.nth(2).fill('secret1'); await ins.nth(3).fill('secret1')
             await pg.click('text=Create the admin account'); await pg.wait_for_selector('nav >> text=Storage')
 
-            # 1: Storage tab > Add a NAS share, filled in for \\192.168.1.166\Jon
+            # 1: Storage tab > Add a NAS share, filled in for \\192.168.1.50\James
             await pg.wait_for_timeout(1000)
             await pg.click('#tabs button[data-tab=storage]')
             await pg.wait_for_function("()=>document.querySelector('main h2')?.textContent==='Where files are kept'")
             await pg.click('text=Add a NAS share'); await pg.wait_for_timeout(300)
             fields = pg.locator('main input')
             await fields.nth(0).fill('NAS')
-            await fields.nth(1).fill('192.168.1.166')
-            await fields.nth(2).fill('Jon')
+            await fields.nth(1).fill('192.168.1.50')
+            await fields.nth(2).fill('James')
             await fields.nth(3).fill('')
             await fields.nth(4).fill('')
             await pg.mouse.move(5, 5)
@@ -50,7 +50,7 @@ async def main():
             st = await pg.evaluate("()=>{ const e=document.querySelector('#tabs button[data-tab=storage]'); const r=e.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }")
             ring(im, st, pad=4); num(im, (st[0] + st[2] / 2, st[1] + st[3] + 26), 1)
             card = await box(pg, 'main .card')
-            for i, (lab, txt) in enumerate([(1, '192.168.1.166'), (2, 'Jon')]):
+            for i, (lab, txt) in enumerate([(1, '192.168.1.50'), (2, 'James')]):
                 r = await pg.evaluate(f"()=>{{ const e=document.querySelectorAll('main input')[{lab}]; const r=e.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }}")
                 ring(im, r, pad=3)
             sv = await pg.evaluate("()=>{ const e=[...document.querySelectorAll('main button')].find(x=>x.textContent.trim()==='Save and connect'); const r=e.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }")
@@ -62,7 +62,7 @@ async def main():
             # (this PC can't mount the share, so the box refuses to save it here: it is shown as the box lists it once saved)
             async def connected(route):
                 resp = await route.fetch(); j = await resp.json()
-                j['config']['places']['nas'] = {'label': 'NAS', 'type': 'smb', 'server': '192.168.1.166', 'share': 'Jon', 'username': '',
+                j['config']['places']['nas'] = {'label': 'NAS', 'type': 'smb', 'server': '192.168.1.50', 'share': 'James', 'username': '',
                                                 'connected': True, 'space': None, 'problem': '', 'used': []}
                 j['usb'] = [{'uuid': '1A2B-3C4D', 'fstype': 'exfat', 'label': '', 'name': 'SanDisk Ultra', 'size': 64.1e9, 'dev': '/dev/sda1', 'place': None}]
                 await route.fulfill(response=resp, body=json.dumps(j), headers={**resp.headers, 'content-type': 'application/json'})
@@ -70,7 +70,7 @@ async def main():
             await pg.goto(ADMIN + '/'); await pg.wait_for_selector('#tabs:not([hidden])'); await pg.wait_for_timeout(1000)
             await pg.click('#tabs button[data-tab=storage]'); await pg.wait_for_function("()=>document.querySelector('main h2')?.textContent==='Where files are kept'"); await pg.wait_for_timeout(300)
             im = await shot(pg)
-            row = await pg.evaluate("()=>{ const e=[...document.querySelectorAll('main tr')].find(x=>x.textContent.includes('192.168.1.166')); const r=e.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }")
+            row = await pg.evaluate("()=>{ const e=[...document.querySelectorAll('main tr')].find(x=>x.textContent.includes('192.168.1.50')); const r=e.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }")
             ring(im, row, pad=4)
             arrow(im, (row[0] + row[2] * 0.55, row[1] + row[3] + 120), (row[0] + row[2] * 0.55, row[1] + row[3] + 8), 'It should say "connected"', side='right')
             save(im, 'nas-2.jpg', w=1100)
@@ -85,7 +85,7 @@ async def main():
             arrow(im, (use[0] + use[2] + 50, use[1] + use[3] / 2 + 50), (use[0] + use[2] + 8, use[1] + use[3] / 2), 'Plug it in, then' + chr(10) + 'click this', side='right')
             save(im, 'box-usb.jpg', crop=[card[0] - 10, card[1] - 10, card[0] + card[2] + 10, card[1] + card[3] + 10], w=1000)
 
-            # 3: Users tab > edit Jon > Add a folder on the NAS: folder "3D Objects"
+            # 3: Users tab > edit James > Add a folder on the NAS: folder "3D Objects"
             await pg.click('#tabs button[data-tab=users]'); await pg.wait_for_function("()=>document.querySelector('main h2')?.textContent==='People who can use 3DJames'")
             await pg.locator('main button', has_text='Edit').first.click(); await pg.wait_for_timeout(400)
             await pg.click('text=Add a folder'); await pg.wait_for_timeout(300)
