@@ -3,6 +3,7 @@
 import { Matrix4, Vector3, Euler, Quaternion, MathUtils } from 'three';
 import { store, creatorOf, isSimplePrimitive, lastFeatureOf, nextName, nextColor, featuresOfBody } from './store.js';
 import { SHAPES, evalExpr, HOLE_KINDS } from './shared.js';
+import { PART_DEFS } from './parts/defs.js';
 import { app, scope, bodyData } from './state.js';
 import { r2, r4, toast } from './ui/dom.js';
 import { valueNow } from './ui/sketch.js';
@@ -26,7 +27,7 @@ export function editStep(fid) {
 export function copySel() { app.clip = app.sel.slice(); }
 export function paste() {
   const ids = (app.clip || []).filter((id) => app.results.bodies.has(id));
-  if (ids.length) { app.sel = ids; duplicateSel(); }
+  if (ids.length) { app.sel = ids; vp.setSelection(ids); duplicateSel(); } // (the copy is placed beside what was copied, not beside what was selected)
 }
 
 // ---------------------------------------------------------------- shapes
@@ -43,7 +44,7 @@ const SHAPE_COLORS = { box: '#22B14C', sphere: '#22B14C', cyl: '#00A2E8', tetra:
 export function defaultColor(kind, label, doc) {
   if (label === 'Tetrahedron') return SHAPE_COLORS.tetra;
   if (label === 'Hexagon') return SHAPE_COLORS.hexagon;
-  return SHAPE_COLORS[kind] || nextColor(doc);
+  return SHAPE_COLORS[kind] || PART_DEFS[kind]?.color || nextColor(doc);
 }
 
 /** Add a shape with its bottom middle at a spot (dropped there from the toolbar). Same arguments as addShape after it. */
@@ -133,6 +134,9 @@ const SCALE_MAP = {
   sketch: (p, s) => [{ h: p.h * s.z }, [s.x, s.y, 1]],
   pin: (p, s) => [{ len: p.len * s.z }, [s.x, s.y, 1]], rod: (p, s) => [{ len: p.len * s.z }, [s.x, s.y, 1]], insert: () => [{}, null], screwhole: () => [{}, null], nuttrap: () => [{}, null],
 };
+
+// the ready-made parts keep their own numbers (resizing one just stretches it)
+for (const k of Object.keys(PART_DEFS)) SCALE_MAP[k] ??= () => [{}, null];
 
 /** Which way a shape's own height grows, after its turn (rot in degrees): [x, y, z]. */
 export function turnedUp(rot) {

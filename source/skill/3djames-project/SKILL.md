@@ -60,7 +60,7 @@ The user edits these files by hand. In 3DJames, selecting an object shows how it
 | tube | `od` 20, `id` 14, `h` 20 |
 | prism | `n` sides 6 (hexagon), `af` width across flats 20, `h` 10 |
 | text | `text`, `size` 10, `depth` 3, `font` `sans`/`round` |
-| extrusion | `size` `t2020`/`t2040` (T-slot) or `v2020`/`v2040`/`v4040` (V-slot), exact profiles; `len` 100 |
+| extrusion | `size` `t2020`/`t2040`/`t2060`/`t3030`/`t4040` (T-slot) or `v2020`/`v2040`/`v2060`/`v2080`/`v4040` (V-slot), exact profiles (3030: typical dimensions); `len` 100 |
 | washer | `size` M2–M12 (ISO 7089), `id`, `od`, `t` |
 | standoff | `size` M2–M5, `od`, `hole`, `h` |
 | screwhole (hole) | `size` M2–M8 (ISO 273 clearance), `head` `plain`/`countersunk`/`counterbore`, `d`, `len` 10, `hd` (countersink Ø), `cb`, `hk` (counterbore Ø and depth). Opening at the top |
@@ -69,6 +69,70 @@ The user edits these files by hand. In 3DJames, selecting an object shows how it
 | thread | `kind` `bolt`/`nut`/`cutter`, `size` e.g. `M8` (or `custom`), `D` 8, `P` 1.25, `len` 16, `clear` 0.15, `head` `hex`/`round`/`none`, `headH` 5.6, `af` 13, `nutH` 6.4, `chamfer` true |
 
 | sketch | a drawn profile made solid: `loops` (outlines, below), `h` 10, `mode` (leave out = push up; `revolve`, `loft`, `sweep`), `angle` 360 (revolve) |
+
+<!-- parts:start -->
+### Ready-made parts (each stands on its base, centred; every number can be an expression)
+| kind | label: p (defaults) |
+|---|---|
+| screw | Screw: `type` "socket" (`socket`/`button`/`flat`/`hex`/`set`), `size` "M3" (`M2`/`M2.5`/`M3`/`M4`/`M5`/`M6`/`M8`/`M10`), `len` 10, `d` 3, `dk` 5.5, `k` 3, `s` 2.5 |
+| nut | Nut: `type` "regular" (`regular`/`nylock`/`thin`), `size` "M3" (`M2`/`M2.5`/`M3`/`M4`/`M5`/`M6`/`M8`/`M10`/`M12`), `af` 5.5, `m` 2.4, `d` 3 |
+| bearing | Bearing: `size` "608" (`608`/`623`/`624`/`625`/`626`/`688`/`6000`/`6001`/`6002`/`6200`/`6201`/`6202`/`6800`/`F623`/`F624`/`F625`/`F608`/`F688`/`LM6UU`/`LM8UU`/`LM10UU`/`LM12UU`), `id` 8, `od` 22, `w` 7, `fd` 0, `ft` 0 |
+| pin | Dowel pin: `d` 3, `len` 12 |
+| rod | Smooth rod: `d` 8, `len` 100 |
+| magnet | Round magnet: `size` "6x3" (`3x2`/`5x2`/`6x2`/`6x3`/`8x2`/`8x3`/`10x2`/`10x3`/`10x5`/`12x3`/`15x3`/`20x3`), `d` 6, `h` 3 |
+| hexstandoff | Hex standoff: `size` "M3" (`M2`/`M2.5`/`M3`/`M4`), `len` 10, `af` 5, `d` 3, `male` false, `stud` 6 |
+| gfbaseplate | Gridfinity baseplate: `nx` 3, `ny` 3, `floor` 0, `magnets` false |
+| gfbin | Gridfinity bin: `nx` 2, `ny` 1, `nz` 3, `wall` 1.2, `lip` true, `magnets` false, `divx` 1, `divy` 1 |
+| boardhook | Wall hook: `style` "pegboard" (`pegboard`/`skadis`), `armLen` 40, `armW` 10, `armT` 4, `lipH` 15, `plateT` 4, `pegD` 6, `spacing` 25.4, `pegLen` 10, `pegs` 2, `slotW` 5, `board` 5, `tabClear` 0.3, `tabGap` 40 |
+| drawerdivider | Drawer divider: `len` 200, `h` 60, `t` 2, `slots` 3, `depth` 0.5, `clear` 0.25, `slotsOn` "top" (`top`/`bottom`) |
+| lidbox | Box with lid: `part` "box" (`box`/`lid`), `style` "press" (`press`/`sliding`/`hinged`), `w` 80, `d` 60, `h` 40, `wall` 2, `round` 4, `clear` 0.3, `knuckles` 5, `pin` 2 |
+| keyhole (hole) | Keyhole slot: `head` 9, `shank` 4.5, `slot` 9, `depth` 5, `pocket` 3 |
+| screwtab | Screw tab: `w` 20, `len` 30, `t` 3, `hole` 4.5, `csk` 9 |
+| frenchcleat | French cleat: `part` "wall" (`wall`/`item`), `len` 150, `h` 40, `t` 10, `holes` 3 |
+| cableclip | Cable clip: `cable` 6, `wall` 1.6, `len` 10, `gap` 0.7, `hole` 3.4, `base` 2 |
+| zipanchor | Zip-tie anchor: `tie` 4.8, `tieT` 1.4, `padW` 22, `padD` 14, `t` 2.4, `hole` 3.4 |
+| grommet | Desk grommet: `hole` 60, `thick` 25, `wall` 2.5, `flange` 6, `flangeT` 3, `clear` 0.4, `slot` false |
+| chainlink | Cable-chain link: `inW` 30, `inH` 12, `t` 3, `pitch` 20, `pin` 3, `clear` 0.3 |
+| boardposts | Board standoffs: `board` "pi4" (`pi4`/`pizero`/`pico`/`uno`/`mega`/`custom`), `hx` 58, `hy` 49, `h` 6, `od` 6, `pilot` 0, `pilotDepth` 5, `plate` 2, `margin` 3 |
+| boardholes (hole) | Board mounting holes: `board` "pi4" (`pi4`/`pizero`/`pico`/`uno`/`mega`/`custom`), `hx` 58, `hy` 49, `d` 0, `len` 10 |
+| fanmount | Fan mount plate: `size` "40" (`25`/`30`/`40`/`50`/`60`/`70`/`80`/`92`/`120`/`140`), `side` 40, `spacing` 32, `screw` 3.4, `open` 37, `t` 3, `round` 3 |
+| fanholes (hole) | Fan holes: `size` "40" (`25`/`30`/`40`/`50`/`60`/`70`/`80`/`92`/`120`/`140`), `spacing` 32, `screw` 3.4, `open` 37, `len` 4 |
+| ptfehole (hole) | PTFE push-fit hole: `fit` "PC4-M10" (`PC4-M5`/`PC4-M6`/`PC4-M10`/`PC6-M10`/`PC6-M12`), `len` 15, `depth` 8, `tap` 0, `bore` 0 |
+| filamentguide | Filament guide: `bore` 2.4, `len` 20, `od` 8, `flangeD` 20, `flangeT` 3, `funnel` 2.5, `hole` 3.4 |
+| spoolaxle | Spool axle: `d` 8, `len` 120, `flangeD` 75, `flangeT` 4, `seatD` 54, `seatLen` 25 |
+| bearingmount | Bearing mount: `bearing` "608" (`608`/`623`/`624`/`625`/`626`/`688`/`6000`/`6001`/`6002`/`6200`/`6201`/`6202`/`6800`/`F623`/`F624`/`F625`/`F608`/`F688`/`LM6UU`/`LM8UU`/`LM10UU`/`LM12UU`), `clear` 0.15, `wall` 4, `base` 4, `hole` 3.4 |
+| bearingpocket (hole) | Bearing pocket: `bearing` "608" (`608`/`623`/`624`/`625`/`626`/`688`/`6000`/`6001`/`6002`/`6200`/`6201`/`6202`/`6800`/`F623`/`F624`/`F625`/`F608`/`F688`/`LM6UU`/`LM8UU`/`LM10UU`/`LM12UU`), `clear` 0.15, `len` 12 |
+| gt2pulley | GT2 pulley: `teeth` 20, `bore` 5, `flat` 0, `belt` 6.5, `hubD` 16, `hubH` 8, `setscrew` true |
+| shaftcollar | Shaft collar: `style` "set" (`set`/`clamp`), `bore` 8, `od` 18, `w` 10, `screw` 3.4 |
+| vwheel | V-slot wheel: `size` "standard" (`standard`/`mini`/`custom`), `od` 23.9, `w` 10.2, `vdepth` 2.6, `lip` 1, `bore` 5, `seat` 16, `seatDepth` 5 |
+| footpocket (hole) | Foot pocket: `d` 12, `depth` 3, `screw` 0, `len` 10 |
+| levelfoot | Leveling foot: `baseD` 30, `baseH` 5, `dome` 3, `stemD` 8, `stemLen` 25 |
+| hinge | Hinge: `style` "inplace" (`inplace`/`pin`), `len` 40, `leaf` 22, `t` 3, `d` 8, `pin` 3, `knuckles` 5, `gap` 0.4, `clear` 0.3, `screws` 2, `hole` 3.4 |
+| dovetail | Dovetail tail: `len` 30, `w` 14, `h` 6, `angle` 15, `base` 3 |
+| dovetailslot (hole) | Dovetail slot: `len` 30, `w` 14, `h` 6, `angle` 15, `clear` 0.2 |
+| peg | Peg: `d` 8, `len` 12, `chamfer` 1, `baseD` 16, `baseH` 3 |
+| pegsocket (hole) | Peg socket: `d` 8, `depth` 12, `clear` 0.2, `chamfer` 0.8 |
+| balljoint | Ball joint: `d` 14, `stem` 6, `stemLen` 14, `wall` 3, `clear` 0.35, `postD` 10, `postLen` 8 |
+| ujoint | Universal joint: `size` 14, `pin` 4, `armT` 4, `armW` 12, `clear` 0.4, `shaft` 8, `shaftLen` 20 |
+| shafthole (hole) | Shaft hole: `type` "d" (`d`/`dd`/`keyway`/`round`), `d` 5, `len` 12, `flat` 0.5, `kw` 2, `kd` 1, `clear` 0.1 |
+| boss | Screw boss: `od` 8, `h` 12, `hole` 2.5, `depth` 8, `ribs` 4, `ribT` 1.6, `ribH` 0.7, `ribL` 8 |
+| rib | Rib (gusset): `w` 20, `h` 20, `t` 3 |
+| knob | Knob: `style` "knurl" (`knurl`/`scallop`/`round`), `d` 30, `h` 16, `teeth` 20, `depth` 1.5, `bore` 6, `flat` 0, `trapAF` 0, `trapH` 3, `setscrew` false |
+| thumbscrew | Thumbscrew: `head` "wing" (`wing`/`knurl`/`hex`), `hd` 30, `hh` 8, `d` 5, `len` 20 |
+| drawerpull | Drawer pull: `spacing` 96, `barD` 12, `reach` 30, `postD` 10, `hole` 3.3, `holeDepth` 15 |
+| snapfit | Snap-fit clip: `w` 10, `len` 15, `t` 1.6, `hook` 1.2, `hookH` 2.5, `baseD` 8, `baseH` 4 |
+| tolerancetest | Tolerance test: `d` 8, `n` 6, `step` 0.1, `t` 4, `pegLen` 6 |
+| gear | Gear: `type` "spur" (`spur`/`helical`/`bevel`), `m` 1.5, `z` 20, `w` 10, `pa` 20, `helix` 20, `herring` false, `mate` 40, `bore` 5, `flat` 0, `hubD` 0, `hubH` 0 |
+| rack | Gear rack: `m` 1.5, `teeth` 15, `w` 10, `base` 5, `pa` 20 |
+| worm | Worm: `m` 1.5, `starts` 1, `len` 30, `pitchD` 14, `hand` "right" (`right`/`left`), `bore` 5, `flat` 0 |
+| stock | Profile: `shape` "tube" (`tube`/`ibeam`/`cchannel`/`angle`/`tbeam`/`flat`), `w` 40, `d` 40, `t` 3, `tw` 3, `len` 200 |
+| cornerbracket | Corner bracket: `w` 20, `armA` 25, `armB` 25, `t` 3, `hole` 5.5, `gusset` true |
+| tnut | T-nut: `series` "2020" (`2020`/`3030`), `thread` "M5" (`M3`/`M4`/`M5`/`M6`/`M8`), `w` 9.8, `len` 10, `t` 4.2, `hole` 4.2 |
+| woodscrew | Wood or sheet-metal screw: `type` "wood" (`wood`/`pan`/`sheet`), `size` "4" (`2.5`/`3`/`3.5`/`4`/`4.5`/`5`/`6`), `len` 30, `d` 4, `dk` 8, `k` 2.8 |
+| rivet | Pop rivet: `size` "4" (`3.2`/`4`/`4.8`), `d` 4, `len` 8, `flangeD` 8, `flangeT` 0.8, `bore` 2 |
+
+Mark the bodies of parts shown as `(hole)` with `"hole": true`. Moving parts (hinge, ball joint, universal joint, tolerance test) are separate solids with a gap: do not merge them with anything touching the gap. `gear` types: `spur`, `helical`, `bevel`. Part sizes with a standard list (fans, boards, bearings, fittings) fill in their numbers when you pick one in 3DJames; in a project, give every number.
+<!-- parts:end -->
 
 ### Sketches (`kind: "sketch"`)
 A sketch is a 2D drawing (mm, x right, y up) that the user can reopen and edit in 3DJames' sketch board (Properties > Edit sketch). Use it for any custom profile instead of approximating with primitives.
@@ -111,7 +175,9 @@ Positioning tip: when stacking (a wall on a base), overlap by 0.01 (`"pos":[x,y,
 ```python
 import json, re, sys, collections
 d = json.load(open(sys.argv[1])); errs = []
-KINDS = {'box','cyl','sphere','cone','torus','wedge','pyramid','tube','prism','text','thread','extrusion','washer','standoff','screwhole','nuttrap','insert','sketch'}
+# parts:kinds:start
+KINDS = {'box','cyl','sphere','cone','torus','wedge','pyramid','tube','prism','text','thread','extrusion','washer','standoff','screwhole','nuttrap','insert','sketch','screw','nut','bearing','pin','rod','magnet','hexstandoff','gfbaseplate','gfbin','boardhook','drawerdivider','lidbox','keyhole','screwtab','frenchcleat','cableclip','zipanchor','grommet','chainlink','boardposts','boardholes','fanmount','fanholes','ptfehole','filamentguide','spoolaxle','bearingmount','bearingpocket','gt2pulley','shaftcollar','vwheel','footpocket','levelfoot','hinge','dovetail','dovetailslot','peg','pegsocket','balljoint','ujoint','shafthole','boss','rib','knob','thumbscrew','drawerpull','snapfit','tolerancetest','gear','rack','worm','stock','cornerbracket','tnut','woodscrew','rivet'}
+# parts:kinds:end
 TYPES = {'shape','combine','copy','move','array','mirror','fillet','chamfer','shell','extrude','split','delete','pushpull'}
 names = [v['name'] for v in d.get('vars', [])]
 ids = [f['id'] for f in d['features']]

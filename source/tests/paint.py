@@ -77,6 +77,19 @@ async def main():
     pc = await ev('(id) => __pieces(id)', box)
     check('Fill: a click paints the top face, and only it', len(pc) >= 2 and all(abs(c[0][2] - bb[1][2]) < 1e-3 for c in pc) and all(c[1][0] > 0.9 and c[1][1] < 0.1 for c in pc), pc[:4])
 
+    # Fill dragged from the top over the front: both faces, as one stroke (one Ctrl+Z takes both off)
+    await ev('() => { window.__3dj.vp.view("home", false); }'); await pg.wait_for_timeout(300)
+    fr = await ev('(p) => __scr(p)', [top[0], bb[0][1], (bb[0][2] + bb[1][2]) / 2])
+    await pg.mouse.move(at[0] + 2, at[1] + 1); await pg.mouse.down()
+    for k in range(1, 11): await pg.mouse.move(at[0] + (fr[0] - at[0]) * k / 10, at[1] + (fr[1] - at[1]) * k / 10)
+    await pg.mouse.up()
+    pc = await ev('(id) => __pieces(id)', box)
+    faces = {round(c[0][2] - bb[1][2], 2) == 0 for c in pc} | {round(c[0][1] - bb[0][1], 2) == 0 for c in pc}
+    strokes = await ev('(id) => window.__3dj.app.tool.ops[id].length', box)
+    check('Fill: dragging across the object fills each face passed over (like 3D Builder), as one Undo step', True in faces and len(pc) > 2 and any(abs(c[0][1] - bb[0][1]) < 1e-3 for c in pc) and strokes == 3, (len(pc), strokes))  # the click's fill + the drag's two
+    await pg.keyboard.press('Control+z')
+    check('Ctrl+Z takes the whole drag off, the earlier fill stays', await ev('(id) => window.__3dj.app.tool.ops[id].length', box) == 1)
+
     # Cancel takes it off again; nothing is kept
     await pg.get_by_role('button', name='Cancel').click()
     check('Cancel: the paint made goes away, nothing kept', not await ev('(id) => __pieces(id).length', box) and not await ev('(id) => !!window.__3dj.store.doc.bodies[id].paint', box))
