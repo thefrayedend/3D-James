@@ -46,6 +46,7 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
   const f = doc.features[fi];
   if (!f || !canMakeEditable(doc, id)) { toast('Make editable works on an imported STL, OBJ or 3MF mesh.', 'err'); return false; }
   const name = doc.bodies[id]?.name || f.p?.name || 'Part';
+  const was = JSON.stringify(f); // the import step as it was when the work started
   const busy = toast(`Making ${name} editable… big or detailed models can take a minute.`, 'info', 600000);
   app.converting = true;
   let res, seq;
@@ -66,9 +67,17 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
     else toast(`${name} could not be rebuilt from sketches (it is curved all over), so it stays a mesh.`, 'info', 9000);
     return false;
   }
+  // Another project opened, or the import step changed or went while the engine worked: the result is for
+  // something that is no longer there, so it is dropped rather than put in place of whatever is there now.
+  const at = store.doc.features.findIndex((x) => x.id === f.id);
+  if (at < 0 || JSON.stringify(store.doc.features[at]) !== was || !store.doc.bodies[id]) {
+    lastReport = { done: false, summary: `${name} changed (or another project was opened) while it was being made editable, so nothing was changed.` };
+    toast(`${name} changed (or another project was opened) while it was being made editable, so nothing was changed. Try again if you still want it.`, 'info', 9000);
+    return false;
+  }
   // The steps were numbered from this project's counter, the first part keeping the object's id (so later
   // steps still find it). If the project changed meanwhile, they get fresh ids.
-  const same = store.doc.seq === seq && store.doc.features.indexOf(f) === fi;
+  const same = store.doc.seq === seq && at === fi;
   const ids = new Map();
   const map = (old, prefix) => { if (!ids.has(old)) ids.set(old, same || old === solidParts[0].body ? (same ? old : id) : store.newId(prefix)); return ids.get(old); };
   const newIds = [];
@@ -98,7 +107,7 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
       steps.push({ id: store.newId('f'), type: 'shape', body: b, kind: 'import', name: `${p.name}: kept as a mesh`, p: { file: fid, name: p.name, fmt: 'stl' }, pos: [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, mn[2]], rot: [0, 0, 0] });
       newIds.push(b);
     }
-    d.features.splice(fi, 1, ...steps);
+    d.features.splice(at, 1, ...steps);
   });
   select([id, ...newIds]);
   if (!quiet || res.parts.some((p) => p.mesh) || Object.keys(res.errors || {}).length) explain(name, res, true);

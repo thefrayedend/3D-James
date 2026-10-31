@@ -9,6 +9,7 @@ import { drive } from './drive/index.js';
 import { select, placeNew } from './commands.js';
 import { endTool, setWorkplane } from './tools.js';
 import { readZip, parse3mf, parseObj, meshToStl } from './formats.js';
+import { worldPaint } from './painting.js';
 import { modelSnapshot } from './versions.js';
 import { idb } from './storage.js';
 import { zipStore } from './zip.js';
@@ -61,7 +62,15 @@ async function writeChecked(handle, data) {
 // ---------------------------------------------------------------- saving
 function exportItems() {
   return [...app.results.bodies.keys()].filter((id) => !store.doc.bodies[id]?.hidden && !store.doc.bodies[id]?.hole)
-    .map((id) => ({ id, name: bodyName(id), color: store.doc.bodies[id]?.color || '#C3C3C3' }));
+    .map((id) => ({ id, name: bodyName(id), color: store.doc.bodies[id]?.color || '#C3C3C3', paint: worldPaint(store.doc, id) }));
+}
+
+/** Painted objects in a 3MF: which filament number each color is on in OrcaSlicer / Bambu Studio. They keep the
+ * filament colors you have set there, so this says which to give each one. */
+function filamentNote(colors) {
+  toast(h('div', {}, h('div', {}, 'In OrcaSlicer or Bambu Studio, set the filaments to these colors:'),
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px' }, colors.map((c, i) => h('span', { style: 'display:inline-flex;align-items:center;gap:4px' },
+      h('b', {}, String(i + 1)), h('span', { style: `display:inline-block;width:14px;height:14px;border:1px solid #888;background:${c}` }))))), 'info', 15000);
 }
 
 /** The bytes of the project in a file format. .3dj and 3MF keep the full step history (and imported files). */
@@ -94,6 +103,7 @@ export async function buildFileData(fmt, onSnapshot) {
       ...Object.entries(versions).map(([k, v]) => ({ name: `Metadata/3djames-versions/${k}.json`, data: new TextEncoder().encode(JSON.stringify(v)).buffer }))];
     const r = await workerCall({ type: 'export', format: '3mf', items, base: safeName(), project: JSON.stringify(doc), extra });
     if (r.files[0].data.byteLength > 400 * 1048576) throw new Error('The 3MF exceeds 400 MB. Delete older versions or reduce model detail before saving.');
+    if (r.filaments) filamentNote(r.filaments);
     return r.files[0].data;
   }
   if (!items.length) throw new Error('There is nothing to save yet.');
@@ -229,7 +239,7 @@ export async function openFile(file, handle) {
         loadProject({ ...doc, files, versionData }, { name: file.name, fmt: '3mf', handle });
       } else {
         const stage = [];
-        for (const m of parse3mf(zip)) await addMeshBody(m.name || baseName(file.name), meshToStl(m.verts, m.tris), stage);
+        await addMeshParts(parse3mf(zip).map((m) => ({ ...m, name: m.name || baseName(file.name) })), stage);
         loadProject({ name: baseName(file.name) }, { name: file.name, fmt: '3mf', handle });
         for (const add of stage) add();
         offerEditable();
@@ -255,9 +265,9 @@ export async function insertFile(file, opts = {}) {
     if (mb > 400) throw new Error(`That file is ${Math.round(mb)} MB, more than 3DJames can handle. Try exporting it with less detail or as separate parts.`);
     if (mb > 15) toast(`Reading ${file.name} (${Math.round(mb)} MB). Big files can take a minute or two.`, 'info', 9000);
     const bytes = new Uint8Array(await file.arrayBuffer());
-    if (fmt === 'stl') await addMeshBody(baseName(file.name), bytes, opts.stage);
-    else if (fmt === 'obj') { const m = parseObj(new TextDecoder().decode(bytes)); await addMeshBody(baseName(file.name), meshToStl(m.verts, m.tris), opts.stage); }
-    else if (fmt === '3mf') { for (const m of parse3mf(await readZip(bytes))) await addMeshBody(m.name || baseName(file.name), meshToStl(m.verts, m.tris), opts.stage); }
+    if (fmt === 'stl') await addMeshParts([{ name: baseName(file.name), stl: bytes }], opts.stage);
+    else if (fmt === 'obj') await addMeshParts([{ ...parseObj(new TextDecoder().decode(bytes)), name: baseName(file.name) }], opts.stage);
+    else if (fmt === '3mf') await addMeshParts(parse3mf(await readZip(bytes)).map((m) => ({ ...m, name: m.name || baseName(file.name) })), opts.stage);
     else if (fmt === 'step') return await addStep(baseName(file.name), bytes, opts.stepParts, opts.stage);
     else if (fmt === 'json' || fmt === '3dj') return openFile(file, null);
     else toast('Insert works with STEP, STL, 3MF and OBJ files.', 'err');
@@ -265,21 +275,44 @@ export async function insertFile(file, opts = {}) {
   } catch (err) { if (opts.throwErrors) throw err; toast(`Could not insert ${file.name}: ${err.message}`, 'err', 7000); return false; }
 }
 
-async function addMeshBody(name, stlBytes, stage) {
-  const fid = newFileId();
-  const info = await workerCall({ type: 'checkImport', fileId: fid, data: stlBytes.slice().buffer });
-  markSent(fid); keepFile(fid, stlBytes);
+/**
+ * Add meshes (each { name, stl } or { name, verts, tris }) as objects. Every part is checked before any is added,
+ * so a bad part leaves the project as it was; then they all come in as one undo step. Parts of one file (a 3MF
+ * with several objects) keep where they were relative to each other; the group as a whole is placed like a new shape.
+ */
+async function addMeshParts(parts, stage) {
+  const checked = [];
+  for (const part of parts) {
+    const stl = part.stl || meshToStl(part.verts, part.tris);
+    const fid = newFileId();
+    const info = await workerCall({ type: 'checkImport', fileId: fid, data: stl.slice().buffer });
+    checked.push({ name: part.name, stl, fid, tris: info.tris, box: part.verts ? meshBox(part.verts) : null });
+  }
+  for (const c of checked) { markSent(c.fid); keepFile(c.fid, c.stl); }
+  const all = checked.length > 1 && checked.every((c) => c.box) ? [0, 1].map((k) => [0, 1, 2].map((i) => (k ? Math.max : Math.min)(...checked.map((c) => c.box[k][i])))) : null;
   const add = () => {
-    let id;
+    const ids = [];
     store.commit((doc) => {
-      id = store.newId('b');
-      doc.features.push({ id: store.newId('f'), type: 'shape', body: id, kind: 'import', p: { file: fid, name, fmt: 'stl' }, pos: placeNew(), rot: [0, 0, 0] });
-      doc.bodies[id] = { name, color: nextColor(doc) };
+      const at = placeNew();
+      for (const c of checked) {
+        const id = store.newId('b');
+        // a shape sits on pos by the middle of its bottom, so each part's spot is its own bottom middle, measured from the group's
+        const pos = all ? [at[0] + (c.box[0][0] + c.box[1][0] - all[0][0] - all[1][0]) / 2, at[1] + (c.box[0][1] + c.box[1][1] - all[0][1] - all[1][1]) / 2, at[2] + c.box[0][2] - all[0][2]].map((v) => Math.round(v * 1e4) / 1e4) : at;
+        doc.features.push({ id: store.newId('f'), type: 'shape', body: id, kind: 'import', p: { file: c.fid, name: c.name, fmt: 'stl' }, pos, rot: [0, 0, 0] });
+        doc.bodies[id] = { name: c.name, color: nextColor(doc) };
+        ids.push(id);
+      }
     });
-    select([id]);
-    if (info.tris > 60000) toast(`${name}: ${info.tris.toLocaleString()} triangles. Large models make combining slower.`);
+    select(ids);
+    for (const c of checked) if (c.tris > 60000) toast(`${c.name}: ${c.tris.toLocaleString()} triangles. Large models make combining slower.`);
   };
   if (stage) stage.push(add); else add();
+}
+
+function meshBox(verts) {
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < verts.length; i += 3) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], verts[i + k]); mx[k] = Math.max(mx[k], verts[i + k]); }
+  return [mn, mx];
 }
 
 function askStepParts(n) {

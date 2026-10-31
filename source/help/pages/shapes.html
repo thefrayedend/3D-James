@@ -12,7 +12,7 @@
 <ul>
 <li><b>Text</b> is a solid word: type the text, letter height, thickness and font in Properties. (To put letters onto the face of another object, use <a data-help-topic="edges">Emboss</a>.)</li>
 <li>For screws, nuts, bearings, holes and other hardware, use <a data-help-topic="parts">Parts</a>. To draw a shape of your own, use <a data-help-topic="sketch">Sketch</a>.</li>
-<li><b>Add</b> (Insert tab, also ☰ &gt; <b>Insert a model…</b>) brings a model from a file into this project: STL, STEP, 3MF or OBJ. STEP files come in as real CAD solids; STL, 3MF and OBJ come in as meshes, which can be moved, sized and merged but have no faces or edges to round, hollow or emboss.</li>
+<li><b>Add</b> (Insert tab, also ☰ &gt; <b>Insert a model…</b>) brings a model from a file into this project: STL, STEP, 3MF or OBJ. STEP files come in as real CAD solids; STL, 3MF and OBJ come in as meshes, which can be moved, sized and merged but have no faces or edges to round, hollow or emboss. A 3MF with several objects (from a slicer such as Bambu Studio or PrusaSlicer) brings every object in where it was, all selected, and one Undo takes them all out again. If one part of the file is damaged, nothing is added and a note says what is wrong.</li>
 </ul>
 
 <h2>Exact sizes: Properties</h2>
@@ -33,8 +33,9 @@
 <ul>
 <li>The buttons at the left of the bottom bar switch the handles between <b>Move</b>, <b>Turn</b> and <b>Size</b> (keys M, R, S).</li>
 <li>Drag the size arrows or corner dots, or type exact numbers in the bottom bar. The lock in the bottom bar keeps the proportions while sizing.</li>
+<li>Sizing keeps the object where it is: take 1 mm off X (typed in the bottom bar) and it gets 0.5 mm smaller on each side. Dragging a left, right, front or back size arrow moves that side with the pointer and the opposite side the same amount the other way, so the middle stays put. Up and down keep the bottom where it is (on the floor it stays on the floor): the top arrow moves the top. Changing <b>Height</b> in Properties of a shape turned on its side (like a logo on a wall) grows it out of the face it stands on.</li>
 <li>Turning snaps to steps set in <b>View</b> &gt; <b>Turn</b> (free, 5°, 15°, 45°, 90°).</li>
-<li>A shape turned on its side (or a sketch standing on an upright face) keeps its own numbers when you size it: the X, Y or Z that runs along its height changes its <b>Height</b>, and it grows away from its base, just like changing Height in Properties. It stays a shape you can change, not a mesh. (Only a shape turned at an angle that isn't a quarter turn becomes a stretched copy.)</li>
+<li>A shape turned on its side (or a sketch standing on an upright face) keeps its own numbers when you size it: the X, Y or Z that runs along its height changes its <b>Height</b>. It stays a shape you can change, not a mesh. (Only a shape turned at an angle that isn't a quarter turn becomes a stretched copy.)</li>
 </ul>
 
 <h2>Exact gaps: the Ruler</h2>

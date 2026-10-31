@@ -66,6 +66,38 @@ function sketchRef(M, skip = []) {
   for (const id of shownBodies(skip)) { const r = edgesOnPlane(bodyData(id), null, toLocal, onPlane); ref.segs.push(...r.segs); ref.pts.push(...r.pts); }
   return ref;
 }
+/** The outline of a mesh's flat area (pairs of points, from meshfaces.js) as lines on the board, with their corners. */
+function meshEdgeRef(ref, E, M) {
+  if (!E?.length) return ref;
+  const toLocal = (i) => { const v = new Vector3(E[i], E[i + 1], E[i + 2]).applyMatrix4(M); return [Math.round(v.x * 1e4) / 1e4, Math.round(v.y * 1e4) / 1e4, v.z]; };
+  const key = (p) => `${Math.round(p[0] * 1e3)},${Math.round(p[1] * 1e3)}`;
+  const from = new Map(), used = new Set();
+  const segs = [];
+  for (let i = 0; i < E.length; i += 6) {
+    const a = toLocal(i), b = toLocal(i + 3); if (Math.abs(a[2]) > 0.02 || Math.abs(b[2]) > 0.02) continue;
+    const s = segs.push([a, b]) - 1;
+    for (const p of [a, b]) { const l = from.get(key(p)); if (l) l.push(s); else from.set(key(p), [s]); }
+  }
+  // join the pieces end to end into lines, keep only the points where a line turns
+  for (let s0 = 0; s0 < segs.length; s0++) {
+    if (used.has(s0)) continue;
+    used.add(s0); const line = [segs[s0][0], segs[s0][1]];
+    for (;;) {
+      const end = line[line.length - 1], next = (from.get(key(end)) || []).find((s) => !used.has(s)); if (next === undefined) break;
+      used.add(next); line.push(key(segs[next][0]) === key(end) ? segs[next][1] : segs[next][0]);
+    }
+    const pts = [line[0]];
+    for (let i = 1; i < line.length - 1; i++) {
+      const a = pts[pts.length - 1], b = line[i], c = line[i + 1];
+      const turn = Math.abs((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])) / ((Math.hypot(b[0] - a[0], b[1] - a[1]) * Math.hypot(c[0] - b[0], c[1] - b[1])) || 1);
+      if (turn > 0.05) pts.push(b);
+    }
+    pts.push(line[line.length - 1]);
+    ref.segs.push(pts.map((p) => [p[0], p[1]]));
+    for (const p of pts.length > 12 ? [pts[0]] : pts) ref.pts.push({ p: [p[0], p[1]], kind: 'corner' });
+  }
+  return ref;
+}
 const shownBodies = (skip) => [...app.results.bodies.keys()].filter((id) => !store.doc.bodies[id]?.hidden && !skip.includes(id));
 /** Then, a moment later: every object seen straight on through the board, so it is clear where the drawing goes. */
 function addOutline(k, M, skip = []) {
@@ -82,7 +114,7 @@ export function startSketch({ restoreWorkplane, start = [] } = {}) {
   const M = boardMatrix(wp);
   const k = openSketch(start, (loops, rules, extra = {}) => {
     askSolid((o) => { createSketch(loops, rules, o, wp, extra); done(); }, { onFace: !!wp, loops });
-  }, wp ? (wp.curved ? 'Sketch on a tangent plane: straight extrusion or cut, without wrapping' : 'Sketch on a face: dashed lines are the face’s edges, grey is your objects seen straight on') : 'Sketch on the floor: grey is your objects seen from above, dashed lines are their bottoms', { ref: sketchRef(M), onCancel: done });
+  }, wp ? (wp.curved ? 'Sketch on a tangent plane: straight extrusion or cut, without wrapping' : 'Sketch on a face: dashed lines are the face’s edges, grey is your objects seen straight on') : 'Sketch on the floor: grey is your objects seen from above, dashed lines are their bottoms', { ref: meshEdgeRef(sketchRef(M), wp?.meshEdges, M), onCancel: done });
   addOutline(k, M);
   return k;
 }

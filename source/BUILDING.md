@@ -128,6 +128,25 @@ More sketch tools (Trim, Slot, Polygon, Offset, Pattern, helper <-> drawn line, 
 reading DXF / SVG in `src/sketchimport.js`, the tools on the board in `src/ui/sketchmore.js`; Offset runs in the
 geometry engine (`offsetLoops` in `src/engine.js`). Help pictures: `python help/shots/tools_shots.py`.
 
+Sketch on a mesh: `src/meshfaces.js` groups a mesh's triangles into flat areas (and tells a flat face from the facets
+of a curve), so Sketch > On a surface... and Workplane can pick an imported STL. `python tests/mesh_sketch.py` does it
+with the mouse on the fixture block (cut into its top) and knob (a plane touching its round side). Help picture:
+`python help/shots/mesh_shots.py`.
+
+Importing meshes: `src/formats.js` reads 3MF (the main model from `_rels/.rels`, parts in other model files through
+`p:path` as Bambu Studio and PrusaSlicer save them) and OBJ (faces with dents filled properly); `addMeshParts` in
+`src/files.js` checks every part before adding any, keeps the parts of one file where they were relative to each
+other, and adds them as one undo step. `python tests/imports.py` checks that, bad 3MF numbers and units, and that
+Make editable drops a result when the project changed while it worked (`TDJ_APP=<path>` runs it on another build).
+
+Sizing: `python tests/sizing.py` checks that typed sizes and the X / Y size arrows (real mouse drags) change both
+sides the same so the object stays put (plain, turned and combined objects), and that Z keeps the bottom on the floor.
+
+Paint: `python tests/paint.py` paints with the real mouse (Fill, Brush) and the other tools, checks Done / Cancel /
+Undo, the paint following moves, turns, sizing, copies and merges, and reads the 3MF's `paint_color` back the way
+OrcaSlicer's TriangleSelector does (src/paint.js says how the strings are made). Checked by hand in OrcaSlicer 2.x:
+the paint lands on the right filaments; Orca keeps its own filament colors for files from other programs.
+
 Make editable (STL to sketches): `src/stlconvert.js` rebuilds a mesh as sketches pushed up (layers between flat
 faces, holes through several layers as one cutter), profiles spun around, or outlines seen from two or three sides
 pushed through each other, then works out what that misses the same way (cut out or merged in). Outlines become

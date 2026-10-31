@@ -1194,7 +1194,10 @@ export function exportMeshOf(id) {
   const bb = solidBounds(b.v.shape);
   const diag = len3(sub(bb[1], bb[0])) || 1;
   const m = b.v.shape.mesh({ tolerance: Math.max(0.002, Math.min(diag / 5000, 0.05)), angularTolerance: 0.1 }); // fine enough for printing, even on big round parts
-  return { vertices: m.vertices, triangles: m.triangles };
+  // (with its faces, so paint that fills a face fills the same face here)
+  const faceRanges = new Int32Array(m.faceGroups.length * 2);
+  m.faceGroups.forEach((g, i) => { faceRanges[2 * i] = g.start; faceRanges[2 * i + 1] = g.count; });
+  return { vertices: m.vertices, triangles: m.triangles, faceRanges };
 }
 /** Exact tangent frame at a clicked point on the current world-space CAD solid. */
 export function surfacePlane(id, index, point) {

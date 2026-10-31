@@ -35,7 +35,7 @@ async def main():
   await page.locator('.help-section',has_text='Start here').click(); await page.locator('.help-link',has_text='About 3DJames').click()
   results.append({'name':'the topic list keeps its scroll position when a chapter or topic is clicked','ok':True})
   while await page.locator('.help-section:not(.open)').count(): await page.locator('.help-section:not(.open)').first.click()
-  count=await page.locator('.help-link').count();assert count==31,count
+  count=await page.locator('.help-link').count();assert count==32,count
   # every link between pages goes to a page that exists, and clicking one opens it
   ids=await page.evaluate('()=>window.__3DJ_HELP.pages.map(p=>p.id)')
   for pg in await page.evaluate('()=>window.__3DJ_HELP.pages.map(p=>[p.id,[...p.html.matchAll(/data-help-topic="([^"]+)"/g)].map(m=>m[1])])'):
@@ -53,7 +53,7 @@ async def main():
   results.append({'name':'all 28 Help topics render and every referenced picture decodes offline with alternative text','ok':True})
   search=page.get_by_placeholder('Search help…');await search.fill('tangent')
   await page.locator('.help-link').filter(has_text='Sketch on a face or curved surface').click()
-  assert await page.locator('.help-body figure').count()==5
+  assert await page.locator('.help-body figure').count()==6  # the mesh picture, then the five steps
   await page.screenshot(path=str(ROOT/'dist/help-curved.png'))
   results.append({'name':'curved-plane tutorial is discoverable through Help search and has five captioned steps','ok':True})
   first=page.locator('.help-body img').first

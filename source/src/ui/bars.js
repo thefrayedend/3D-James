@@ -132,8 +132,9 @@ export function renderHint() {
   const t = app.tool;
   if (!t) { el.hidden = true; return; }
   el.hidden = false; el.replaceChildren();
-  const msg = { fillet: 'Click edges to round', chamfer: 'Click edges to bevel', shell: 'Click faces to leave open', extrude: 'Click a face', pushpull: 'Click a flat face to push or pull', layflat: 'Click the face that should sit on the bed', insertpocket: 'Click the face to put the insert pocket in', workplane: 'Click a flat or curved surface to build on', sketchplane: 'Click a spot on a solid to place the sketch plane', align: 'Click a dot to line up with the outlined object (hover to preview). Click another picked object to line up with it instead', split: 'Move or tilt the green plane, then click Split' }[t.type];
+  const msg = { fillet: 'Click edges to round', chamfer: 'Click edges to bevel', shell: 'Click faces to leave open', extrude: 'Click a face', pushpull: 'Click a flat face to push or pull', layflat: 'Click the face that should sit on the bed', insertpocket: 'Click the face to put the insert pocket in', workplane: 'Click a flat or curved surface to build on', sketchplane: 'Click a spot on an object (a solid or an imported mesh) to place the sketch plane', align: 'Click a dot to line up with the outlined object (hover to preview). Click another picked object to line up with it instead', split: 'Move or tilt the green plane, then click Split', paint: 'Click or drag on an object to paint' }[t.type];
   const oneClick = ONE_CLICK.has(t.type);
+  if (t.type === 'paint') { el.append(h('span', {}, msg), h('span', { class: 'k' }, 'Shift: rub off'), h('span', { class: 'k' }, 'Esc: Done')); return; }
   el.append(h('span', {}, msg), h('span', { class: 'k' }, t.type === 'align' ? 'Esc when done' : 'Esc to cancel'), ...(oneClick ? [] : [h('span', { class: 'k' }, 'Enter to apply')]));
 }
 

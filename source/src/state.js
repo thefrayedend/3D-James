@@ -13,7 +13,7 @@ export const app = {
   historyAll: false, // History shows every step instead of just the selected object's
   file: null, // { name, fmt, handle } of the open file
   dirty: false,
-  settings: { grid: 1, rot: 15, edges: true, theme: 'auto', lock: true, panelOpen: false, printer: null, unit: 'mm', display: 'solid', flat: false, ruler: false },
+  settings: { grid: 1, rot: 15, edges: true, reflection: true, theme: 'auto', lock: true, panelOpen: false, printer: null, unit: 'mm', display: 'solid', flat: false, ruler: false },
 };
 
 const SETTINGS_KEY = '3djames.settings';

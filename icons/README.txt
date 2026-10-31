@@ -49,7 +49,7 @@ eye.svg                        (small buttons and lists)
 eye-off.svg                    (small buttons and lists)
 file-plus.svg                  New
 flip-horizontal-2.svg          Flip left–right, Mirror
-flip-vertical-2.svg            Flip front–back, Flip upside down
+flip-vertical-2.svg            Flip front–back, Flip upside down, Reflection
 folder-open.svg                Open…, Projects folder…
 grid-2x2.svg                   Aluminum extrusion, Pattern, Flat view
 group.svg                      Group
@@ -99,3 +99,8 @@ undo-2.svg                     Undo
 ungroup.svg                    Ungroup
 x.svg                          Select none
 bot.svg                        (small buttons and lists)
+paintbrush.svg                 Paint parts
+paint-bucket.svg               (small buttons and lists)
+brush.svg                      (small buttons and lists)
+globe.svg                      (small buttons and lists)
+rows-3.svg                     (small buttons and lists)

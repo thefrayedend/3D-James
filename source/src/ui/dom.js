@@ -5,7 +5,7 @@ import {
   FlipVertical2, FolderOpen, Grid2x2, Group, Hexagon, History, House, Layers, Lock, LockOpen, Magnet, Maximize, Menu, Minus, Mouse,
   MousePointerClick, Move3d, Nut, Package, Pipette, Plus, Printer, Pyramid, Settings2, Redo2, Rotate3d, Ruler, RulerDimensionLine, Save, SaveAll, Scale3d, ScanEye, Scissors, SlidersHorizontal, Spline,
   SquareRoundCorner, SquaresIntersect, SquaresSubtract, SquaresUnite, SunMoon, Torus, Trash2, Triangle, TriangleAlert, TriangleRight, Type,
-  Undo2, Ungroup, X, Bot,
+  Undo2, Ungroup, X, Bot, Paintbrush, PaintBucket, Brush, Globe, Rows3,
 } from 'lucide';
 
 const LUCIDE = {
@@ -13,7 +13,7 @@ const LUCIDE = {
   CircleDashed, CircleDot, ClipboardPaste, Cone, Copy, Cylinder, Diamond, Eye, EyeOff, FilePlus, FlipHorizontal2, FlipVertical2, FolderOpen,
   Grid2x2, Group, Hexagon, History, House, Layers, Lock, LockOpen, Magnet, Maximize, Menu, Minus, Mouse, MousePointerClick, Move3d, Nut,
   Package, Pipette, Plus, Printer, Pyramid, Settings2, Redo2, Rotate3d, Ruler, RulerDimensionLine, Save, SaveAll, Scale3d, ScanEye, Scissors, SlidersHorizontal, Spline, SquareRoundCorner, SquaresIntersect,
-  SquaresSubtract, SquaresUnite, SunMoon, Torus, Trash2, Triangle, TriangleAlert, TriangleRight, Type, Undo2, Ungroup, X, Bot,
+  SquaresSubtract, SquaresUnite, SunMoon, Torus, Trash2, Triangle, TriangleAlert, TriangleRight, Type, Undo2, Ungroup, X, Bot, Paintbrush, PaintBucket, Brush, Globe, Rows3,
 };
 
 export const $ = (id) => document.getElementById(id);

@@ -8,6 +8,7 @@ How Help is organised (0.17.0):
   Tablets and the 3DJames box, Reference. Put a new topic in the chapter where someone would look for it.
   Picture scripts that work on Windows: help/shots/*_shots.py (they use help/shots/markup.py).
   basics_shots.py makes spin-1..5, view-tab, history-vars and objects-list.
+  mesh_shots.py makes mesh-sketch (the board on the top of an imported STL).
 
 Maintaining Help is required for changes users need to learn (see source/AGENTS.md).
 Use screenshots from the real app with captions, alternative text and a worked

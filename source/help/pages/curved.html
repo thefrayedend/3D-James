@@ -2,10 +2,18 @@
 <p>Draw right on an object: a pocket in the top of a box, a boss on its side, a hole in the side of a cylinder. The sketch board works as always; only where the drawing sits is different.</p>
 <h2>On a flat face</h2>
 <ol>
-<li><b>Insert</b> &gt; <b>Sketch</b> &gt; <b>On a surface…</b>, and click a flat face of a solid.</li>
+<li><b>Insert</b> &gt; <b>Sketch</b> &gt; <b>On a surface…</b>, and click a flat face of an object.</li>
 <li>The board opens on that face. Its edges show as dashed lines, and your objects seen straight on show in grey: your lines snap to their corners, middles and circle centers.</li>
 <li>Draw the outline, click <b>Done</b>, and choose <b>Push up</b> with <b>New object</b> (a boss standing on the face) or <b>Cut into the face</b> (a pocket as deep as the height). See <a data-help-topic="solid">Make the sketch solid</a>.</li>
 </ol>
+<h2>On a mesh (an STL, OBJ or 3MF)</h2>
+<p>An imported mesh has no faces, only triangles, but you can still sketch on it. <b>On a surface…</b> finds the flat area around the spot you click: triangles that lie in one plane count as one face and light up together.</p>
+<ul>
+<li><b>A flat area</b> (the top of a box, a flat side): the board opens on it, with its outline (and the outline of any hole in it) as dashed lines to snap to, just like a solid's face.</li>
+<li><b>A curved area</b> (the side of a round knob): a mesh only has small flat pieces there, so you get a plane touching the mesh at the spot you clicked, with Offset and Flip, as on a curved solid below.</li>
+<li>Then draw, click <b>Done</b>, and choose <b>Cut into the face</b> or <b>New object</b> as usual. The sketch stays editable; the mesh itself still can't be changed (for that, see <a data-help-topic="editable">Make an STL editable</a>).</li>
+</ul>
+<figure><img src="mesh-sketch.jpg" alt="The sketch board opened on the top of an imported STL block: the top's outline and its pocket show as dashed lines"><figcaption>Sketching on the top of an STL. Dashed: the flat area you clicked (outside edge and its pocket). Grey: the whole object seen straight on.</figcaption></figure>
 <p>For simple pockets and bosses (rectangle, circle, slot, polygon) you don't need a sketch: <b>Object</b> &gt; <b>Faces</b> &gt; <b>Shape on a face</b> (see <a data-help-topic="edges">Edges, faces, split and emboss</a>).</p>
 <h2>Sketch planes and the Workplane</h2>
 <ul>
@@ -50,7 +58,7 @@
 <h2>If the result is unexpected</h2>
 <ul>
 <li><b>No cut:</b> check the depth, flip direction and outline position. An outline far from the picked point may miss a curved body entirely.</li>
-<li><b>Cannot pick:</b> use a CAD solid. Mesh-only STL/OBJ surfaces are not supported. Near a singular tip, choose a smoother nearby point.</li>
+<li><b>Cannot pick:</b> wait until the model has finished rebuilding. Near a singular tip, choose a smoother nearby point. On a rough or scanned mesh, flat areas may be broken into small pieces: click where it is flattest, or use the offset to move the plane.</li>
 <li><b>The body changed:</b> plane placement stays fixed in space. It does not automatically reattach after the supporting body changes. Place a new plane if needed.</li>
 <li><b>Wanted a wrapped drawing:</b> this tool makes a flat tangent sketch with a straight extrusion or cut. Surface wrapping and constant-depth curved engraving are not included.</li>
 </ul>
