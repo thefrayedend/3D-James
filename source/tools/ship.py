@@ -1,5 +1,6 @@
 # Puts a fresh build where it is used. Run after build.py:  python tools/ship.py
 #   1. local/3DJames.html is copied to the 3DJames folder (..\3DJames.html, the one you open) and to ..\single
+#      and ..\update.json (version, size, SHA-256) is written for the installed program's update check
 #   2. the version number in ..\README.txt is brought up to date, and ..\icons\originals is remade
 #   3. ..\Share\3djames-project-skill.zip: the Claude skill (source\skill) that writes .3dj projects, and
 #      ..\Share\3DJames guide for Copilot.txt: the same guide for chat AIs without skills
@@ -33,6 +34,15 @@ if version_in(shipped) == VERSION and without_version(shipped) != without_versio
 # 1. the app itself
 for dest in [os.path.join(APP, '3DJames.html'), os.path.join(APP, 'single', '3DJames.html')]:
     if os.path.isdir(os.path.dirname(dest)): shutil.copyfile(built, dest); print('copied to', dest)
+
+# 1b. update.json: what the installed program looks for on GitHub at start-up (Installation/build/App.cs). It names the version,
+#     the size and the SHA-256 of 3DJames.html, which sits next to it in the GitHub project; the program downloads the page only
+#     when the version is newer than its own, and keeps it only when size and checksum match
+import hashlib, json
+page = open(built, 'rb').read()
+with open(os.path.join(APP, 'update.json'), 'w', encoding='utf-8', newline='\n') as f:
+    json.dump({'version': VERSION, 'sha256': hashlib.sha256(page).hexdigest(), 'size': len(page)}, f, indent=2); f.write('\n')
+print('update.json: version', VERSION)
 
 # 2. README version and the built-in button pictures
 readme = os.path.join(APP, 'README.txt')

@@ -82,6 +82,11 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -114,6 +119,234 @@ static class Program
     }
 }
 
+// Looks on GitHub for a newer 3DJames.html when the program starts, and keeps the newest copy in the user's own app data
+// folder (the install folder may be Program Files, which a normal program may not write to). The next start shows it.
+// Nothing of the user's is sent: it is two plain downloads (update.json, then 3DJames.html if there is a newer one).
+static class Updates
+{
+    // update.json and 3DJames.html sit side by side in the GitHub project (tools/ship.py writes update.json)
+    const string ManifestUrl = "https://raw.githubusercontent.com/thefrayedend/3D-James/main/update.json";
+    const string Marker = "window.__3DJ_VERSION=\"";
+    public static string Root;                    // ...\3DJames in the user's local app data
+    public static string Pending;                 // a newer version downloaded during this run
+    static readonly object gate = new object();
+
+    public static string Dir { get { return Path.Combine(Root, "update"); } }
+    static string OffFile { get { return Path.Combine(Dir, "updates-off"); } }
+
+    // TDJ_UPDATE_URL points the check at another address (tests only; plain http is accepted only on this computer)
+    static string Manifest
+    {
+        get
+        {
+            string o = Environment.GetEnvironmentVariable("TDJ_UPDATE_URL");
+            return string.IsNullOrEmpty(o) ? ManifestUrl : o;
+        }
+    }
+
+    public static bool Enabled
+    {
+        get { return !File.Exists(OffFile); }
+        set
+        {
+            try
+            {
+                Directory.CreateDirectory(Dir);
+                if (value) { if (File.Exists(OffFile)) File.Delete(OffFile); }
+                else File.WriteAllText(OffFile, "off");
+            }
+            catch { }
+        }
+    }
+
+    static int[] Parse(string v)
+    {
+        if (v == null || !Regex.IsMatch(v, @"^\d+(\.\d+){1,3}$")) return null;
+        string[] p = v.Split('.');
+        int[] r = new int[4];
+        for (int i = 0; i < p.Length; i++) { int n; if (!int.TryParse(p[i], out n)) return null; r[i] = n; }
+        return r;
+    }
+
+    // > 0 when a is newer than b; an unreadable version counts as older than any readable one
+    public static int Compare(string a, string b)
+    {
+        int[] x = Parse(a), y = Parse(b);
+        if (x == null && y == null) return 0;
+        if (x == null) return -1;
+        if (y == null) return 1;
+        for (int i = 0; i < 4; i++) if (x[i] != y[i]) return x[i] < y[i] ? -1 : 1;
+        return 0;
+    }
+
+    // the version a 3DJames.html says it is (window.__3DJ_VERSION="x.y.z"), or null
+    public static string ScanVersion(string path)
+    {
+        try
+        {
+            byte[] key = Encoding.ASCII.GetBytes(Marker);
+            const int chunk = 4 << 20, keepBytes = 64;
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 20))
+            {
+                byte[] buf = new byte[chunk + keepBytes];
+                int keep = 0;
+                while (true)
+                {
+                    int n = fs.Read(buf, keep, chunk);
+                    if (n <= 0) return null;
+                    int total = keep + n;
+                    for (int i = 0; i + key.Length < total; i++)
+                    {
+                        if (buf[i] != key[0]) continue;
+                        int j = 1;
+                        while (j < key.Length && buf[i + j] == key[j]) j++;
+                        if (j < key.Length) continue;
+                        int s = i + key.Length, e = s;
+                        while (e < total && e - s < 24 && buf[e] != (byte)'"') e++;
+                        if (e < total && buf[e] == (byte)'"') return Encoding.ASCII.GetString(buf, s, e - s);
+                    }
+                    keep = Math.Min(keepBytes, total);
+                    Buffer.BlockCopy(buf, total - keep, buf, 0, keep);
+                }
+            }
+        }
+        catch { return null; }
+    }
+
+    // The folder to show 3DJames from: a downloaded copy when it is newer than the installed one, else the install folder.
+    // Older and unfinished downloads are removed.
+    public static string Best(string appDir, out string version)
+    {
+        version = ScanVersion(Path.Combine(appDir, "3DJames.html"));
+        string best = appDir;
+        try
+        {
+            if (!Directory.Exists(Dir)) return best;
+            foreach (string d in Directory.GetDirectories(Dir))
+            {
+                string v = Path.GetFileName(d), html = Path.Combine(d, "3DJames.html"), ok = Path.Combine(d, "ok");
+                if (Parse(v) == null || !File.Exists(html) || !File.Exists(ok)) continue;
+                long size;
+                if (!long.TryParse(File.ReadAllText(ok).Trim(), out size) || new FileInfo(html).Length != size) continue;
+                if (Compare(v, version) > 0) { version = v; best = d; }
+            }
+            foreach (string d in Directory.GetDirectories(Dir))
+            {
+                if (string.Equals(d, best, StringComparison.OrdinalIgnoreCase)) continue;
+                try { Directory.Delete(d, true); } catch { }
+            }
+            foreach (string f in Directory.GetFiles(Dir, "*.part")) { try { File.Delete(f); } catch { } }
+        }
+        catch { }
+        return best;
+    }
+
+    public class Result { public string Status; public string Version; }
+
+    static HttpWebRequest Ask(string url)
+    {
+        Uri u = new Uri(url);
+        bool testing = u.IsLoopback && Environment.GetEnvironmentVariable("TDJ_UPDATE_URL") != null;
+        if (u.Scheme != "https" && !(testing && u.Scheme == "http")) throw new InvalidOperationException("not https");
+        HttpWebRequest r = (HttpWebRequest)WebRequest.Create(u);
+        r.UserAgent = "3DJames";
+        r.Timeout = 15000;
+        r.ReadWriteTimeout = 30000;
+        r.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore);
+        return r;
+    }
+
+    // a different address each time, so GitHub's five-minute cache can't hand back an older file
+    static string Fresh(string url) { return url + (url.Contains("?") ? "&" : "?") + "t=" + DateTime.UtcNow.Ticks; }
+
+    // Looks for a newer version than the one running; downloads it when there is one. Blocking: call from a worker thread.
+    public static Result Run(string running)
+    {
+        lock (gate)
+        {
+            string newest = running;
+            if (Pending != null && Compare(Pending, newest) > 0) newest = Pending;
+            string part = null;
+            try
+            {
+                ServicePointManager.SecurityProtocol = ServicePointManager.SecurityProtocol | (SecurityProtocolType)3072;
+                string manifestUrl = Manifest, text;
+                using (WebResponse rs = Ask(Fresh(manifestUrl)).GetResponse())
+                using (StreamReader sr = new StreamReader(rs.GetResponseStream(), Encoding.UTF8))
+                {
+                    char[] b = new char[8192];
+                    int n = sr.Read(b, 0, b.Length);
+                    text = n > 0 ? new string(b, 0, n) : "";
+                }
+                Match mv = Regex.Match(text, "\"version\"\\s*:\\s*\"([0-9.]+)\"");
+                Match mh = Regex.Match(text, "\"sha256\"\\s*:\\s*\"([0-9a-fA-F]{64})\"");
+                Match ms = Regex.Match(text, "\"size\"\\s*:\\s*(\\d+)");
+                if (!mv.Success || !mh.Success || !ms.Success || Parse(mv.Groups[1].Value) == null) return new Result { Status = "failed" };
+                string ver = mv.Groups[1].Value, sha = mh.Groups[1].Value.ToLowerInvariant();
+                long size = long.Parse(ms.Groups[1].Value);
+                if (Compare(ver, newest) <= 0)
+                {
+                    if (Pending != null && Compare(Pending, running) > 0) return new Result { Status = "downloaded", Version = Pending };
+                    return new Result { Status = "current", Version = running };
+                }
+                if (size < 200 || size > 300L * 1024 * 1024) return new Result { Status = "failed" };
+
+                // 3DJames.html sits next to update.json
+                string htmlUrl = manifestUrl.Substring(0, manifestUrl.LastIndexOf('/') + 1) + "3DJames.html";
+                Directory.CreateDirectory(Dir);
+                part = Path.Combine(Dir, ver + ".part");
+                long got = 0;
+                string have;
+                using (HashAlgorithm h = SHA256.Create())
+                {
+                    HttpWebRequest hq = Ask(Fresh(htmlUrl));
+                    hq.Timeout = 30000;
+                    using (WebResponse hs = hq.GetResponse())
+                    using (Stream ins = hs.GetResponseStream())
+                    using (FileStream outs = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        byte[] buf = new byte[1 << 16];
+                        int k;
+                        while ((k = ins.Read(buf, 0, buf.Length)) > 0)
+                        {
+                            got += k;
+                            if (got > size) break;
+                            h.TransformBlock(buf, 0, k, null, 0);
+                            outs.Write(buf, 0, k);
+                        }
+                    }
+                    h.TransformFinalBlock(new byte[0], 0, 0);
+                    have = BitConverter.ToString(h.Hash).Replace("-", "").ToLowerInvariant();
+                }
+                // complete, unchanged, and really that version: otherwise it is thrown away and tried again next start
+                if (got != size || have != sha || ScanVersion(part) != ver)
+                {
+                    try { File.Delete(part); } catch { }
+                    return new Result { Status = "failed" };
+                }
+                string dir = Path.Combine(Dir, ver);
+                Directory.CreateDirectory(dir);
+                string dest = Path.Combine(dir, "3DJames.html");
+                if (File.Exists(dest)) File.Delete(dest);
+                File.Move(part, dest);
+                File.WriteAllText(Path.Combine(dir, "ok"), size.ToString());   // written last: a folder without it is ignored
+                Pending = ver;
+                return new Result { Status = "downloaded", Version = ver };
+            }
+            catch (WebException)
+            {
+                if (part != null) { try { File.Delete(part); } catch { } }
+                return new Result { Status = "offline" };
+            }
+            catch
+            {
+                if (part != null) { try { File.Delete(part); } catch { } }
+                return new Result { Status = "failed" };
+            }
+        }
+    }
+}
+
 class MainForm : Form
 {
     // The 3DJames Link (the AI link, 3DJamesLink.exe) accepts this address: keep the two the same.
@@ -121,6 +354,10 @@ class MainForm : Form
     readonly WebView2 web;
     bool isFullscreen;
     FormWindowState savedState;
+    string runningVersion;          // the version being shown
+    string lastStatus = "idle";     // what the page was last told about updates
+    string lastVersion;
+    bool checking;
 
     public MainForm()
     {
@@ -144,8 +381,11 @@ class MainForm : Form
     {
         try
         {
-            string dataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "3DJames", "WebView2");
+            // TDJ_DATA moves everything the program keeps (tests only)
+            string baseDir = Environment.GetEnvironmentVariable("TDJ_DATA");
+            if (string.IsNullOrEmpty(baseDir)) baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            Updates.Root = Path.Combine(baseDir, "3DJames");
+            string dataDir = Path.Combine(Updates.Root, "WebView2");
             // The page talks to the AI link on this computer (http://127.0.0.1:47831): don't block or ask about that.
             var options = new CoreWebView2EnvironmentOptions(
                 "--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights");
@@ -154,7 +394,9 @@ class MainForm : Form
 
             CoreWebView2 core = web.CoreWebView2;
             string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            core.SetVirtualHostNameToFolderMapping(Host, appDir, CoreWebView2HostResourceAccessKind.Allow);
+            // the installed 3DJames.html, or a newer one downloaded earlier: same address either way, so saved settings stay
+            string shownFrom = Updates.Best(appDir, out runningVersion);
+            core.SetVirtualHostNameToFolderMapping(Host, shownFrom, CoreWebView2HostResourceAccessKind.Allow);
 
             core.Settings.IsStatusBarEnabled = false;
             core.Settings.AreDevToolsEnabled = true;
@@ -184,18 +426,36 @@ class MainForm : Form
                 SetFullscreen(core.ContainsFullScreenElement);
             };
 
-            // F11 toggles fullscreen like a browser.
+            // F11 toggles fullscreen like a browser; the page also asks about updates here.
             core.WebMessageReceived += delegate (object s, CoreWebView2WebMessageReceivedEventArgs a)
             {
                 string msg = null;
                 try { msg = a.TryGetWebMessageAsString(); } catch { }
                 if (msg == "__3dj_f11") SetFullscreen(!isFullscreen);
+                else if (msg == "__3dj_updates_on") { Updates.Enabled = true; PostStatus(); }
+                else if (msg == "__3dj_updates_off") { Updates.Enabled = false; PostStatus(); }
+                else if (msg == "__3dj_status") PostStatus();
+                else if (msg == "__3dj_check") StartCheck();
             };
             await core.AddScriptToExecuteOnDocumentCreatedAsync(
                 "window.addEventListener('keydown',function(e){if(e.key==='F11'){e.preventDefault();" +
                 "window.chrome.webview.postMessage('__3dj_f11');}},true);");
+            // tells the page it is in the program, and whether it looks for updates
+            await core.AddScriptToExecuteOnDocumentCreatedAsync(
+                "window.__3DJ_HOST={program:true,updates:" + (Updates.Enabled ? "true" : "false") + "};");
 
             core.Navigate("https://" + Host + "/3DJames.html");
+
+            // once, a few seconds after starting, so it never slows down the page loading
+            if (Updates.Enabled)
+            {
+                int wait;
+                if (!int.TryParse(Environment.GetEnvironmentVariable("TDJ_UPDATE_WAIT"), out wait) || wait <= 0) wait = 4000;
+                System.Windows.Forms.Timer t = new System.Windows.Forms.Timer();
+                t.Interval = wait;
+                t.Tick += delegate { t.Stop(); t.Dispose(); StartCheck(); };
+                t.Start();
+            }
         }
         catch (Exception ex)
         {
@@ -203,6 +463,40 @@ class MainForm : Form
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
             Close();
         }
+    }
+
+    void StartCheck()
+    {
+        if (checking) return;
+        checking = true;
+        SetStatus("checking", null);
+        string running = runningVersion;
+        Task.Factory.StartNew(delegate
+        {
+            Updates.Result r = Updates.Run(running);
+            try { BeginInvoke(new Action(delegate { checking = false; SetStatus(r.Status, r.Version); })); } catch { }
+        });
+    }
+
+    void SetStatus(string status, string version)
+    {
+        lastStatus = status;
+        lastVersion = version;
+        PostStatus();
+    }
+
+    // tells the page where updates stand: idle, checking, current, downloaded (opens next start), offline, failed
+    void PostStatus()
+    {
+        try
+        {
+            string json = "{\"type\":\"3dj-update\",\"status\":\"" + lastStatus + "\",\"version\":" +
+                (lastVersion == null ? "null" : "\"" + lastVersion + "\"") + ",\"current\":" +
+                (runningVersion == null ? "null" : "\"" + runningVersion + "\"") + ",\"enabled\":" +
+                (Updates.Enabled ? "true" : "false") + "}";
+            if (web.CoreWebView2 != null) web.CoreWebView2.PostWebMessageAsJson(json);
+        }
+        catch { }
     }
 
     void SetFullscreen(bool on)
@@ -378,6 +672,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Dirs]
 Name: "{userdocs}\3DJames\Projects"; Flags: uninsneveruninstall
+
+[UninstallDelete]
+; newer copies of the app that the program downloaded by itself (see Updates in the program's source)
+Type: filesandordirs; Name: "{localappdata}\3DJames\update"
 
 [Files]
 Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

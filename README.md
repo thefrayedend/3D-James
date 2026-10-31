@@ -7,6 +7,8 @@ draw your own outlines with exact sizes, and everything stays editable. Runs off
 
 On Windows: download **[3DJames-Setup.exe](3DJames-Setup.exe)** (click it, then the download button) and run it. It installs 3DJames
 with a Start menu entry and lets AI apps (Claude, Antigravity) work in the open window.
+The installed app looks here for a newer version a few seconds after it starts (`update.json` and `3DJames.html` in this folder),
+downloads it if there is one and opens it next time; Help > Licenses and components > Updates turns that off.
 
 Or without installing: download **3DJames.html** and open it in Edge or Chrome (or double-click **Open 3DJames.cmd**).
 **Make desktop shortcut.cmd** puts an icon on your desktop. Everything you need to know is in the app's Help tab.

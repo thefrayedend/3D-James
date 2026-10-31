@@ -34,6 +34,7 @@ import { applyTouchMode, toggleMod, mods, onTouchModeChange } from './touch.js';
 import * as server from './drive/server.js';
 import { makeEditable } from './editable.js';
 import { startBridge } from './bridge.js';
+import { startUpdates } from './updates.js';
 
 // ---------------------------------------------------------------- keyboard
 // Remember what a text box held when you clicked into it, so Ctrl+Z can tell typing from undoing.
@@ -130,6 +131,7 @@ store.onChange((kind) => {
   // opened from a 3DJames server? Then files come from the server's folders, and each person keeps their own backups
   if ((await detectDrive()).mode === 'server') { idb.name = `3djames-${server.me.user}`; buildTabBar(); renderCmdBar(); }
   loadMyParts();
+  startUpdates(); // in the installed Windows program: hears whether a newer version was downloaded (src/updates.js)
   startBridge(); // an AI helper on this computer may ask to work in this window (src/bridge.js)
   loadCustomIcons(() => { buildTabBar(); renderCmdBar(); renderAll(); });
   const last = await restoreSession();

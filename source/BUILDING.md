@@ -90,6 +90,17 @@ Putting a build where it is used: `python tools/ship.py` copies `local/3DJames.h
 builds and copies the AI link. (There is no share zip: 3DJames is shared as the installer that
 `Installation\Make 3DJames Installer.cmd` makes.) The 3DJames folder above `source` is the master copy of everything that ships.
 
+Updates in the installed program: the installer's program (the C# source is inside `Installation\Build-3DJames.ps1`, which writes it to
+`Installation\build\App.cs`; `Updates` and `MainForm` are in it) reads `update.json` from the GitHub project a few seconds after it
+starts. `tools/ship.py` writes that file (version, size, SHA-256 of `3DJames.html`) into the 3DJames folder; the GitHub project holds both
+files side by side at its top. If the version is newer than the one running, the program downloads `3DJames.html` next to it, keeps it only
+when size, checksum and the version inside all match, and stores it in `%LOCALAPPDATA%\3DJames\update\<version>\`. The next start serves
+the newest of that and the installed copy at the same address (`https://3djames-app.example/`), so saved settings and the AI link carry
+on. The page's side is `src/updates.js` (a notice, and Help > Licenses and components > Updates). Tests: `tests/updates.py` (the page, with
+a stand-in connection) and `tests/updater_host.py` (builds the real program from the script and runs it against a local web server;
+it only ever stops the programs it started). A release is: `build.py`, `tools/ship.py`, the installer script, then push
+`3DJames.html`, `update.json` and the installer to GitHub together.
+
 Code map (the parts most changes touch):
 - `src/sketchgeom.js`: sketch loop geometry shared by the board and the engine (closed outlines, circles, helper
   lines and open lines; `isSolidLoop`, `isOpenLoop`, `sideCount` say which is which).
