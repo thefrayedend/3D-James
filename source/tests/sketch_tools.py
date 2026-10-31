@@ -244,7 +244,7 @@ async def main():
     check('Done with an imported drawing finishes', await ev("()=>!!window.__done"))
 
     # a sketch standing on an upright face: sizing across the face (Y here) changes its height, it stays a sketch, and
-    # it grows out of the face (its back stays put), the same as changing Height in Properties
+    # (like any typed size) it shrinks evenly on both sides; changing Height in Properties grows it out of the face
     await ev("()=>{ document.querySelector('.sketch') && window.__k?.close(); __3dj.commands.newProject(); }"); await pg.wait_for_timeout(800)
     await ev("""()=>{ const C=__3dj.commands, A=__3dj.app; C.createSketch([{type:'poly',pts:[[-20,-10],[20,-10],[20,10],[-20,10]]}], [], {mode:'extrude', h:2, cut:false}, null);
       window.__id=A.sel[0]; A.settings.lock=false; }""")
@@ -257,12 +257,14 @@ async def main():
     await ev("()=>{ __3dj.vp.setSelection([window.__id]); __3dj.app.gizmo='scale'; __3dj.commands.barCommit(1, '5'); }"); await ev(built)
     b1, s1 = await box(), await state()
     check('a sketch standing on a face: sizing Y (across the face) changes its Height and it stays a sketch', s1 == {'solid': True, 'h': 5, 'steps': 1}, s1)
-    check('…it grows out of the face: its back and its height off the floor stay where they were', b1[1][1] == b0[1][1] and b1[0][1] == b0[1][1] - 5 and b1[0][2] == b0[0][2] and b1[1][2] == b0[1][2], [b0, b1])
+    mid = lambda b, i: round((b[0][i] + b[1][i]) / 2, 3)
+    check('…it shrinks evenly on both sides: its middle and its height off the floor stay where they were', all(mid(b1, i) == mid(b0, i) for i in range(3)) and b1[1][1] - b1[0][1] == 5 and b1[0][2] == b0[0][2] and b1[1][2] == b0[1][2], [b0, b1])
     await ev("()=>__3dj.store.undo()"); await ev(built)
     await ev("()=>{ __3dj.commands.openPanel('props'); __3dj.commands.renderAll(); }"); await ev(built)
     hbox = pg.locator('#side .field', has=pg.locator('label', has_text='Height')).locator('input.in').first
     await hbox.fill('5'); await hbox.press('Enter'); await ev(built)
-    check('changing Height in Properties grows it out of the face the same way (one Undo step)', await box() == b1, [await box(), b1])
+    b1 = await box()
+    check('changing Height in Properties grows it out of the face: its back stays put (one Undo step)', b1[1][1] == b0[1][1] and b1[0][1] == b0[1][1] - 5 and b1[0][2] == b0[0][2], [b0, b1])
     await ev("()=>__3dj.store.undo()"); await ev(built)
     check('…and Undo puts it back where it was', await box() == b0, [await box(), b0])
 
@@ -274,7 +276,7 @@ async def main():
     b2 = await box()
     await ev("()=>{ __3dj.vp.setSelection([window.__id]); __3dj.app.gizmo='scale'; __3dj.commands.barCommit(1, '3'); }"); await ev(built)
     s3, b3 = await state(), await box()
-    check('…then sizing Y changes its Height and it stays a sketch, its back where it was', s3 == {'solid': True, 'h': 3, 'steps': 1} and b3[1][1] == b2[1][1], [s3, b2, b3])
+    check('…then sizing Y changes its Height and it stays a sketch, its middle where it was', s3 == {'solid': True, 'h': 3, 'steps': 1} and abs(mid(b3, 1) - mid(b2, 1)) < 1e-3, [s3, b2, b3])
 
     check('no page errors', not errs, errs)
     await b.close()

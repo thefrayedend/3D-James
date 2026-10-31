@@ -10,6 +10,8 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { mods, palm } from './touch.js';
+import { meshAreas } from './meshfaces.js';
+import { paintMesh, applyOp, meshContext, eachPiece } from './paint.js';
 
 const tmpV = new THREE.Vector3();
 const NICE = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
@@ -25,6 +27,7 @@ export class Viewport {
     this.grid = 1;
     this.rotSnap = 15;
     this.showEdges = true;
+    this.showReflection = true;
     this.activeAxis = null; // like 3D Builder: the axis last used (or being typed) shows green, the rest blue
     this.display = 'solid'; // solid, wire, see (see-through) or xray (hidden edges show through)
     this.lockScale = true;
@@ -325,6 +328,7 @@ export class Viewport {
   }
 
   disposeEntry(e) {
+    this.dropPaint(e);
     this.scene.remove(e.group);
     this.scene.remove(e.mirror); e.mirror.material.dispose();
     e.mesh.geometry.dispose(); e.mesh.material.dispose();
@@ -351,9 +355,11 @@ export class Viewport {
       em.depthTest = dm !== 'xray'; em.opacity = dm === 'xray' || dm === 'see' ? 0.8 : em.userData.base; em.needsUpdate = true;
       e.edges.renderOrder = dm === 'xray' ? 2 : 0;
       e.group.visible = !p.hidden;
-      e.mirror.visible = !p.hidden && !p.hole && solid; e.mirror.material.color.set(p.color || '#C3C3C3');
+      e.mirror.visible = this.showReflection && !p.hidden && !p.hole && solid; e.mirror.material.color.set(p.color || '#C3C3C3');
       e.mesh.renderOrder = p.hole ? 1 : 0;
-      if (sel.has(id) && !p.hidden) outlined.push(e.mesh);
+      this.updatePaint(e);
+      if (e.paintMesh) { const pm = e.paintMesh.material; pm.transparent = m.transparent; pm.opacity = m.opacity; pm.depthWrite = m.depthWrite; pm.wireframe = m.wireframe; pm.needsUpdate = true; }
+      if (sel.has(id) && !p.hidden && this.mode === 'select') outlined.push(e.mesh);
     }
     this.outline.selectedObjects = this.mode === 'select' ? outlined : [];
     this.requestRender();
@@ -384,6 +390,7 @@ export class Viewport {
     this.updateGizmo();
   }
   setEdgesVisible(v) { this.showEdges = v; this.updateStyles(); }
+  setReflection(v) { this.showReflection = v; this.updateStyles(); }
   /** Show (or with null, remove) the workplane: a see-through grid square on the picked face. */
   setWorkplane(wp) {
     if (this.wpMesh) { this.scene.remove(this.wpMesh); this.wpMesh.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); }); this.wpMesh = null; }
@@ -1083,6 +1090,97 @@ export class Viewport {
     this.requestRender();
   }
 
+  // ---------------- paint (see paint.js): drawn over the object, in the colours of its strokes ----------------
+  /** Lay the object's strokes (hooks.paintOf) on it again when they or the object changed. */
+  updatePaint(e) {
+    const ops = (!this.props?.[e.id]?.hole && this.hooks.paintOf?.(e.id)) || null;
+    if (e.paintOps === ops && e.paintKey === e.key) return;
+    e.paintOps = ops; e.paintKey = e.key;
+    e.paint = ops ? paintMesh(e.data, ops) : null;
+    this.drawPaint(e);
+  }
+  dropPaint(e) { if (e.paintMesh) { e.group.remove(e.paintMesh); e.paintMesh.geometry.dispose(); e.paintMesh.material.dispose(); e.paintMesh = null; } }
+  drawPaint(e) {
+    const P = e.paint;
+    if (!P || !P.trees.some((x) => x)) { this.dropPaint(e); this.requestRender(); return; }
+    const V = e.data.vertices, T = e.data.triangles, g = e.mesh.geometry, nA = g.getAttribute('normal'), gi = g.index;
+    const cols = P.colors.map((c) => new THREE.Color(c));
+    const pos = [], nor = [], col = [];
+    eachPiece(P.trees, (t, s, ...w) => {
+      const c = cols[s - 1];
+      for (const b of w) {
+        for (let i = 0; i < 3; i++) pos.push(b[0] * V[3 * T[3 * t] + i] + b[1] * V[3 * T[3 * t + 1] + i] + b[2] * V[3 * T[3 * t + 2] + i]);
+        const n = [0, 0, 0];
+        for (let k = 0; k < 3; k++) { const j = gi ? gi.getX(3 * t + k) : 3 * t + k; n[0] += b[k] * nA.getX(j); n[1] += b[k] * nA.getY(j); n[2] += b[k] * nA.getZ(j); }
+        nor.push(...n); col.push(c.r, c.g, c.b);
+      }
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    if (e.paintMesh) { e.paintMesh.geometry.dispose(); e.paintMesh.geometry = geo; }
+    else {
+      // drawn right on the surface: the object itself is pushed back a little (its polygonOffset), so this wins
+      e.paintMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.03 }));
+      e.paintMesh.raycast = () => {};
+      e.group.add(e.paintMesh);
+    }
+    this.requestRender();
+  }
+  /** Add a stroke to an object's paint at once (while a brush is being dragged). */
+  paintLive(id, op) {
+    const e = this.bodies.get(id); if (!e) return;
+    e.paint ||= { colors: [], trees: new Array(e.data.triangles.length / 3).fill(0) };
+    applyOp(meshContext(e.data), e.paint, op);
+    this.drawPaint(e);
+  }
+  /** Paint mode: dragging on an object paints (hooks.onPaint), dragging beside it turns the view. */
+  setPaintMode(on) {
+    this.mode = on ? 'paint' : 'select';
+    if (!on) { this.paintPainting = false; this.showPaintCursor(null); this.showPaintPreview(null); this.renderer.domElement.style.cursor = 'default'; }
+    this.clearHandles();
+    this.updateStyles();
+    this.updateGizmo();
+  }
+  /** The brush outline where the pointer is: a ring of radius r, flat across n (null hides it). */
+  showPaintCursor(at, n, r, color) {
+    if (!at) { if (this.paintCursor) this.paintCursor.visible = false; this.requestRender(); return; }
+    if (!this.paintCursor) {
+      this.paintCursor = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 64), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthTest: false, side: THREE.DoubleSide }));
+      this.paintCursor.renderOrder = 20;
+      this.paintCursor.raycast = () => {};
+      this.scene.add(this.paintCursor);
+    }
+    const c = this.paintCursor;
+    c.visible = true; c.material.color.set(color || '#ffffff');
+    c.position.set(...at); c.scale.setScalar(r);
+    c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...n).normalize());
+    this.requestRender();
+  }
+  /** See-through colour over triangles of an object (what a click would fill); null clears it. */
+  showPaintPreview(id, tris, color) {
+    if (this.paintPreview) { this.scene.remove(this.paintPreview); this.paintPreview.geometry.dispose(); this.paintPreview.material.dispose(); this.paintPreview = null; }
+    const e = id && this.bodies.get(id);
+    if (e && tris?.length) {
+      const T = e.data.triangles, idx = new Uint32Array(tris.length * 3);
+      tris.forEach((t, i) => idx.set(T.subarray(3 * t, 3 * t + 3), 3 * i));
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(e.data.vertices, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      this.paintPreview = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: color || '#ffffff', transparent: true, opacity: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      this.paintPreview.raycast = () => {};
+      this.scene.add(this.paintPreview);
+    }
+    this.requestRender();
+  }
+  /** What a paint stroke needs from a pointer hit: the object, the point, the face's direction and the view's. */
+  paintHit(hit) {
+    if (!hit) return null;
+    const n = hit.face ? hit.face.normal.clone() : new THREE.Vector3(0, 0, 1);
+    return { body: hit.object.userData.bodyId, point: hit.point.toArray(), normal: n.toArray(), dir: this.raycaster.ray.direction.toArray(), tri: hit.faceIndex, wpp: this.worldPerPixel(hit.point) };
+  }
+
   hitBody(e) {
     this.setPointer(e);
     const meshes = [];
@@ -1122,6 +1220,16 @@ export class Viewport {
       }
       down = { x: e.clientX, y: e.clientY, button: e.button, moved: false };
       if (e.button !== 0) return;
+      if (this.mode === 'paint') {
+        // on an object: paint (the view stays still); beside it: turn the view as usual
+        const hit = this.paintHit(this.hitBody(e));
+        if (hit && this.hooks.onPaint?.('down', hit, e)) {
+          this.paintPainting = true; this.orbit.enabled = false;
+          try { dom.setPointerCapture(e.pointerId); } catch { /* */ }
+          e.stopImmediatePropagation();
+        }
+        return;
+      }
       if (this.mode !== 'select') return;
       const hit = this.hitBody(e);
       if (hit) {
@@ -1132,6 +1240,10 @@ export class Viewport {
     }, { capture: true });
 
     dom.addEventListener('pointermove', (e) => {
+      if (this.mode === 'paint' && e.pointerType !== 'touch') {
+        if (this.paintPainting || !e.buttons) this.hooks.onPaint?.(this.paintPainting ? 'drag' : 'hover', this.paintHit(this.hitBody(e)), e);
+        if (this.paintPainting) return;
+      }
       if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > (down.touch ? 10 : 4)) { down.moved = true; if (hold && !this.drag) { clearTimeout(hold.timer); hold = null; } }
       const d = this.drag;
       if (d) {
@@ -1181,6 +1293,12 @@ export class Viewport {
           return;
         }
       }
+      if (this.paintPainting) {
+        this.paintPainting = false; this.orbit.enabled = true; down = null;
+        try { dom.releasePointerCapture(e.pointerId); } catch { /* */ }
+        this.hooks.onPaint?.('up', null, e);
+        return;
+      }
       const d = this.drag;
       if (d) {
         this.drag = null;
@@ -1209,7 +1327,7 @@ export class Viewport {
       const hit = this.hitBody(e);
       if (hit) this.hooks.onDoubleClick?.(hit.object.userData.bodyId);
     });
-    dom.addEventListener('pointerleave', () => { if (this.pick?.hover) { this.pick.hover = null; this.refreshPickOverlay(); } });
+    dom.addEventListener('pointerleave', (e) => { if (this.mode === 'paint' && !this.paintPainting) this.hooks.onPaint?.('hover', null, e); if (this.pick?.hover) { this.pick.hover = null; this.refreshPickOverlay(); } });
   }
 
   /** A second finger came down while an object was being dragged: put it back, the fingers move the camera. */
@@ -1417,11 +1535,13 @@ export class Viewport {
       const s = new THREE.Vector3(1, 1, 1);
       const pivot = box.getCenter(new THREE.Vector3()); pivot.z = box.min.z;
       if (h.type === 'edge' || h.type === 'depth' || h.type === 'face') {
-        const ax = h.ax, sg = h.sign;
-        pivot.setComponent(ax, sg > 0 ? box.min.getComponent(ax) : box.max.getComponent(ax));
+        // X and Y size from the middle (the arrow follows the pointer, the opposite side moves the same the other way,
+        // so the object doesn't wander); Z keeps the opposite side still, so an object on the floor stays on it
+        const ax = h.ax, sg = h.sign, both = ax < 2;
+        if (!both) pivot.setComponent(ax, sg > 0 ? box.min.getComponent(ax) : box.max.getComponent(ax));
         const dir = new THREE.Vector3(); dir.setComponent(ax, sg);
         const ext0 = size.getComponent(ax) || 1;
-        const ext = Math.max(0.1, snap(ext0 + this.axisDelta(hd.anchor, dir, dx, dy)));
+        const ext = Math.max(0.1, snap(ext0 + (both ? 2 : 1) * this.axisDelta(hd.anchor, dir, dx, dy)));
         const f = ext / ext0;
         if (this.lockScale) s.setScalar(f); else s.setComponent(ax, f);
       } else {
@@ -1471,6 +1591,7 @@ export class Viewport {
 
   hover(e) {
     const dom = this.renderer.domElement;
+    if (this.mode === 'paint') return;
     if (this.mode === 'select') {
       dom.style.cursor = this.hitBody(e) ? 'pointer' : 'default';
       return;
@@ -1484,9 +1605,10 @@ export class Viewport {
   }
 
   // ---------------- picking edges / faces ----------------
-  startPick(kind, bodyFilter, items = []) {
+  /** meshes: faces can also be flat areas of meshes (hits then carry `area`, one of meshAreas' areas) */
+  startPick(kind, bodyFilter, items = [], { meshes = false } = {}) {
     this.mode = 'pick';
-    this.pick = { kind, bodyFilter, items, hover: null };
+    this.pick = { kind, bodyFilter, items, hover: null, meshes };
     this.clearHandles();
     this.updateStyles();
     this.refreshPickOverlay();
@@ -1514,7 +1636,7 @@ export class Viewport {
   pickAt(e) {
     this.setPointer(e);
     const p = this.pick; if (!p) return null;
-    const entries = [...this.bodies.values()].filter((en) => !this.props?.[en.id]?.hidden && (!p.bodyFilter || p.bodyFilter(en.id)) && (p.kind === 'point' || en.data.solid));
+    const entries = [...this.bodies.values()].filter((en) => !this.props?.[en.id]?.hidden && (!p.bodyFilter || p.bodyFilter(en.id)) && (p.kind === 'point' || en.data.solid || (p.meshes && p.kind === 'face')));
     const meshHit = this.raycaster.intersectObjects(entries.map((en) => en.mesh), false)[0];
     if (p.kind === 'point') {
       if (!meshHit) return null;
@@ -1532,6 +1654,11 @@ export class Viewport {
     if (p.kind === 'face') {
       if (!meshHit) return null;
       const en = this.bodies.get(meshHit.object.userData.bodyId);
+      if (!en.data.solid) {
+        // a mesh: the flat area around the triangle (numbered after any solid face, so items stay comparable)
+        const M = meshAreas(en.data), ai = M.areaOf[meshHit.faceIndex];
+        return { body: en.id, index: 1e9 + ai, point: meshHit.point.toArray(), area: M.areas[ai], normal: M.normal(meshHit.faceIndex) };
+      }
       const fi = rangeIndex(en.data.faceRanges, meshHit.faceIndex * 3);
       return fi < 0 ? null : { body: en.id, index: fi, point: meshHit.point.toArray() };
     }
@@ -1562,7 +1689,17 @@ export class Viewport {
     this.clearOverlay();
     const p = this.pick; if (!p || p.kind === 'point') return;
     const draw = (it, hover) => {
-      const en = this.bodies.get(it.body); if (!en || !en.data.solid) return;
+      const en = this.bodies.get(it.body); if (!en) return;
+      if (it.area && !en.data.solid) {
+        const T = en.data.triangles, idx = new Uint32Array(it.area.tris.length * 3);
+        it.area.tris.forEach((t, i) => idx.set(T.subarray(3 * t, 3 * t + 3), 3 * i));
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(en.data.vertices, 3));
+        g.setIndex(new THREE.BufferAttribute(idx, 1));
+        this.overlay.add(new THREE.Mesh(g, hover ? this.faceMatHover : this.faceMat));
+        return;
+      }
+      if (!en.data.solid) return;
       if (p.kind === 'edge') {
         const r = en.data.edgeRanges; const start = r[2 * it.index], count = r[2 * it.index + 1];
         const seg = en.data.lines.subarray(start * 3, (start + count) * 3); if (!seg.length) return;

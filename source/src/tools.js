@@ -13,6 +13,7 @@ import { measurePick } from './measure.js';
 import { planeDialog } from './sketchplane.js';
 import { workerCall, waitForBuild, refreshToolPreview } from './build.js';
 import { lookAtFace } from './sketchcmd.js';
+import { finishPaint } from './painttool.js';
 
 // tools that finish with a single click (no Apply button)
 export const ONE_CLICK = new Set(['extrude', 'pushpull', 'layflat', 'insertpocket', 'workplane', 'sketchplane', 'align', 'lookat', 'measure']);
@@ -59,7 +60,7 @@ export function startTool(type) {
     vp.setAlign({ anchor: withGroup([app.sel[0]]) });
   } else if (['workplane', 'sketchplane'].includes(type)) {
     app.tool = { type, items: [] };
-    vp.startPick('face', (b) => !!bodyData(b)?.solid, []);
+    vp.startPick('face', (b) => !!bodyData(b), [], { meshes: true });
   } else if (type === 'lookat') {
     app.tool = { type, items: [] };
     vp.startPick('face', () => true, []);
@@ -77,6 +78,7 @@ export function startTool(type) {
   renderAll();
 }
 export function endTool() {
+  if (app.tool?.type === 'paint') { finishPaint(true); return; } // Esc while painting keeps the paint, like Done
   if (app.tool?.type === 'workplane') app.afterWorkplane = null;
   const wasSplit = app.tool?.type === 'split';
   const hadPreview = app.tool?.type === 'emboss' && app.tool.face; // its orange preview goes away
@@ -98,6 +100,20 @@ export function toolPick(kind, hit) {
   if (['workplane', 'sketchplane'].includes(t.type)) {
     if (t.busy) return;
     const d = bodyData(hit.body); if (!d) return;
+    if (hit.area) {
+      // a mesh (an imported STL): a flat area is used as it is; on a curve, the plane touches the mesh where it was clicked
+      const ar = hit.area, size = Math.max(40, Math.round(1.6 * Math.max(...[0, 1, 2].map((k) => d.bbox[1][k] - d.bbox[0][k])) / 10) * 10);
+      const then = app.afterWorkplane; app.afterWorkplane = null;
+      const flat = !ar.curved, n = flat ? ar.n : hit.normal;
+      // a flat area's plane goes through its middle (Place sketch plane: the clicked point on it); a curve's through the clicked point
+      const dist = flat ? hit.point.reduce((s, v, k) => s + (v - ar.P[k]) * n[k], 0) : 0;
+      const P = flat && t.type === 'workplane' ? ar.P : hit.point.map((v, k) => v - n[k] * dist);
+      const wp = { P, n: n.slice(), curved: !flat, size, body: hit.body, meshEdges: flat ? ar.edges : null };
+      endTool();
+      if (flat && t.type === 'workplane') { setWorkplane(wp); if (then) then(); else toast('Workplane set. New shapes go on this plane; click Workplane to return to the floor.'); }
+      else planeDialog(wp, then);
+      return;
+    }
     const curved = d.flat && !d.flat[hit.index];
     const pickedRevision = store.revision;
     if ((curved || t.type === 'sketchplane') && (app.building || app.pending || app.builtRevision !== pickedRevision)) return toast('Wait for the model to finish rebuilding, then click the surface again.');
@@ -212,6 +228,7 @@ export function toolPreviewDone() {
 }
 export function applyTool() {
   const t = app.tool; if (!t) return;
+  if (t.type === 'paint') { finishPaint(true); return; }
   const d = bodyData(t.body);
   if (t.type === 'emboss') {
     if (!t.face) return toast('Pick a flat face first.');

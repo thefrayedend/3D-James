@@ -6,6 +6,7 @@ import { withGroup, commitTransform, editStep, translateSel, alignPlan, alignSel
 import { toolPick, splitBarValues, endTool } from './tools.js';
 import { renderAll } from './ui/panels.js';
 import { renderObjBar, setBarValues, markActiveAxis } from './ui/bars.js';
+import { paintOpsOf, paintPointer } from './painttool.js';
 
 export const vp = new Viewport($('view'), {
   onSelect(id, additive) {
@@ -38,6 +39,8 @@ export const vp = new Viewport($('view'), {
     else if (app.gizmo === 'translate' && app.barBase) setBarValues(app.barBase.map((b, i) => b + [v.x, v.y, v.z][i]));
   },
   onPick(kind, hit) { toolPick(kind, hit); },
+  paintOf(id) { return paintOpsOf(id); },
+  onPaint(kind, hit, e) { return paintPointer(kind, hit, e); },
   onRulerMove(d) { translateSel(...d); },
   onActiveAxis(ax) { markActiveAxis(ax); },
   alignPreview(axis, where) { return app.tool?.type === 'align' ? alignPlan(axis, where, app.tool.anchor) : {}; },

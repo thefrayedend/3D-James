@@ -1,0 +1,35 @@
+<h1>Paint parts</h1>
+<p>Give parts of an object other colors: the top of a box, a stripe, a band round a cup, a logo's letters. It works like 3D Builder's <b>Color</b> tool, with the brushes of OrcaSlicer. Saved as a <b>3MF</b>, the paint goes to OrcaSlicer and Bambu Studio as their own filament paint, so each color prints with its own filament (and you can still change the paint there).</p>
+<figure><img src="paint-parts.jpg" alt="The Paint tab while painting: Cancel, Done, the colors, the Fill, Brush, Sphere, Band and Eraser tools and the Size slider across the top; a blue box with a yellow top, a red band round its bottom and a white wavy brush stroke on its front"><figcaption>Painting a box: Fill made the top yellow, Band put a red band round the bottom, and the Brush drew the white wave.</figcaption></figure>
+
+<h2>Start and finish</h2>
+<ol>
+<li>On the <b>Paint</b> tab, click <b>Paint parts</b>. The row of buttons changes to the paint tools.</li>
+<li>Click a <b>color</b> (<b>More</b> for any color), then a tool.</li>
+<li>Click or drag on an object to paint it. Drag beside the object to turn the view (the right mouse button and the wheel work as always).</li>
+<li>Click <b>Done</b> (or press <b>Esc</b> or <b>Enter</b>) to keep the paint: all of it is one step, so one <b>Undo</b> takes it off again. <b>Cancel</b> drops everything painted since you clicked Paint parts.</li>
+</ol>
+<p>While painting, <b>Ctrl+Z</b> and <b>Ctrl+Y</b> undo and redo one stroke at a time.</p>
+
+<h2>The tools</h2>
+<ul>
+<li><b>Fill</b>: point at a face and it lights up in the color; click to fill it (like 3D Builder). <b>Coverage</b> says how far it spreads: over edges that bend less than that many degrees. At 0° it fills just that face; at 30° the whole round side of a cylinder; at 180° everything that touches. (Ctrl + mouse wheel changes it.)</li>
+<li><b>Brush</b>: a round brush on the surface you see (OrcaSlicer's Circle). The ring shows its size.</li>
+<li><b>Sphere</b>: paints everything within a ball around the pointer, round corners and onto every side it touches (OrcaSlicer's Sphere).</li>
+<li><b>Band</b>: click once to paint a level band all the way round the object, at that height, as tall as <b>Size</b> (OrcaSlicer's Height range). Good for stripes and color changes by height.</li>
+<li><b>Eraser</b>: rubs paint off, back to the object's own color. Holding <b>Shift</b> while you paint does the same with any tool.</li>
+<li><b>Size</b>: how wide the brush, sphere or band is, in mm. <b>Alt + mouse wheel</b> changes it while you paint.</li>
+<li><b>Clear</b>: takes all paint off the picked objects (or off every object, when none is picked).</li>
+</ul>
+<p>The colors already used in the project are added at the end of the color list, so the same color is easy to find again. The <b>Whole object</b> colors next to Paint parts still color a whole object at once; paint goes on top of that color.</p>
+
+<h2>Changing the object afterwards</h2>
+<ul>
+<li>The paint goes along when you move, turn, size, duplicate or mirror the object, or change its position in Properties.</li>
+<li>Merging objects keeps the paint of each of them on the merged object.</li>
+<li>When you change a shape's own sizes (its width, a hole, a fillet), a <b>Fill</b> finds its face again and fills the whole face, however big it is now. Brush strokes, spheres and bands stay where you painted them, so a stroke can end up off the edge of a face that moved.</li>
+</ul>
+
+<h2>Into the slicer</h2>
+<p>Save as <b>3MF</b> (Save as, then pick 3MF). In OrcaSlicer and Bambu Studio each color is on a filament of its own: first the objects' own colors, then the paint colors. Those programs keep the filament colors you have set, so after saving 3DJames shows which filament number each color is on: set the filaments to those colors (or let the AMS fill them in). To change the paint there, pick the object and use their <b>Color painting</b> tool.</p>
+<p>STL and STEP files have no colors, so the paint is not in them. Holes cannot be painted (they are not printed).</p>

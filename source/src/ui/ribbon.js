@@ -7,6 +7,7 @@ import { $, h, ic, toast, popMenu, closeMenu, mi, pickMenu, subMenu } from './do
 import { vp } from '../view.js';
 import { centerOn, addShape, addShapeAt, mirrorSel, turnCopySel, addPattern, groupSel, ungroupSel, duplicateSel, dropSel, deleteSel, setBodyProp, selectAll, selectNone, select, editStep, copySel, paste, combine } from '../commands.js';
 import { setWorkplane, startTool, endTool, applyTool } from '../tools.js';
+import { startPaint, paintBar, paintUndo } from '../painttool.js';
 import { newProject, openDialog, saveDoc, saveAs, insertDialog, chooseProjectsFolder, updateTitle } from '../files.js';
 import { saveNewVersionDialog, versionsDialog } from '../versions.js';
 import { backupsDialog } from '../storage.js';
@@ -27,7 +28,7 @@ function sketchMenu(anchor) {
     mi('Layers', 'On a surface…', () => startFaceSketch()),
     mi('Camera', 'From a photo…', () => startPhotoSketch()),
     mi('Import', 'From a DXF / SVG file…', () => startImportSketch()),
-    mi('Layers', 'Place sketch plane…', () => { startTool('sketchplane'); toast('Click a spot on a flat or curved solid.'); }),
+    mi('Layers', 'Place sketch plane…', () => { startTool('sketchplane'); toast('Click a spot on an object: a solid, or a mesh such as an STL.'); }),
     ...(app.workplane ? [mi('Settings2', 'Adjust current plane…', () => planeDialog(app.workplane))] : []),
     h('hr'),
     mi('PenLine', 'Edit picked sketches together', () => editSketches(app.sel)),
@@ -232,6 +233,7 @@ export function renderCmdBar() {
     bar.append(cb('', 'ArrowLeft', 'Cancel', endTool), cb('', 'Check', 'Split', applyTool), sepEl(), keep('above', 'Keep top'), keep('below', 'Keep bottom'), keep('both', 'Keep both'));
     return;
   }
+  if (app.tool?.type === 'paint') { bar.append(...paintBar(cb, sepEl)); updateToolbar(); fitRibbon(); return; }
   const t = app.tab;
   if (t === 'Insert') {
     bar.append(cb('', 'Plus', 'Add', insertDialog, { title: 'Insert a model from a file (STL, STEP, 3MF, OBJ)' }), sepEl(),
@@ -241,7 +243,7 @@ export function renderCmdBar() {
       shapeCb('Triangle', 'Tetrahedron', 'pyramid', { n: 3, d: 23.09, h: 16.33 }, 'Tetrahedron'),
       shapeCb('CircleDot', 'Tube', 'tube'), sepEl(),
       shapeCb('Type', 'Text', 'text', undefined, undefined, () => openPanel('props')), cb('', 'PenLine', 'Sketch', (b) => sketchMenu(b), { dd: true, title: 'Draw an outline (lines, arcs, rectangles, circles) with exact sizes, then push it up, spin it around, or cut it in. On the floor or on a face.' }), cb('', 'Package', 'Parts', (b) => partsMenu(b), { dd: true, title: 'Ready-made parts: hardware, aluminum extrusion and more' }), sepEl(),
-      cb('workplane', 'Layers', 'Workplane', () => (app.workplane ? setWorkplane(null) : startTool('workplane')), { on: !!app.workplane || app.tool?.type === 'workplane', title: app.workplane ? 'New shapes go on the picked face. Click to go back to the floor.' : 'Click a flat or curved solid to place a sketch plane; click again to return to the floor' }));
+      cb('workplane', 'Layers', 'Workplane', () => (app.workplane ? setWorkplane(null) : startTool('workplane')), { on: !!app.workplane || app.tool?.type === 'workplane', title: app.workplane ? 'New shapes go on the picked face. Click to go back to the floor.' : 'Click a flat or curved surface (of a solid or a mesh) to place a sketch plane; click again to return to the floor' }));
   } else if (t === 'Object') {
     bar.append(cb('union', 'SquaresUnite', 'Merge', () => combine('union'), { title: 'Join the selected objects (holes get cut out)' }),
       cb('subtract', 'SquaresSubtract', 'Subtract', () => combine('subtract'), { title: 'Select the object to cut with and click Subtract: it is cut out of everything it passes through. (With several selected, the others are cut out of the first one you clicked.)' }),
@@ -281,7 +283,8 @@ export function renderCmdBar() {
       cb('', 'MousePointerClick', 'Select all', selectAll), cb('', 'X', 'Select none', selectNone));
   } else if (t === 'Paint') {
     const cur = store.doc.bodies[app.sel[0]]?.color;
-    bar.append(h('span', { class: 'cmuted' }, app.sel.length ? 'Color' : 'Select an object to paint'),
+    bar.append(cb('paint', 'Paintbrush', 'Paint parts', startPaint, { title: 'Paint parts of objects in other colors: fill faces, brush, sphere, band (they go to OrcaSlicer and Bambu Studio in a 3MF as filament paint)' }), sepEl(),
+      h('span', { class: 'cmuted' }, app.sel.length ? 'Whole object' : 'Select an object to color it all'),
       h('div', { class: 'swgrid' }, PALETTE.map((c) => h('button', { class: 'swl' + (c.toLowerCase() === String(cur).toLowerCase() ? ' on' : ''), style: `background:${c}`, title: c, 'aria-label': `Color ${c}`, onclick: () => app.sel.length && setBodyProp(app.sel, 'color', c) }))),
       h('label', { class: 'cb', title: 'Pick any color' }, ic('Pipette'), h('span', {}, 'More'), h('input', { type: 'color', value: cur || '#C3C3C3', style: 'width:0;height:0;opacity:0;position:absolute', onchange: (e) => app.sel.length && setBodyProp(app.sel, 'color', e.target.value) })));
   } else if (t === 'View') {
@@ -290,6 +293,7 @@ export function renderCmdBar() {
       cb('', null, 'Top', () => vp.view('top')), cb('', null, 'Front', () => vp.view('front')), cb('', null, 'Left', () => vp.view('left')), cb('', null, 'Right', () => vp.view('right')), cb('', null, 'Back', () => vp.view('back')), cb('', null, 'Bottom', () => vp.view('bottom')), sepEl(),
       cb('', 'Box', { solid: 'Solid', wire: 'Wireframe', see: 'See-through', xray: 'X-ray' }[s.display] || 'Solid', (b) => pickMenu(b, 'How objects are drawn', [['solid', 'Solid'], ['wire', 'Wireframe'], ['see', 'See-through'], ['xray', 'X-ray (hidden edges show)']], s.display, (v) => { s.display = v; vp.setDisplay(v); saveSettings(); renderCmdBar(); }), { dd: true }),
       cb('', 'Spline', 'Edges', () => { s.edges = !s.edges; vp.setEdgesVisible(s.edges); saveSettings(); renderCmdBar(); }, { on: s.edges }),
+      cb('', 'FlipVertical2', 'Reflection', () => { s.reflection = !s.reflection; vp.setReflection(s.reflection); saveSettings(); renderCmdBar(); }, { on: s.reflection, title: 'The faint mirror picture of your objects in the floor' }),
       cb('lookat', 'ScanEye', 'Look at face', () => startTool('lookat'), { on: app.tool?.type === 'lookat', title: 'Click a face, and the view turns to look straight at it' }),
       cb('measure', 'Ruler', 'Measure', () => startTool('measure'), { title: 'Measure surface points, edge lengths, face areas and parallel face spacing' }),
       cb('', 'RulerDimensionLine', 'Ruler', () => { s.ruler = !s.ruler; vp.setRuler(s.ruler); saveSettings(); renderCmdBar(); }, { on: s.ruler, title: 'Show the gaps around the selected object; click a number to type an exact gap' }),
@@ -321,5 +325,5 @@ export function updateToolbar() {
   for (const k of ['fillet', 'chamfer', 'split', 'align']) cmdButtons[k]?.classList.toggle('on', app.tool?.type === k);
   cmdButtons.faces?.classList.toggle('on', ['shell', 'extrude', 'pushpull', 'layflat', 'insertpocket'].includes(app.tool?.type));
 }
-export function doUndo() { if (app.tool) endTool(); if (!store.undo()) toast('Nothing to undo.'); editStep(null); }
-export function doRedo() { if (app.tool) endTool(); if (!store.redo()) toast('Nothing to redo.'); }
+export function doUndo() { if (app.tool?.type === 'paint') return paintUndo(false); if (app.tool) endTool(); if (!store.undo()) toast('Nothing to undo.'); editStep(null); }
+export function doRedo() { if (app.tool?.type === 'paint') return paintUndo(true); if (app.tool) endTool(); if (!store.redo()) toast('Nothing to redo.'); }

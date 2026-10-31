@@ -3,6 +3,7 @@ import ManifoldModule from 'manifold-3d';
 import { evaluate, setManifoldModule, R, exportMeshOf, solidOf, parseSTLToMf, hasStep, registerStep, countSolids, solidBounds, surfacePlane, unionLoops, offsetLoops, outlineOf } from './engine.js';
 import { zipStore } from './zip.js';
 import { convertAndCheck } from './stlconvert.js';
+import { paintMesh, paintString } from './paint.js';
 
 const fonts = new Set();
 let ready = false;
@@ -63,22 +64,35 @@ function stlBinary(parts) {
   return new Uint8Array(buf);
 }
 
-function threeMF(parts, project, extra = []) {
+function threeMF(parts, project, extra = [], out = {}) {
   const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+  // each object's colour is a colour group (the 3MF materials extension): OrcaSlicer and Bambu Studio put each
+  // different colour on a filament of its own (checked with both). They skip <basematerials> colours.
+  // Paint (see paint.js) goes on each triangle as their "paint_color", which names a filament by its number. Every
+  // paint colour gets a colour group too, after the objects' ones: they number the filaments by each new colour in
+  // the order of the colour groups, so the numbers here are worked out the same way.
+  const painted = parts.map((p) => (p.paint?.length ? paintMesh(p, p.paint) : null));
+  const hex = (c) => `${c.toUpperCase()}FF`;
+  const groups = [...parts.map((p) => hex(p.color)), ...new Set(painted.flatMap((x) => x?.colors || []).map(hex))];
+  const filament = new Map();
+  for (const g of groups) if (!filament.has(g)) filament.set(g, filament.size + 1);
+  if (painted.some(Boolean)) out.filaments = [...filament.keys()].map((g) => g.slice(0, 7)); // (told after saving)
   let mats = '', objs = '', items = '';
+  groups.forEach((g, i) => { mats += `<m:colorgroup id="${parts.length + i + 2}"><m:color color="${g}"/></m:colorgroup>`; });
   parts.forEach((p, i) => {
-    mats += `<base name="${esc(p.name)}" displaycolor="${p.color.toUpperCase()}FF"/>`;
-  });
-  parts.forEach((p, i) => {
-    const v = p.vertices, t = p.triangles;
+    const v = p.vertices, t = p.triangles, pt = painted[i];
+    const fil = pt && ((s) => filament.get(hex(pt.colors[s - 1])));
     let vs = '', ts = '';
     for (let k = 0; k < v.length; k += 3) vs += `<vertex x="${+v[k].toFixed(5)}" y="${+v[k + 1].toFixed(5)}" z="${+v[k + 2].toFixed(5)}"/>`;
-    for (let k = 0; k < t.length; k += 3) ts += `<triangle v1="${t[k]}" v2="${t[k + 1]}" v3="${t[k + 2]}"/>`;
-    objs += `<object id="${i + 2}" name="${esc(p.name)}" type="model" pid="1" pindex="${i}"><mesh><vertices>${vs}</vertices><triangles>${ts}</triangles></mesh></object>`;
+    for (let k = 0; k < t.length; k += 3) {
+      const s = pt?.trees[k / 3] ? paintString(pt.trees[k / 3], fil) : '';
+      ts += `<triangle v1="${t[k]}" v2="${t[k + 1]}" v3="${t[k + 2]}"${s ? ` paint_color="${s}"` : ''}/>`;
+    }
+    objs += `<object id="${i + 2}" name="${esc(p.name)}" type="model" pid="${parts.length + i + 2}" pindex="0"><mesh><vertices>${vs}</vertices><triangles>${ts}</triangles></mesh></object>`;
     items += `<item objectid="${i + 2}"/>`;
   });
   const model = `<?xml version="1.0" encoding="UTF-8"?>
-<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources><basematerials id="1">${mats}</basematerials>${objs}</resources><build>${items}</build></model>`;
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02"><resources>${mats}${objs}</resources><build>${items}</build></model>`;
   const enc = new TextEncoder();
   return zipStore([
     { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>') },
@@ -93,20 +107,20 @@ async function doExport({ format, items, base, project, extra }) {
   const parts = [];
   for (const it of items) {
     const m = exportMeshOf(it.id);
-    if (m) parts.push({ ...m, name: it.name, color: it.color });
+    if (m) parts.push({ ...m, name: it.name, color: it.color, paint: it.paint });
   }
   if (!parts.length && !(format === '3mf' && project)) throw new Error('Nothing to export');
-  const files = [];
+  const files = [], info = {};
   if (format === 'stl') files.push({ name: base + '.stl', data: stlBinary(parts) });
   else if (format === 'stl-each') items.forEach((it, i) => parts[i] && files.push({ name: `${base}-${it.name.replace(/[^\w.-]+/g, '_')}.stl`, data: stlBinary([parts[i]]) }));
-  else if (format === '3mf') files.push({ name: base + '.3mf', data: threeMF(parts, project, extra) });
+  else if (format === '3mf') files.push({ name: base + '.3mf', data: threeMF(parts, project, extra, info) });
   else if (format === 'step') {
     const solids = items.map((it) => ({ shape: solidOf(it.id), name: it.name, color: it.color })).filter((x) => x.shape);
     if (!solids.length) throw new Error('STEP needs solid shapes. Threads and imported models are meshes and can only be saved as STL or 3MF.');
     const blob = R.exportSTEP(solids.map((s) => ({ shape: s.shape.clone(), name: s.name, color: s.color })));
     files.push({ name: base + '.step', data: new Uint8Array(await blob.arrayBuffer()) });
   }
-  return { zip: zipStore(files), files, skipped: format === 'step' ? items.length - files.length : 0 };
+  return { zip: zipStore(files), files, skipped: format === 'step' ? items.length - files.length : 0, filaments: info.filaments };
 }
 
 /**

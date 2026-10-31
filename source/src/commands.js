@@ -8,6 +8,7 @@ import { r2, r4, toast } from './ui/dom.js';
 import { valueNow } from './ui/sketch.js';
 import { vp } from './view.js';
 import { requestBuild } from './build.js';
+import { worldPaint, setPaint, movePaint, transformOps } from './painting.js';
 import { renderAll } from './ui/panels.js';
 
 // ---------------------------------------------------------------- selection and the step being edited
@@ -93,7 +94,10 @@ function placeByMatrix(f, M, hgt) {
   return { pos: W.sub(c).toArray().map(r4), rot: [e.x, e.y, e.z].map((a) => { let d = r4(MathUtils.radToDeg(a)); if (Math.abs(d) < 1e-4) d = 0; return d; }) };
 }
 export function bodyMatrixFeature(doc, id, M) {
-  // Apply a world-space matrix to a body as one step.
+  // Apply a world-space matrix to a body as one step (its paint goes along).
+  movePaint(doc, id, M, () => matrixStep(doc, id, M));
+}
+function matrixStep(doc, id, M) {
   if (isSimplePrimitive(doc, id)) {
     const f = creatorOf(doc, id);
     const pr = placeByMatrix(f, M, app.results.heights[f.id]);
@@ -160,6 +164,7 @@ export function foldMoves(doc, id) {
   if (f?.type !== 'shape' || f.body !== id || h == null || !SCALE_MAP[f.kind] || f.kind === 'thread') return false;
   const rest = featuresOfBody(doc, id).filter((x) => x !== f);
   if (!rest.length || !rest.every((x) => x.type === 'move' && x.body === id && Array.isArray(x.m))) return false;
+  const paint = worldPaint(doc, id); // it looks exactly the same afterwards: so does its paint
   let M = new Matrix4();
   for (const x of rest) M = new Matrix4().multiplyMatrices(new Matrix4().fromArray(x.m), M);
   const t = new Vector3(), q = new Quaternion(), sv = new Vector3();
@@ -191,6 +196,7 @@ export function foldMoves(doc, id) {
   if (!pr) return false;
   f.pos = pr.pos; f.rot = pr.rot;
   doc.features = doc.features.filter((x) => !rest.includes(x));
+  if (paint) setPaint(doc, id, paint, h * k);
   return true;
 }
 
@@ -232,11 +238,11 @@ export function commitTransform(ids, M, info) {
               if (st.every((v) => Math.abs(v - 1) < 1e-4)) delete f.stretch; else f.stretch = st;
             }
             // the shape is placed by its middle, half its own height above pos. Its middle goes where sizing puts it,
-            // except along its own height: there its base (the side on the floor, or on the face it stands on) stays
-            const j = own[2], up = turnedUp(rot)[j], h = data.bbox[1][j] - data.bbox[0][j], h2 = h * ss.z;
-            const mid0 = new Vector3(...pos).add(new Vector3(0, 0, h / 2)), mid = mid0.clone().sub(piv).multiply(s).add(piv);
-            if (ids.length === 1) mid.setComponent(j, mid0.getComponent(j) + (up * (h2 - h)) / 2); // (several at once: sized together)
-            f.pos = mid.sub(new Vector3(0, 0, h2 / 2)).toArray().map(r4);
+            // turned or not: typed sizes shrink or grow it evenly on both sides (Height in Properties keeps its base)
+            const j = own[2], h = data.bbox[1][j] - data.bbox[0][j], h2 = h * ss.z;
+            const mid = new Vector3(...pos).add(new Vector3(0, 0, h / 2)).sub(piv).multiply(s).add(piv);
+            const U = new Matrix4().makeTranslation(piv.x, piv.y, piv.z).multiply(new Matrix4().makeScale(s.x, s.y, s.z)).multiply(new Matrix4().makeTranslation(-piv.x, -piv.y, -piv.z));
+            movePaint(doc, id, U, () => { f.pos = mid.sub(new Vector3(0, 0, h2 / 2)).toArray().map(r4); }, app.results.heights[f.id] * ss.z);
             continue;
           }
         }
@@ -357,6 +363,7 @@ export function duplicateSel() {
       const pb = doc.bodies[id] || {};
       doc.bodies[nid] = { ...pb, name: nextName(doc, (pb.name || 'Object').replace(/\s+\d+$/, '')) };
       if (pb.group) { groupMap[pb.group] = groupMap[pb.group] || store.newId('g'); doc.bodies[nid].group = groupMap[pb.group]; }
+      copyPaint(doc, id, nid, new Matrix4().makeTranslation(...off));
       newIds.push(nid);
     }
   });
@@ -394,6 +401,8 @@ export function combine(op) {
       const all = [target, ...tools];
       const allHoles = all.every((id) => doc.bodies[id]?.hole);
       doc.bodies[target] = { ...doc.bodies[target], hole: allHoles };
+      const paint = all.flatMap((id) => (doc.bodies[id]?.hole ? [] : worldPaint(doc, id) || []));
+      if (paint.length) setPaint(doc, target, paint);
     } else doc.bodies[target] = { ...doc.bodies[target], hole: false };
   });
   app.sel = [target]; vp.setSelection(app.sel); renderAll();
@@ -430,9 +439,18 @@ export function subtractFromAll(cutter) {
 
 export function mirrorSel(axis, copy) {
   if (!app.sel.length) return;
-  if (!copy) { store.commit((doc) => { for (const id of app.sel) doc.features.push({ id: store.newId('f'), type: 'mirror', body: id, axis, copy, side: 'max' }); }); return; }
-  // Mirror copy: a new, separate object on the far side (a sketch stays an editable sketch, drawn flipped)
   const ax = { x: 0, y: 1, z: 2 }[axis];
+  if (!copy) {
+    store.commit((doc) => {
+      for (const id of app.sel) {
+        const d = bodyData(id);
+        if (d) movePaint(doc, id, mirrorMatrix(ax, (d.bbox[0][ax] + d.bbox[1][ax]) / 2));
+        doc.features.push({ id: store.newId('f'), type: 'mirror', body: id, axis, copy, side: 'max' });
+      }
+    });
+    return;
+  }
+  // Mirror copy: a new, separate object on the far side (a sketch stays an editable sketch, drawn flipped)
   const box = vp.selectionBox(), at = r4(box.max.getComponent(ax)); // the selection is mirrored as a whole, across its far side
   const newIds = [], groupMap = {};
   store.commit((doc) => {
@@ -448,6 +466,7 @@ export function mirrorSel(axis, copy) {
       const pb = doc.bodies[id] || {};
       doc.bodies[nid] = { ...pb, name: nextName(doc, `${(pb.name || 'Object').replace(/\s+\d+$/, '')} mirrored`) };
       if (pb.group) { groupMap[pb.group] = groupMap[pb.group] || store.newId('g'); doc.bodies[nid].group = groupMap[pb.group]; }
+      copyPaint(doc, id, nid, mirrorMatrix(ax, at), sk ? app.results.heights[f.id] : null);
       newIds.push(nid);
     }
   });
@@ -522,6 +541,7 @@ export function turnCopySel(deg) {
       const pb = doc.bodies[id] || {};
       doc.bodies[nid] = { ...pb, name: nextName(doc, `${(pb.name || 'Object').replace(/\s+\d+$/, '')} turned`) };
       if (pb.group) { groupMap[pb.group] = groupMap[pb.group] || store.newId('g'); doc.bodies[nid].group = groupMap[pb.group]; }
+      copyPaint(doc, id, nid, M);
       newIds.push(nid);
     }
   });
@@ -535,4 +555,13 @@ export function addPattern() {
   let fid;
   store.commit((doc) => { fid = store.newId('f'); doc.features.push({ id: fid, type: 'array', body: id, kind: 'linear', n: 3, dx: w, dy: 0, dz: 0, angle: 360, cx: 0, cy: 0 }); });
   editStep(fid); renderAll();
+}
+
+// ---------------------------------------------------------------- paint on copies
+const mirrorMatrix = (ax, at) => { const s = [1, 1, 1], t = [0, 0, 0]; s[ax] = -1; t[ax] = 2 * at; return new Matrix4().makeTranslation(...t).multiply(new Matrix4().makeScale(...s)); };
+/** A copy of an object gets the original's paint, moved by M (the copy's own shape: h is its height, when known). */
+function copyPaint(doc, from, to, M, h) {
+  const p = worldPaint(doc, from), b = { ...doc.bodies[to] };
+  delete b.paint; doc.bodies[to] = b;
+  if (p) setPaint(doc, to, transformOps(p, M), h ?? app.results.heights[creatorOf(doc, from)?.id]);
 }
