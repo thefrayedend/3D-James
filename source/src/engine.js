@@ -6,6 +6,10 @@ import * as R from 'replicad';
 import { Matrix4, Vector3, Quaternion, Euler } from 'three';
 import { threadRodMesh } from './threadmesh.js';
 import { evalExpr, varScope, EXTRUSIONS, EXTRUSION_ALIAS, SLOT_HALF, JOIN_CAVITY } from './shared.js';
+import { PART_DEFS } from './parts/defs.js';
+import { BUILDERS } from './parts/index.js';
+import { makeKit } from './parts/kit.js';
+import { tslot30Profile } from './parts/stock.js';
 
 let MF = null; // manifold wasm module
 export function setManifoldModule(m) { MF = m; }
@@ -219,10 +223,11 @@ const revolveProfile = (pts) => {
 
 const LABELS = { w: 'Width', d: 'Diameter', h: 'Height', D: 'Diameter', P: 'Pitch', len: 'Length', od: 'Outer diameter', id: 'Inner diameter', af: 'Width across flats', size: 'Letter height', depth: 'Thickness', headH: 'Head height', nutH: 'Nut height' };
 const labelOf = (k) => LABELS[k] || k;
+const fieldLabel = (kind, k) => String(PART_DEFS[kind]?.fields.find((f) => f[0] === k)?.[1] || k).replace(/\s*\(.*$/, '');
 
 // st: stretch along the shape's own X, Y and Z (1 = none). Round shapes stretched unevenly become ovals.
 function buildPrimitive(kind, p, num, ctx, st = [1, 1, 1]) {
-  const pos = (k, min = 0.001) => { const v = num(p[k]); if (!(v >= min)) fail(`${labelOf(k)} must be at least ${min}`); return v; };
+  const pos = (k, min = 0.001) => { const v = num(p[k]); if (!(v >= min)) fail(`${PART_DEFS[kind] ? fieldLabel(kind, k) : labelOf(k)} must be at least ${min}`); return v; };
   const [sx, sy, sz] = st;
   const even = Math.abs(sx - 1) < 1e-9 && Math.abs(sy - 1) < 1e-9;
   const flat = (d) => (even ? d : d.stretch(sx, [0, 1], [0, 0]).stretch(sy, [1, 0], [0, 0])); // stretch a 2D outline (the direction given is the axis it stretches away from)
@@ -473,7 +478,7 @@ function buildPrimitive(kind, p, num, ctx, st = [1, 1, 1]) {
     }
     case 'extrusion': {
       const e = EXTRUSIONS[p.size] || EXTRUSIONS[EXTRUSION_ALIAS[p.size]]; if (!e) fail('Unknown profile');
-      return up(extrusionProfile(e), pos('len'));
+      return up(e.pitch === 30 ? tslot30Profile(R) : extrusionProfile(e), pos('len'));
     }
     case 'import': {
       if (p.fmt === 'step') {
@@ -483,7 +488,11 @@ function buildPrimitive(kind, p, num, ctx, st = [1, 1, 1]) {
       }
       return { mf: ctx.getImport(p.file).translate([0, 0, 0]) };
     }
-    default: fail(`Unknown shape ${kind}`);
+    default: {
+      const make = BUILDERS[kind];
+      if (!make) fail(`Unknown shape ${kind}`);
+      return make(p, makeKit(R, num, fail), pos);
+    }
   }
 }
 

@@ -35,7 +35,7 @@ async def main():
   await page.locator('.help-section',has_text='Start here').click(); await page.locator('.help-link',has_text='About 3DJames').click()
   results.append({'name':'the topic list keeps its scroll position when a chapter or topic is clicked','ok':True})
   while await page.locator('.help-section:not(.open)').count(): await page.locator('.help-section:not(.open)').first.click()
-  count=await page.locator('.help-link').count();assert count==32,count
+  count=await page.locator('.help-link').count();assert count==35,count
   # every link between pages goes to a page that exists, and clicking one opens it
   ids=await page.evaluate('()=>window.__3DJ_HELP.pages.map(p=>p.id)')
   for pg in await page.evaluate('()=>window.__3DJ_HELP.pages.map(p=>[p.id,[...p.html.matchAll(/data-help-topic="([^"]+)"/g)].map(m=>m[1])])'):

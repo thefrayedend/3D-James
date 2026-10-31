@@ -35,6 +35,7 @@ export function shapeFields(f) {
         if (x.kind === 'thread' && key === 'size' && v !== 'custom') Object.assign(x.p, threadDefaults(v));
         if (key === 'size' && HARDWARE[x.kind]?.[v]) Object.assign(x.p, HARDWARE_DEFAULTS(x.kind, v));
         if ((key === 'size' || key === 'type') && PART_SHAPES[x.kind]) Object.assign(x.p, presetFor(x.kind, x.p));
+        if (SHAPES[x.kind]?.preset && (SHAPES[x.kind].presetOn || ['size']).includes(key)) Object.assign(x.p, SHAPES[x.kind].preset(x.p));
         if (x.kind === 'sketch' && key === 'mode' && v === 'revolve' && x.p.angle == null) x.p.angle = 360;
         if (x.kind === 'thread' && key === 'kind') {
           store.doc.bodies[x.body] && Object.assign(store.doc.bodies[x.body], { hole: v === 'cutter' });
@@ -45,7 +46,7 @@ export function shapeFields(f) {
     } else {
       out.push(exprField(label, f.p[key], (v) => updateFeature(f.id, (x) => { x.p[key] = type === 'int' && typeof v === 'number' ? Math.round(v) : v; }), {
         text: type === 'text', step: type === 'int' ? 1 : key === 'clear' || key === 'P' ? 0.05 : 1,
-        slider: type === 'text' ? null : 'auto', int: type === 'int', min: type === 'int' ? Math.min(3, Number(f.p[key]) || 0) : ['round', 'clear', 'hole', 'fd', 'ft', 'd1', 'd2', 'stud'].includes(key) ? 0 : 0.1,
+        slider: type === 'text' ? null : 'auto', int: type === 'int', min: opts.min ?? (opts.zero ? 0 : type === 'int' ? Math.min(3, Number(f.p[key]) || 0) : ['round', 'clear', 'hole', 'fd', 'ft', 'd1', 'd2', 'stud'].includes(key) ? 0 : 0.1),
         onLive: (v) => liveFeature(f.id, (x) => { x.p[key] = type === 'int' ? Math.round(v) : v; }),
       }));
     }

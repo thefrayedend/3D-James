@@ -147,6 +147,19 @@ Undo, the paint following moves, turns, sizing, copies and merges, and reads the
 OrcaSlicer's TriangleSelector does (src/paint.js says how the strings are made). Checked by hand in OrcaSlicer 2.x:
 the paint lands on the right filaments; Orca keeps its own filament colors for files from other programs.
 
+Ready-made parts (Insert > Parts, beyond the plain hardware in `src/catalog.js`): each is a shape kind. `src/parts/defs.js` holds
+the fields, standard numbers and the menu (`PART_DEFS`, `PART_MENU`, `PART_HOLES`, and a `preset` for ones whose size fills in other
+numbers); the builders are in `src/parts/*.js` (`gridfinity`, `organizing`, `mounting`, `electronics`, `printer`, `motion`, `joints`,
+`knobs`, `helpers`, `gears`, `stock`, `fasteners`), made with the small toolkit in `src/parts/kit.js` and registered in
+`src/parts/index.js`; size tables are in `src/parts/tables.js`. replicad's booleans leave their inputs alone but moving, turning
+and mirroring a shape uses it up (clone first); `K.cutMany` / `K.fuseMany` take many pieces at once and only work when the pieces
+do not overlap each other. To add a part: write the builder, add its `PART_DEFS` entry and menu item, add cases to
+`tests/parts.cases.json` (size to expect; a number of separate solids for print-in-place parts), then
+`node tests/parts.mjs` (no browser; builds every case and every menu item), `python tests/parts_sheet.py <kind>` (a contact-sheet
+picture: look at it), `node tools/make_skill_parts.mjs` (the AI skill's table), the Help pages (`parts`, `printparts`, `gridfinity`,
+`gears`; pictures: `python help/shots/parts_shots.py`). `python tests/parts.py` runs the engine check and then the Parts menu with
+the real mouse.
+
 Make editable (STL to sketches): `src/stlconvert.js` rebuilds a mesh as sketches pushed up (layers between flat
 faces, holes through several layers as one cutter), profiles spun around, or outlines seen from two or three sides
 pushed through each other, then works out what that misses the same way (cut out or merged in). Outlines become

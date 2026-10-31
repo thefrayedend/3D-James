@@ -230,6 +230,7 @@ export function applyTool() {
   const t = app.tool; if (!t) return;
   if (t.type === 'paint') { finishPaint(true); return; }
   const d = bodyData(t.body);
+  if (t.body && !d) { toast('That object is gone, so the tool was closed.'); return endTool(); } // (deleted or undone while picking)
   if (t.type === 'emboss') {
     if (!t.face) return toast('Pick a flat face first.');
     if (t.source === 'logo' && !t.logo) return toast('Choose an SVG logo first.');

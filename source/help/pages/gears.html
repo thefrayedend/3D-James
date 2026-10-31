@@ -1,0 +1,32 @@
+<h1>Gears</h1>
+<p><b>Insert</b> tab &gt; <b>Parts</b> &gt; <b>Motion and gears</b>. Spur, helical and bevel gears, racks and worms, with standard involute teeth. Set the module (tooth size) and the number of teeth, and the gear is made.</p>
+<figure><img src="parts-gears.jpg" alt="A blue spur gear meshing with a small orange one and with a green rack below it; beside them a purple helical gear, a yellow bevel gear and a red worm, each with a label"><figcaption>Two spur gears that mesh, a rack, a helical gear, a bevel gear and a worm. All of them are made from their numbers in Properties.</figcaption></figure>
+
+<h2>Make two gears that mesh</h2>
+<ol>
+<li>Add a <b>Spur gear</b> (Parts &gt; Motion and gears &gt; Spur gear &gt; 30 teeth). Add another (12 teeth).</li>
+<li>Both must have the <b>same module and the same pressure angle</b> (1.5 and 20° from the menu).</li>
+<li>Place them so the middles are <b>module × (teeth + teeth) ÷ 2</b> apart: 1.5 × (30 + 12) ÷ 2 = 31.5 mm. Type it in Properties (Placement: Position).</li>
+<li>Turn the small one half a tooth so a tooth meets a gap: 180° ÷ its teeth = 15°. (Properties &gt; Rotation Z.)</li>
+</ol>
+<p>Print them with a little room: move them apart by 0.1 to 0.2 mm so they turn freely.</p>
+
+<h2>The kinds</h2>
+<ul>
+<li><b>Spur</b>: straight teeth. The simplest and strongest to print.</li>
+<li><b>Helical</b>: slanted teeth (set the <b>helix angle</b>, 20° is common): quieter and smoother. A helical pair needs opposite hands: one turned one way, the other the other way (use Mirror for the second). <b>Herringbone</b> is two opposed halves in one gear, so it needs no thrust washer; it is made as two pieces touching along the middle.</li>
+<li><b>Bevel</b>: teeth on a cone, for two gears whose shafts meet at 90°. Say how many teeth the other gear has (<b>Teeth of the gear it meshes with</b>), and the cone is made to match. Two with the same teeth make a pair; to match 16 and 32, make one of each.</li>
+<li><b>Rack</b>: a straight bar of teeth, for a gear of the same module to run along (turns a spin into a slide).</li>
+<li><b>Worm</b>: a screw-shaped gear, with 1 to 4 <b>starts</b>, right- or left-handed, that turns a spur or helical gear (the worm wheel) of the same module: place the gear's middle <b>module × teeth ÷ 2 + the worm's pitch diameter ÷ 2</b> from the worm's middle, with its shaft at right angles.</li>
+</ul>
+
+<h2>Numbers</h2>
+<ul>
+<li><b>Module</b>: the tooth size (the pitch diameter divided by the teeth). 1 to 2 suits most printers.</li>
+<li><b>Pressure angle</b>: 20° is the standard.</li>
+<li><b>Shaft hole</b> and a <b>flat</b> on it for a D shaft (a stepper motor's 5 mm shaft has a 0.5 mm flat); a <b>hub</b> adds a collar to put a set screw in.</li>
+<li>Too few teeth make pointed teeth; the part says so. Gears with fewer than about 10 teeth are weak.</li>
+</ul>
+
+<h2>Limits</h2>
+<p>The teeth are drawn as short straight pieces (many more on a big gear), which is fine for printing. There is no backlash setting: leave a little distance between gears, as above. The bevel gear and the worm are close approximations of the true shapes, good for light work and for learning, not for precision machinery.</p>

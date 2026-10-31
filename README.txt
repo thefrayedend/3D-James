@@ -1,5 +1,5 @@
 3DJames - a parametric 3D modeler for 3D printing
-Version 0.17.21
+Version 0.17.22
 =================================================
 
 Everything runs on your computer. No install, no account, no internet needed.

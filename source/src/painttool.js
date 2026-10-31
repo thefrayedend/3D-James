@@ -12,7 +12,7 @@ import { renderCmdBar } from './ui/ribbon.js';
 import { renderAll } from './ui/panels.js';
 
 const MODES = [
-  ['fill', 'PaintBucket', 'Fill', 'Click a face to fill it, like 3D Builder. Coverage sets how far it spreads: over edges that bend less than that many degrees (0: just that face).'],
+  ['fill', 'PaintBucket', 'Fill', 'Click a face to fill it, or drag across faces to fill each one you pass, like 3D Builder. Coverage sets how far a fill spreads: over edges that bend less than that many degrees (0: just that face).'],
   ['brush', 'Paintbrush', 'Brush', 'Paint with a round brush on the surface you see (like the Circle in OrcaSlicer).'],
   ['ball', 'Globe', 'Sphere', 'Paint everything within a ball around the pointer, on every side (like the Sphere in OrcaSlicer).'],
   ['band', 'Rows3', 'Band', 'Click to paint a level band all the way round the object, as tall as Size (like the Height range in OrcaSlicer).'],
@@ -38,13 +38,14 @@ export function startPaint() {
 }
 
 /** Done (keep: true) or Cancel. */
-export function finishPaint(keep) {
+export function finishPaint(done) {
   const t = app.tool; if (t?.type !== 'paint') return;
+  if (t.stroke) { keep(t.stroke.id, t.stroke.ops); t.stroke = null; } // (Esc with the button still down: the stroke so far counts)
   app.tool = null;
   vp.renderer.domElement.removeEventListener('wheel', onWheel, { capture: true });
   vp.setPaintMode(false);
   const ids = Object.keys(t.ops);
-  if (keep && ids.length) store.commit((doc) => { for (const id of ids) if (doc.bodies[id]) setPaint(doc, id, t.ops[id]); }, 'ui');
+  if (done && ids.length) store.commit((doc) => { for (const id of ids) if (doc.bodies[id]) setPaint(doc, id, t.ops[id]); }, 'ui');
   else vp.updateStyles(); // the strokes made go away again
   renderCmdBar(); renderAll();
 }
@@ -58,10 +59,11 @@ export function paintUndo(redo) {
 }
 
 const opsNow = (id) => paintOpsOf(id) || [];
-function keep(id, op) {
+/** Add strokes to an object's paint as one Undo step (one stroke, or everything one drag painted). */
+function keep(id, ops) {
   const t = app.tool;
   t.undo.push({ id, ops: opsNow(id) }); t.redo.length = 0;
-  t.ops[id] = [...opsNow(id), op];
+  t.ops[id] = [...opsNow(id), ...[ops].flat()];
   vp.updateStyles();
 }
 
@@ -72,19 +74,31 @@ export function paintPointer(kind, hit, e) {
   const r = prefs.size / 2, show = erase ? '#ffffff' : prefs.color;
   if (kind === 'up') {
     const s = t.stroke; t.stroke = null;
-    if (s) keep(s.id, s.op);
+    if (s) keep(s.id, s.ops);
     return true;
   }
   if (kind === 'drag') {
     const s = t.stroke;
     if (s && hit && hit.body === s.id) {
+      if (s.tris) {
+        // Fill, dragged across the object (like 3D Builder): every face the pointer passes over is filled too
+        if (!s.tris.has(hit.tri)) {
+          const area = fillArea(meshContext(vp.bodies.get(s.id).data), hit.point, hit.normal, prefs.coverage, hit.tri);
+          if (area.some((x) => !s.tris.has(x))) {
+            for (const x of area) s.tris.add(x);
+            const op = { t: 'fill', c: s.ops[0].c, p: hit.point.map(r4), n: hit.normal.map(r4), a: prefs.coverage };
+            s.ops.push(op); vp.paintLive(s.id, op);
+          }
+        }
+        return true;
+      }
       // dabs no more than a third of the brush apart, so the stroke has no gaps
-      const last = s.op.pts.slice(-3), P = hit.point, d = Math.hypot(P[0] - last[0], P[1] - last[1], P[2] - last[2]);
+      const op = s.ops[0], last = op.pts.slice(-3), P = hit.point, d = Math.hypot(P[0] - last[0], P[1] - last[1], P[2] - last[2]);
       const n = Math.ceil(d / Math.max(r / 3, 0.05)), add = [];
       for (let i = 1; i <= n && n < 400; i++) for (let k = 0; k < 3; k++) add.push(last[k] + ((P[k] - last[k]) * i) / n);
-      if (add.length) { s.op.pts.push(...add); vp.paintLive(s.id, { ...s.op, pts: add }); }
+      if (add.length) { op.pts.push(...add); vp.paintLive(s.id, { ...op, pts: add }); }
     }
-    cursor(hit, r, show);
+    if (!s?.tris) cursor(hit, r, show);
     return true;
   }
   const id = hit?.body, props = id && store.doc.bodies[id];
@@ -102,11 +116,18 @@ export function paintPointer(kind, hit, e) {
   if (props?.hole) { toast('Holes are not printed, so they cannot be painted.'); return false; }
   if (props?.hidden) return false;
   const c = color && color.toLowerCase();
-  if (prefs.mode === 'fill') { keep(id, { t: 'fill', c, p: hit.point.map(r4), n: hit.normal.map(r4), a: prefs.coverage }); t.preview = null; vp.showPaintPreview(null); return true; }
+  if (prefs.mode === 'fill') {
+    // the first face now; more as the pointer is dragged over them (all of it one Undo step, kept on 'up')
+    const op = { t: 'fill', c, p: hit.point.map(r4), n: hit.normal.map(r4), a: prefs.coverage };
+    const tris = new Set(fillArea(meshContext(vp.bodies.get(id).data), hit.point, hit.normal, prefs.coverage, hit.tri));
+    t.stroke = { id, ops: [op], tris };
+    t.preview = null; vp.showPaintPreview(null); vp.paintLive(id, op);
+    return true;
+  }
   if (prefs.mode === 'band') { keep(id, { t: 'band', c, o: hit.point.map(r4), n: [0, 0, 1], w: prefs.size }); return true; }
   const op = { t: prefs.mode === 'ball' ? 'ball' : 'brush', c, r, pts: hit.point.map(r4) };
   if (op.t === 'brush') op.d = hit.dir.map(r4);
-  t.stroke = { id, op };
+  t.stroke = { id, ops: [op] };
   vp.paintLive(id, op);
   return true;
 }

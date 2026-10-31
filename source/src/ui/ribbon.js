@@ -1,6 +1,6 @@
 // The 3D Builder-style ribbon: the blue tab strip at the top and the row of commands under it, plus its menus.
 import { store } from '../store.js';
-import { PALETTE, threadDefaults, EXTRUSIONS, HARDWARE, HARDWARE_DEFAULTS, SHAPES } from '../shared.js';
+import { PALETTE, threadDefaults, EXTRUSIONS, HARDWARE, HARDWARE_DEFAULTS, SHAPES, HOLE_KINDS } from '../shared.js';
 import { SCREW_TYPES, NUT_TYPES, BEARINGS, BEARING_GROUPS, DOWELS, RODS, MAGNETS, STANDOFF_SIZES, SCREW_LENGTHS, presetFor } from '../catalog.js';
 import { app, saveSettings } from '../state.js';
 import { $, h, ic, toast, popMenu, closeMenu, mi, pickMenu, subMenu } from './dom.js';
@@ -8,6 +8,7 @@ import { vp } from '../view.js';
 import { centerOn, addShape, addShapeAt, mirrorSel, turnCopySel, addPattern, groupSel, ungroupSel, duplicateSel, dropSel, deleteSel, setBodyProp, selectAll, selectNone, select, editStep, copySel, paste, combine } from '../commands.js';
 import { setWorkplane, startTool, endTool, applyTool } from '../tools.js';
 import { startPaint, paintBar, paintUndo } from '../painttool.js';
+import { PART_MENU } from '../parts/defs.js';
 import { newProject, openDialog, saveDoc, saveAs, insertDialog, chooseProjectsFolder, updateTitle } from '../files.js';
 import { saveNewVersionDialog, versionsDialog } from '../versions.js';
 import { backupsDialog } from '../storage.js';
@@ -75,6 +76,8 @@ export function partsMenu(anchor) {
     subMenu('Spline', 'Custom threads', () => [mi('Bolt', 'Threaded bolt', () => addThread('bolt')), mi('Nut', 'Threaded nut', () => addThread('nut')), mi('Minus', 'Threaded rod', () => addThread('rod'))]),
     subMenu('Grid2x2', 'Aluminum extrusion', () => Object.entries(EXTRUSIONS).map(([k, e]) => mi('Grid2x2', e.label, () => { addShape('extrusion', { size: k }, e.label); openPanel('props'); }))),
     h('hr'),
+    ...PART_MENU.map(partsSection),
+    h('hr'),
     subMenu('Package', 'My parts', () => [
       ...myParts.map((p) => mi('Package', p.name, () => insertMyPart(p.part))),
       myParts.length ? h('hr') : null,
@@ -83,6 +86,16 @@ export function partsMenu(anchor) {
     ].filter(Boolean)),
   ]);
 }
+/** Add a ready-made part (from the Parts menu): its standard numbers, then Properties so they can be changed. */
+function addPart(kind, extra = {}, name) {
+  const def = SHAPES[kind];
+  addShape(kind, { ...(def.preset ? def.preset({ ...def.defaults, ...extra }) : {}), ...extra }, name);
+  openPanel('props');
+  if (HOLE_KINDS.has(kind)) toast('This one is a hole: put it where the hole goes, then select it and the part and click Subtract (Object tab).', 'info', 7000);
+}
+const partsSection = (sec) => subMenu(sec.icon, sec.label, () => sec.items.map((it) => (it.sub
+  ? subMenu(sec.icon, it.sub, () => it.items.map(([label, kind, extra, name]) => mi(sec.icon, label, () => addPart(kind, extra, name || it.name))))
+  : mi(sec.icon, it[0], () => addPart(it[1], it[2], it[3])))));
 export function addThread(kind) {
   const d = threadDefaults('M8');
   if (kind === 'rod') addShape('thread', { ...d, size: 'M8', kind: 'bolt', head: 'none', len: 30 });
@@ -182,9 +195,10 @@ export function buildTabBar() {
   const bar = $('tabbar'); bar.replaceChildren();
   bar.append(
     h('button', { class: 'tb-icon', title: 'File', 'aria-label': 'File menu', onclick: (e) => fileMenu(e.currentTarget) }, ic('Menu')),
-    h('div', { class: 'tabs-row', role: 'tablist' }, TABS.map((t) => h('button', { class: 'tab' + (app.tab === t ? ' on' : ''), role: 'tab', onclick: () => { app.tab = t; buildTabBar(); renderCmdBar(); } }, t))),
+    // (like 3D Builder: going to another tab finishes the tool that was open on this one)
+    h('div', { class: 'tabs-row', role: 'tablist' }, TABS.map((t) => h('button', { class: 'tab' + (app.tab === t ? ' on' : ''), role: 'tab', onclick: () => { if (t !== app.tab && app.tool) endTool(); app.tab = t; buildTabBar(); renderCmdBar(); } }, t))),
     h('div', { style: 'flex:1' }),
-    h('input', { id: 'docName', class: 'doc-name', value: store.doc.name || 'Untitled', 'aria-label': 'Project name', onfocus: (e) => { e.target.value = store.doc.name || 'Untitled'; }, onblur: () => updateTitle(), onchange: (e) => store.commit((d) => { d.name = e.target.value.trim().replace(/\s*\*$/, '') || 'Untitled'; }, 'ui') }),
+    h('input', { id: 'docName', class: 'doc-name', value: store.doc.name || 'Untitled', 'aria-label': 'Project name', onfocus: (e) => { e.target.value = store.doc.name || 'Untitled'; }, onblur: () => updateTitle(), onkeydown: (e) => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') e.target.value = store.doc.name || 'Untitled'; e.target.blur(); } }, onchange: (e) => store.commit((d) => { d.name = e.target.value.trim().replace(/\s*\*$/, '') || 'Untitled'; }, 'ui') }),
     h('button', { class: 'tb-text', title: 'Save as a 3DJames project, 3MF, STL or STEP (Ctrl+Shift+S)', onclick: saveAs }, ic('SaveAll'), 'Save as'),
     h('button', { class: 'tb-icon', title: 'Save (Ctrl+S)', onclick: saveDoc }, ic('Save')),
     h('span', { class: 'tb-sep' }),

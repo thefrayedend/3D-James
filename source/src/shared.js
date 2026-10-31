@@ -1,5 +1,6 @@
 // Shared definitions used by both the UI and the geometry worker.
 import { PART_SHAPES } from './catalog.js';
+import { PART_DEFS, PART_HOLES } from './parts/defs.js';
 
 /** Rounded to 3 or 4 decimals (thousandths, ten-thousandths of a mm): how numbers are stored and shown. */
 export const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -93,7 +94,7 @@ export const HARDWARE = {
 };
 // counterbore diameter for a socket head (head diameter + clearance)
 export const CBORE = { M2: 4.4, 'M2.5': 5.5, M3: 6.5, M4: 8, M5: 10, M6: 11, M8: 15 };
-export const HOLE_KINDS = new Set(['screwhole', 'nuttrap', 'insert']);
+export const HOLE_KINDS = new Set(['screwhole', 'nuttrap', 'insert', ...PART_HOLES]);
 export function HARDWARE_DEFAULTS(kind, size) { const v = { ...HARDWARE[kind][size] }; if (kind === 'screwhole') v.cb = CBORE[size]; return v; }
 const sizes = (k) => Object.keys(HARDWARE[k]).map((s) => [s, s]);
 
@@ -126,7 +127,7 @@ export const SHAPES = {
       ['nutH', 'Nut height', 'num', { show: (p) => p.kind === 'nut' }],
       ['chamfer', 'Chamfer thread ends', 'bool']] },
   extrusion: { label: 'Aluminum extrusion', defaults: { size: 't2020', len: 100 },
-    fields: [['size', 'Profile', 'select', [['t2020', 'T-slot 2020'], ['t2040', 'T-slot 2040'], ['v2020', 'V-slot 2020'], ['v2040', 'V-slot 2040'], ['v4040', 'V-slot 4040']]], ['len', 'Length', 'num']] },
+    fields: [['size', 'Profile', 'select', [['t2020', 'T-slot 2020'], ['t2040', 'T-slot 2040'], ['t2060', 'T-slot 2060'], ['t3030', 'T-slot 3030'], ['t4040', 'T-slot 4040'], ['v2020', 'V-slot 2020'], ['v2040', 'V-slot 2040'], ['v2060', 'V-slot 2060'], ['v2080', 'V-slot 2080'], ['v4040', 'V-slot 4040']]], ['len', 'Length', 'num']] },
   washer: { label: 'Washer', defaults: { size: 'M3', ...HARDWARE_DEFAULTS('washer', 'M3') },
     fields: [['size', 'Size', 'select', sizes('washer')], ['id', 'Inner diameter', 'num'], ['od', 'Outer diameter', 'num'], ['t', 'Thickness', 'num']] },
   screwhole: { label: 'Screw hole', defaults: { size: 'M3', head: 'countersunk', len: 10, ...HARDWARE_DEFAULTS('screwhole', 'M3') },
@@ -146,6 +147,7 @@ export const SHAPES = {
       ['h', 'Height', 'num', { show: (p) => !p.mode || p.mode === 'extrude' || p.mode === 'loft' }], ['angle', 'Turn (degrees)', 'num', { show: (p) => p.mode === 'revolve' }],
       ['flip', 'Loft: swap bottom and top', 'bool', { show: (p) => p.mode === 'loft' }], ['ruled', 'Loft: straight sides (no curving)', 'bool', { show: (p) => p.mode === 'loft' }]] },
   ...PART_SHAPES,
+  ...PART_DEFS,
 };
 
 // Aluminum extrusion profiles, all on the common 20 mm grid.
@@ -158,6 +160,11 @@ export const EXTRUSIONS = {
   v2020: { label: 'V-slot 2020', kind: 'v', cells: [[1]] },
   v2040: { label: 'V-slot 2040', kind: 'v', cells: [[1, 1]] },
   v4040: { label: 'V-slot 4040', kind: 'v', cells: [[1, 1], [1, 1]] },
+  t2060: { label: 'T-slot 2060', kind: 't', cells: [[1, 1, 1]] },
+  t4040: { label: 'T-slot 4040', kind: 't', cells: [[1, 1], [1, 1]] },
+  v2060: { label: 'V-slot 2060', kind: 'v', cells: [[1, 1, 1]] },
+  v2080: { label: 'V-slot 2080', kind: 'v', cells: [[1, 1, 1, 1]] },
+  t3030: { label: 'T-slot 3030 (8 mm slot)', kind: 't', pitch: 30, cells: [[1]] }, // typical dimensions: parts/stock.js
 };
 // half of each slot (cell center at 0,0, slot opening on the +x side), mirrored across the x axis
 export const SLOT_HALF = {

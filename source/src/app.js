@@ -54,6 +54,8 @@ document.addEventListener('keydown', (e) => {
   if (mod && k === 's') { e.preventDefault(); e.shiftKey ? saveAs() : saveDoc(); return; }
   if (mod && k === 'o') { e.preventDefault(); openDialog(); return; }
   if (typing) return;
+  // Esc in a box takes back what was typed there (the box blurs itself first, so it looks like Esc in the 3D view)
+  if (e.key === 'Escape' && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
   if (mod && k === 'g') { e.preventDefault(); e.shiftKey ? ungroupSel() : groupSel(); return; }
   if (mod && k === 'd') { e.preventDefault(); duplicateSel(); return; }
   if (mod && k === 'a') { e.preventDefault(); selectAll(); return; }
