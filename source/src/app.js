@@ -4,18 +4,18 @@ import { app } from './state.js';
 import { $, h, menuOpen, closeMenu, loadCustomIcons, iconNames, iconFile } from './ui/dom.js';
 import { vp } from './view.js';
 import { startWorker, workerCall, requestBuild } from './build.js';
-import { createVersion, restoreVersion, deleteVersion, versionsDialog } from './versions.js';
+import { createVersion, restoreVersion, deleteVersion, versionsDialog, modelSnapshot } from './versions.js';
 import { parseLogo } from './logo.js';
 import { moveFeature, canMoveFeature, historyDependencies, dependentSteps } from './history.js';
 import { measureResult, measurePick, setMeasureMode } from './measure.js';
-import { scheduleBackup, restoreSession, idb } from './storage.js';
+import { scheduleBackup, restoreSession, forgetUnsaved, idb } from './storage.js';
 import { saveToMyParts, insertMyPart, loadMyParts, usePartsFolder } from './myparts.js';
 import {
   centerOn, alignSel, addShape, combine, mirrorSel, turnCopySel, addPattern, duplicateSel, deleteSel, dropSel, rotateSel, translateSel, groupSel, ungroupSel, setBodyProp,
   selectAll, selectNone, editStep, copySel, paste,
 } from './commands.js';
 import { startTool, endTool, applyTool, quickEdges, toolPick, ONE_CLICK } from './tools.js';
-import { openDialog, openFile, insertFile, saveDoc, saveAs, buildFileData, loadProject, newProject, updateTitle, fmtOf } from './files.js';
+import { openDialog, openFile, insertFile, saveDoc, saveAs, buildFileData, loadProject, newProject, askToSave, updateTitle, fmtOf } from './files.js';
 import { readZip, parse3mf } from './formats.js';
 import { renderAll, openPanel } from './ui/panels.js';
 import { buildTabBar, renderCmdBar, addThread, doUndo, doRedo } from './ui/ribbon.js';
@@ -84,9 +84,23 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   if (ev !== 'drop') return;
   const f = e.dataTransfer.files?.[0];
-  if (f) { if (['3dj', 'json'].includes(fmtOf(f.name)) || !app.results.bodies.size) openFile(f, null); else insertFile(f); }
+  if (f) { if (['3dj', 'json'].includes(fmtOf(f.name)) || !app.results.bodies.size) askToSave().then((ok) => ok && openFile(f, null)); else insertFile(f); }
 }));
 window.addEventListener('beforeunload', (e) => { if (app.dirty) { e.preventDefault(); e.returnValue = ''; } });
+// In the installed program the window's close button asks the page first (Installation/build/App.cs):
+//   program -> page { type: '3dj-close' };  page -> program  __3dj_close_wait (asking now), then __3dj_close_ok to close.
+if (window.chrome?.webview && window.__3DJ_HOST?.program) {
+  const host = window.chrome.webview;
+  host.addEventListener('message', async (e) => {
+    if (e.data?.type !== '3dj-close') return;
+    host.postMessage('__3dj_close_wait');
+    if (!(await askToSave())) return;
+    if (app.dirty) await forgetUnsaved(app.savedModel ? { ...app.savedModel, versions: store.doc.versions } : emptyDoc());
+    app.dirty = false;
+    host.postMessage('__3dj_close_ok');
+  });
+  host.postMessage('__3dj_close_asks'); // this page answers the close button
+}
 
 // ---------------------------------------------------------------- example shown on the very first start
 function exampleDoc() {
@@ -138,7 +152,8 @@ store.onChange((kind) => {
   store.doc = last?.doc || exampleDoc();
   app.file = last?.file || null;
   app.savedModel = last?.savedModel || null; app.savedAt = last?.savedAt || null;
-  app.dirty = false;
+  // work brought back from last time is still unsaved when it differs from the file it was saved to (or was never saved)
+  app.dirty = !!last && (last.savedModel ? JSON.stringify(modelSnapshot(store.doc)) !== JSON.stringify(last.savedModel) : !last.file && store.doc.features.length > 0);
   updateTitle();
   vp.grid = app.settings.grid; vp.rotSnap = app.settings.rot; vp.showEdges = app.settings.edges; vp.showReflection = app.settings.reflection !== false; vp.lockScale = app.settings.lock; vp.display = app.settings.display || 'solid'; vp.ruler = !!app.settings.ruler;
   applyTheme();

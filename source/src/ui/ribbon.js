@@ -9,7 +9,8 @@ import { centerOn, addShape, addShapeAt, mirrorSel, turnCopySel, addPattern, gro
 import { setWorkplane, startTool, endTool, applyTool } from '../tools.js';
 import { startPaint, paintBar, paintUndo } from '../painttool.js';
 import { PART_MENU } from '../parts/defs.js';
-import { newProject, openDialog, saveDoc, saveAs, insertDialog, chooseProjectsFolder, updateTitle } from '../files.js';
+import { fitAround, makeLid, addHinge } from '../helpercmds.js';
+import { newProject, askToSave, openDialog, saveDoc, saveAs, insertDialog, chooseProjectsFolder, updateTitle } from '../files.js';
 import { saveNewVersionDialog, versionsDialog } from '../versions.js';
 import { backupsDialog } from '../storage.js';
 import { saveToMyParts, insertMyPart, manageMyParts, myParts, refreshMyParts } from '../myparts.js';
@@ -120,7 +121,7 @@ export function mirrorMenu(anchor) {
 }
 export function fileMenu(anchor) {
   popMenu(anchor, [
-    mi('FilePlus', 'New', newProject),
+    mi('FilePlus', 'New', async () => { if (await askToSave()) newProject(); }),
     mi('FolderOpen', 'Open…', openDialog, 'Ctrl+O'),
     mi('Save', 'Save', saveDoc, 'Ctrl+S'),
     mi('SaveAll', 'Save as…', saveAs, 'Ctrl+Shift+S'),
@@ -244,7 +245,9 @@ export function renderCmdBar() {
   if (app.tool?.type === 'split') {
     const tl = app.tool;
     const keep = (k, label) => cb('', 'Triangle', label, () => { tl.keep = k; renderCmdBar(); }, { on: tl.keep === k });
-    bar.append(cb('', 'ArrowLeft', 'Cancel', endTool), cb('', 'Check', 'Split', applyTool), sepEl(), keep('above', 'Keep top'), keep('below', 'Keep bottom'), keep('both', 'Keep both'));
+    const joints = [['none', 'No connectors'], ['pegs', 'Pegs and holes'], ['pins', 'Pin holes (loose pins)'], ['dovetail', 'Dovetail']];
+    bar.append(cb('', 'ArrowLeft', 'Cancel', endTool), cb('', 'Check', 'Split', applyTool), sepEl(), keep('above', 'Keep top'), keep('below', 'Keep bottom'), keep('both', 'Keep both'), sepEl(),
+      cb('', 'Pill', tl.keep === 'both' ? `Connectors: ${joints.find(([k]) => k === tl.joint)?.[1] || 'none'}` : 'Connectors (keep both)', (b) => pickMenu(b, 'Connectors so the two parts line up and hold together', joints, tl.joint, (v) => { tl.joint = v; if (v !== 'none') tl.keep = 'both'; renderCmdBar(); }), { dd: true, title: 'Pegs, pin holes or a dovetail on the cut, so the two parts line up when you put them back together' }));
     return;
   }
   if (app.tool?.type === 'paint') { bar.append(...paintBar(cb, sepEl)); updateToolbar(); fitRibbon(); return; }
@@ -274,7 +277,17 @@ export function renderCmdBar() {
       ]), { dd: true, title: 'Hollow, shape on a face, push/pull a face, lay flat on a face' }), sepEl(),
       cb('mirror', 'FlipHorizontal2', 'Mirror', (b) => mirrorMenu(b), { dd: true }),
       cb('array', 'Grid2x2', 'Pattern', addPattern, { title: 'Repeat in a row or a circle' }),
-      cb('split', 'Scissors', 'Split', () => startTool('split'), { title: 'Cut in two with a flat plane' }), sepEl(),
+      cb('split', 'Scissors', 'Split', () => startTool('split'), { title: 'Cut in two with a flat plane' }),
+      cb('helpers', 'WandSparkles', 'Helpers', (b) => popMenu(b, [
+        mi('Scissors', 'Split to fit the printer (with connectors)', () => startTool('split', { joint: 'pegs' })),
+        mi('BoxSelect', 'Hollow out', () => startTool('shell')),
+        mi('Box', 'Make a lid', makeLid),
+        mi('Rows3', 'Hinge between two parts', addHinge),
+        mi('CircleDot', 'Screw holes on a face', () => startTool('holes')),
+        mi('SquaresSubtract', 'Fit around (cut out with a gap)', fitAround),
+        mi('Magnet', 'Snap clip on a face', () => startTool('snap')),
+        mi('Grid2x2', 'Vents on a face', () => startTool('vents')),
+      ]), { dd: true, title: 'Common jobs in a few clicks: split with connectors, hollow, lid, hinge, screw holes, fit around, snap clip, vents' }), sepEl(),
       cb('group', 'Group', 'Group', (b) => popMenu(b, [
         mi('Group', 'Group', groupSel, 'Ctrl+G'),
         mi('Ungroup', 'Ungroup', ungroupSel, 'Ctrl+Shift+G'),

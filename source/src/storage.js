@@ -171,6 +171,17 @@ export function scheduleBackup() {
   }, 2500);
 }
 
+/** "Don't save" when the program closes: the next start shows `doc` (the project as last saved). The unsaved work
+ * goes into Backups first, so it can still be brought back. */
+export async function forgetUnsaved(doc) {
+  clearTimeout(backupTimer);
+  try {
+    await idb.put('backups', { t: Date.now(), name: store.doc.name || 'Untitled', json: JSON.stringify(store.doc) });
+    for (const v of doc.versions || []) { const snapshot = versionStore.get(v.id); if (snapshot) await idb.put('kv', snapshot, 'version:' + v.id); }
+    await idb.put('kv', JSON.stringify(doc), 'current');
+  } catch (err) { backupFailure(err); }
+}
+
 /** The project that was open last time (or null). */
 export async function restoreSession() {
   let json = null;

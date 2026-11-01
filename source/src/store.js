@@ -16,7 +16,7 @@ export function normalizeDoc(doc) {
   if (doc.bodies != null && (typeof doc.bodies !== 'object' || Array.isArray(doc.bodies))) throw new Error('The project object list is invalid.');
   for (const f of doc.features || []) {
     if (!f || typeof f !== 'object' || typeof f.type !== 'string' || typeof f.id !== 'string') throw new Error('The project contains an invalid feature.');
-    for (const key of ['tools', 'edges', 'faces']) if (f[key] != null && !Array.isArray(f[key])) throw new Error(`Invalid ${key} in the project.`);
+    for (const key of ['tools', 'edges', 'faces', 'pts']) if (f[key] != null && !Array.isArray(f[key])) throw new Error(`Invalid ${key} in the project.`);
     for (const key of ['pos', 'rot']) if (f[key] != null && (!Array.isArray(f[key]) || f[key].length !== 3)) throw new Error(`Invalid ${key} in the project.`);
   }
   if (doc.versions != null && (!Array.isArray(doc.versions) || doc.versions.length > 200 || doc.versions.some((v) => !v || typeof v.id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(v.id) || typeof v.label !== 'string' || !Number.isFinite(v.t)))) throw new Error('The project version list is invalid.');
@@ -98,7 +98,7 @@ export const store = {
 };
 
 // ---------- helpers ----------
-export const featureRefs = (f) => [f.body, f.src, f.body2, ...(f.tools || [])].filter(Boolean);
+export const featureRefs = (f) => [f.body, f.src, f.body2, f.body3, ...(f.tools || [])].filter(Boolean);
 
 /** All features that touch a body (directly). */
 export function featuresOfBody(doc, id) {
@@ -156,6 +156,7 @@ export function nextColor(doc) {
 
 export function shapeLabel(kind) { return SHAPES[kind]?.label || kind; }
 
+const HOLE_NAMES = { plain: 'screw hole', countersunk: 'countersunk hole', counterbore: 'counterbored hole', insert: 'insert hole', nut: 'nut trap' };
 export function describeFeature(doc, f) {
   const bn = (id) => doc.bodies[id]?.name || 'object';
   switch (f.type) {
@@ -173,6 +174,12 @@ export function describeFeature(doc, f) {
     case 'emboss': return { title: f.mode === 'cut' ? 'Engrave' : 'Emboss', sub: `${bn(f.body)} · ${f.source === 'logo' ? f.logo?.label || 'SVG logo' : f.text}` };
     case 'pushpull': return { title: 'Push/pull', sub: `${bn(f.body)} · ${f.d} mm` };
     case 'delete': return { title: 'Delete', sub: bn(f.body) };
+    case 'fit': return { title: 'Fit around', sub: `${bn(f.tools?.[0])} in ${bn(f.body)} · ${f.gap} mm gap` };
+    case 'lid': return { title: { snap: 'Snap-on lid', slide: 'Sliding lid' }[f.style] || 'Push-on lid', sub: `For ${bn(f.src)}` };
+    case 'hinge': return { title: f.style === 'living' ? 'Living hinge' : 'Hinge', sub: `${bn(f.body)} + ${bn(f.body2)}` };
+    case 'holes': { const n = f.pts?.length || 0; return { title: `${n} ${HOLE_NAMES[f.kind] || 'hole'}${n === 1 ? '' : 's'}`, sub: `${bn(f.body)}${f.size ? ` · ${f.size}` : ''}` }; }
+    case 'snap': return { title: f.mode === 'window' ? 'Snap window' : 'Snap hook', sub: bn(f.body) };
+    case 'vents': return { title: 'Vents', sub: `${bn(f.body)} · ${{ hex: 'honeycomb', round: 'round', slots: 'slots' }[f.pattern] || f.pattern}` };
     default: return { title: f.type, sub: '' };
   }
 }

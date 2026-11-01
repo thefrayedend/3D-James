@@ -1,14 +1,14 @@
 // The Properties tab: the selected object, the step being edited, or the open tool.
 import { Matrix4, Vector3, Quaternion } from 'three';
 import { store, creatorOf, isSimplePrimitive, featuresOfBody, describeFeature, nextColor, stepTree } from '../store.js';
-import { SHAPES, threadDefaults, evalExpr, PALETTE, HARDWARE, HARDWARE_DEFAULTS } from '../shared.js';
+import { SHAPES, threadDefaults, evalExpr, PALETTE, HARDWARE, HARDWARE_DEFAULTS, holeDims, HOLE_SIZES } from '../shared.js';
 import { PART_SHAPES, presetFor } from '../catalog.js';
 import { editSketch, editSketches, sketchGroup } from '../sketchcmd.js';
 import { app, scope, bodyData, bodyName } from '../state.js';
 import { $, h, ic, fmt, r2, r4, isPlainNumber } from './dom.js';
 import { vp } from '../view.js';
 import { duplicateSel, deleteSel, setBodyProp, translateSel, rotateSel, editStep, combine } from '../commands.js';
-import { endTool, applyTool, quickEdges, ONE_CLICK, toolPreview, toolPreviewDone } from '../tools.js';
+import { endTool, applyTool, quickEdges, ONE_CLICK, toolPreview, toolPreviewDone, startTool } from '../tools.js';
 import { exprField, selectField, checkField, trioField, updateFeature, liveFeature } from './fields.js';
 import { openPanel, deleteFeature } from './panels.js';
 import { historyDependencies, dependentSteps, canMoveFeature, moveFeature } from '../history.js';
@@ -236,6 +236,22 @@ export function renderFeaturePanel(el, f, { inline = false } = {}) {
       if (f.axis) card.append(selectField('Cut across', f.axis, [['z', 'Height (Z)'], ['x', 'Width (X)'], ['y', 'Depth (Y)']], (v) => updateFeature(f.id, (x) => { x.axis = v; })), num('At position', 'at', { step: 1 }));
       else card.append(num('Move from center (mm)', 'off', { step: 1 }), num('Roll (°)', 'roll', { step: 15 }), num('Pitch (°)', 'pitch', { step: 15 }), num('Yaw (°)', 'yaw', { step: 15 }));
       card.append(selectField('Keep', f.keep, [['above', 'Keep top'], ['below', 'Keep bottom'], ['both', 'Keep both']], (v) => updateFeature(f.id, (x, d) => { x.keep = v; if (v === 'both' && !d.bodies[x.body2]) d.bodies[x.body2] = { name: `${bodyName(x.body)} (part 2)`, color: nextColor(d) }; })));
+      if ((f.keep || 'both') === 'both') {
+        // Helpers > Split to fit the printer: connectors on the cut
+        card.append(h('h3', {}, 'Connectors'), selectField('Kind', f.joint || 'none', [['none', 'None'], ['pegs', 'Pegs and holes'], ['pins', 'Pin holes (loose pins)'], ['dovetail', 'Dovetail']], (v) => updateFeature(f.id, (x, d) => {
+          Object.assign(x, { joint: v, jd: x.jd ?? 5, jl: x.jl ?? 8, jn: x.jn ?? 2, jgap: x.jgap ?? 0.15 });
+          if (v === 'pins' && !x.body3) { x.body3 = store.newId('b'); d.bodies[x.body3] = { name: `${bodyName(x.body)} pins`, color: nextColor(d) }; }
+        })));
+        if (f.joint && f.joint !== 'none') {
+          card.append(num(f.joint === 'dovetail' ? 'Width at the cut' : 'Diameter', 'jd', { step: 0.5, min: 0.6 }), num(f.joint === 'dovetail' ? 'Height' : 'Length', 'jl', { step: 0.5, min: 0.6 }));
+          if (f.joint !== 'dovetail') card.append(num('How many', 'jn', { step: 1, min: 1 }));
+          card.append(num('Gap (each side)', 'jgap', { step: 0.05, min: 0 }), h('div', { class: 'muted' }, {
+            pegs: 'Pegs stand on the bottom part and go into holes in the top part. They are placed where the cut face has room for them.',
+            pins: 'A hole in each part, and loose pins (a separate object beside it) to print and push in.',
+            dovetail: 'A dovetail rail on the bottom part slides into a slot in the top part, along the longest way across the cut.',
+          }[f.joint]));
+        }
+      }
       el.append(card); break;
     case 'emboss':
       card.append(h('h3', {}, 'Emboss / engrave'), ...embossFields(f, (values) => updateFeature(f.id, (x) => Object.assign(x, values))));
@@ -254,6 +270,65 @@ export function renderFeaturePanel(el, f, { inline = false } = {}) {
       el.append(card); break;
     case 'delete':
       card.append(h('div', { class: 'muted' }, `${bodyName(f.body)} is removed at this step. Delete the step to bring it back.`)); el.append(card); break;
+    // ---- Helpers
+    case 'fit':
+      card.append(h('h3', {}, 'Fit around'), num('Gap all round (mm)', 'gap', { step: 0.05, min: 0 }),
+        checkField(`Keep ${bodyName(f.tools?.[0])} as its own object`, f.keepPart !== false, (v) => updateFeature(f.id, (x) => { x.keepPart = v; })),
+        h('div', { class: 'muted' }, `${bodyName(f.tools?.[0])} is cut out of ${bodyName(f.body)} with this gap all round, so it fits after printing. 0.2 mm suits most printers; use more for a loose fit.`));
+      el.append(card); break;
+    case 'lid': {
+      card.append(h('h3', {}, 'Lid'), selectField('Kind', f.style || 'friction', [['friction', 'Push-on (a lip inside the box)'], ['snap', 'Snap-on (the lip clicks into a groove)'], ['slide', 'Sliding (slides in from the front)']], (v) => updateFeature(f.id, (x) => { x.style = v; })),
+        num('Lid thickness', 't', { step: 0.2, min: 0.4 }));
+      if (f.style === 'slide') card.append(num('Groove depth (into the walls)', 'slot', { step: 0.2, min: 0.3 }), num('Rim above the groove', 'rim', { step: 0.2, min: 0.8 }));
+      else card.append(num('Lip depth', 'lip', { step: 0.5, min: 0.6 }), num('Lip wall', 'wall', { step: 0.2, min: 0.5 }));
+      card.append(num('Gap (each side)', 'gap', { step: 0.05, min: 0 }), num('Beside the box: X', 'dx', { step: 5 }), num('Beside the box: Y', 'dy', { step: 5 }),
+        h('div', { class: 'muted' }, f.style === 'slide'
+          ? `Grooves are cut inside the walls of ${bodyName(f.src)}, open at the front, and the lid slides in from the front. The walls need to be thicker than the groove depth plus about 0.8 mm.`
+          : `The lid prints upside down, as shown: plate on the bed, lip up. Turn it over to put it on.${f.style === 'snap' ? ` A small groove is cut inside ${bodyName(f.src)} for the bead on the lip.` : ''} Make the gap bigger if it is too tight.`));
+      el.append(card); break;
+    }
+    case 'hinge':
+      card.append(h('h3', {}, 'Hinge'), selectField('Kind', f.style || 'pin', [['pin', 'Pin hinge (prints in place)'], ['living', 'Living hinge (a thin strip that bends)']], (v) => updateFeature(f.id, (x) => { x.style = v; })));
+      if (f.style === 'living') card.append(num('Strip thickness', 't', { step: 0.1, min: 0.2 }), h('div', { class: 'muted' }, 'A thin strip along the bottom joins the two parts into one object; the gap between them is what bends. 0.4 to 0.8 mm thick with a 2 to 4 mm gap works well in PETG; PP bends best.'));
+      else card.append(num('Knuckle size', 'd', { step: 0.5, min: 2 }), num('Knuckles (0 = pick for me)', 'n', { step: 1, min: 0 }), num('Pin (0 = pick for me)', 'pin', { step: 0.2, min: 0 }),
+        num('Clearance', 'clear', { step: 0.05, min: 0.1 }), num('Gap between knuckles', 'kgap', { step: 0.05, min: 0.2 }),
+        h('div', { class: 'muted' }, 'The knuckles sit along the bottom of the edges that face each other and take turns between the two parts, with a pin through them. Print it as it is: it moves straight off the bed.'));
+      card.append(num('Leave at each end', 'margin', { step: 0.5, min: 0 }));
+      el.append(card); break;
+    case 'holes': {
+      const kinds = [['plain', 'Plain hole'], ['countersunk', 'Countersunk (flat head)'], ['counterbore', 'Counterbored (socket head)'], ['insert', 'Heat-set insert'], ['nut', 'Nut trap']];
+      card.append(h('h3', {}, 'Screw holes'),
+        selectField('Kind', f.kind, kinds, (v) => updateFeature(f.id, (x) => { x.kind = v; Object.assign(x, holeDims(v, x.size)); })),
+        selectField('Screw size', f.size, HOLE_SIZES.map((s) => [s, s]), (v) => updateFeature(f.id, (x) => { x.size = v; Object.assign(x, holeDims(x.kind, v)); })),
+        num(f.kind === 'insert' ? 'Insert hole diameter' : 'Hole diameter', 'd', { step: 0.1, min: 0.3 }));
+      if (f.kind === 'countersunk') card.append(num('Head diameter', 'hd', { step: 0.1, min: 0.5 }));
+      if (f.kind === 'counterbore') card.append(num('Head diameter', 'cb', { step: 0.1, min: 0.5 }), num('Head depth', 'hk', { step: 0.1, min: 0.1 }));
+      if (f.kind === 'insert') card.append(num('Insert depth', 'idepth', { step: 0.5, min: 0.5 }));
+      if (f.kind === 'nut') card.append(num('Nut across flats', 'af', { step: 0.1, min: 0.5 }), num('Nut depth', 'm', { step: 0.1, min: 0.2 }));
+      if (f.kind !== 'insert') card.append(num('Depth (0 = through the wall)', 'depth', { step: 0.5, min: 0 }));
+      card.append(h('div', { class: 'muted', style: 'margin:6px 0 4px' }, 'Where (mm across and up from the middle of the face)'));
+      (f.pts || []).forEach((q, i) => card.append(h('div', { style: 'display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:end' },
+        exprField(`Hole ${i + 1} across`, q[0], (v) => updateFeature(f.id, (x) => { x.pts[i][0] = v; })),
+        exprField('up', q[1], (v) => updateFeature(f.id, (x) => { x.pts[i][1] = v; })),
+        h('button', { class: 'chip', title: 'Remove this hole', 'aria-label': `Remove hole ${i + 1}`, disabled: f.pts.length < 2, onclick: () => updateFeature(f.id, (x) => { x.pts.splice(i, 1); }) }, ic('X')))));
+      card.append(h('div', { class: 'btns' }, h('button', { class: 'btn', onclick: () => { app.sel = [f.body]; vp.setSelection(app.sel); startTool('holes', { step: f.id }); } }, ic('Plus'), 'Click to add more')));
+      el.append(card); break;
+    }
+    case 'snap':
+      card.append(h('h3', {}, 'Snap clip'), selectField('Make', f.mode || 'hook', [['hook', 'The hook (stands on the face)'], ['window', 'The window it clicks into (cut)']], (v) => updateFeature(f.id, (x) => { x.mode = v; })),
+        num('Width', 'w', { step: 0.5, min: 1.1 }), num('Thickness', 't', { step: 0.1, min: 0.5 }), num('Catch', 'barb', { step: 0.1, min: 0.2 }));
+      if (f.mode === 'window') card.append(num('Gap (each side)', 'gap', { step: 0.05, min: 0 }), num('Depth (0 = through the wall)', 'depth', { step: 0.5, min: 0 }));
+      else card.append(num('Length', 'len', { step: 0.5, min: 2.1 }));
+      card.append(selectField('Catch faces', String(f.angle ?? 0), [['0', 'Up the face'], ['90', 'Left'], ['180', 'Down the face'], ['270', 'Right']], (v) => updateFeature(f.id, (x) => { x.angle = +v; })),
+        num('Shift across', 'u'), num('Shift up', 'v'),
+        h('div', { class: 'muted' }, f.mode === 'window' ? 'Use the same width, thickness and catch as the hook: the window is that size plus the gap.' : 'On the other part, add a Snap clip with "The window it clicks into" where the hook goes in. PETG bends better than PLA for clips.'));
+      el.append(card); break;
+    case 'vents':
+      card.append(h('h3', {}, 'Vents'), selectField('Pattern', f.pattern || 'hex', [['hex', 'Honeycomb'], ['round', 'Round holes'], ['slots', 'Slots']], (v) => updateFeature(f.id, (x) => { x.pattern = v; })),
+        num(f.pattern === 'slots' ? 'Slot width' : 'Hole size', 's', { step: 0.5, min: 0.8 }), num('Bars between', 'bar', { step: 0.2, min: 0.4 }), num('Margin at the edges', 'margin', { step: 0.5, min: 0 }));
+      if (f.pattern === 'slots') card.append(selectField('Slots run', f.dir || 'across', [['across', 'Across'], ['up', 'Up and down']], (v) => updateFeature(f.id, (x) => { x.dir = v; })));
+      card.append(num('Depth (0 = through the wall)', 'depth', { step: 0.5, min: 0 }), h('div', { class: 'muted' }, 'The holes fill the face inside the margin and go through the wall under it, not out the far side.'));
+      el.append(card); break;
     default: break;
   }
   el.append(h('div', { class: 'card' }, h('h3', {}, 'Step'), ...meta));
@@ -265,7 +340,7 @@ export function renderFeaturePanel(el, f, { inline = false } = {}) {
 export function renderToolPanel(el) {
   const t = app.tool;
   if (t.type === 'measure') return renderMeasurePanel(el);
-  const titles = { emboss: 'Emboss / engrave', fillet: 'Fillet edges', chamfer: 'Chamfer edges', shell: 'Hollow', extrude: 'Shape on a face', pushpull: 'Push/pull', layflat: 'Lay flat', insertpocket: 'Heat-set insert pocket', workplane: 'Workplane', sketchplane: 'Sketch plane', align: 'Align', split: 'Split' };
+  const titles = { emboss: 'Emboss / engrave', fillet: 'Fillet edges', chamfer: 'Chamfer edges', shell: 'Hollow', extrude: 'Shape on a face', pushpull: 'Push/pull', layflat: 'Lay flat', insertpocket: 'Heat-set insert pocket', workplane: 'Workplane', sketchplane: 'Sketch plane', align: 'Align', split: 'Split', holes: 'Screw holes', snap: 'Snap clip', vents: 'Vents' };
   el.append(h('div', {}, h('h2', {}, titles[t.type]), h('div', { class: 'sub' }, bodyName(t.body))));
   const card = h('div', { class: 'card' });
   if (t.type === 'fillet' || t.type === 'chamfer') {
@@ -292,9 +367,20 @@ export function renderToolPanel(el) {
     card.append(h('div', { class: 'muted' }, 'Click a flat face. You can then type how far to move it: out to add material, in (a negative number) to remove it.'));
   } else if (t.type === 'split') {
     card.append(h('div', { class: 'muted' }, 'Drag the green arrow to move the cutting plane, or switch to turning in the bar at the bottom to tilt it. Pick what to keep in the bar at the top, then click Split.'));
+    if (t.keep === 'both' && t.joint !== 'none') card.append(h('div', { class: 'muted', style: 'margin-top:6px' }, 'Connectors go on the cut so the parts line up. You can change their kind and size after splitting.'));
+  } else if (t.type === 'holes') {
+    const step = t.step && store.doc.features.find((x) => x.id === t.step);
+    if (!step) card.append(selectField('Kind', t.kind, [['plain', 'Plain hole'], ['countersunk', 'Countersunk (flat head)'], ['counterbore', 'Counterbored (socket head)'], ['insert', 'Heat-set insert'], ['nut', 'Nut trap']], (v) => { t.kind = v; }),
+      selectField('Screw size', t.size, HOLE_SIZES.map((s) => [s, s]), (v) => { t.size = v; }));
+    card.append(h('div', { class: 'muted' }, step ? 'Click more spots on the same face for more holes. Click Done when you have them all.' : 'Click on a flat face where a hole goes. Each click adds one; you can type exact positions afterwards.'),
+      h('div', { class: 'stat' }, h('span', {}, 'Holes'), h('b', {}, String(step?.pts?.length || 0))));
+  } else if (t.type === 'snap') {
+    card.append(h('div', { class: 'muted' }, 'Click a flat face where the hook should stand. You can then change its size, and make the window it clicks into on the other part.'));
+  } else if (t.type === 'vents') {
+    card.append(h('div', { class: 'muted' }, 'Click a flat face. It fills with a honeycomb of holes through the wall; you can then change the pattern, sizes and margin.'));
   }
   el.append(card);
-  el.append(h('div', { class: 'btns' }, h('button', { class: 'btn', onclick: endTool }, 'Cancel'), !ONE_CLICK.has(t.type) ? h('button', { class: 'btn primary', onclick: applyTool }, ic('Check'), 'Apply') : null));
+  el.append(h('div', { class: 'btns' }, h('button', { class: 'btn', onclick: endTool }, t.type === 'holes' && t.step ? 'Stop' : 'Cancel'), !ONE_CLICK.has(t.type) ? h('button', { class: 'btn primary', onclick: applyTool }, ic('Check'), t.type === 'holes' ? 'Done' : 'Apply') : null));
 }
 
 export function renderWelcome(el) {

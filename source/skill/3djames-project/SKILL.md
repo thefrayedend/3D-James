@@ -167,6 +167,15 @@ Sizes M2–M30, #6-32, #8-32, #10-24, 1/4"-20, 5/16"-18, 3/8"-16, 1/2"-13. Alway
 - **split** `{"type":"split","body":"b1","off":0,"roll":0,"pitch":0,"yaw":0,"keep":"above"|"below"|"both","body2":"b8"}` — plane through the body's centre, normal +Z rotated by roll/pitch/yaw degrees, shifted `off` along the normal. `body2` (needed for `both`) gets the upper part.
 - **pushpull** `{"type":"pushpull","body":"b1","face":{nc,d},"d":5}` — moves a flat face along its normal: positive adds material, negative removes it.
 - **delete** `{"type":"delete","body":"b5"}`.
+
+### Helpers (common jobs; each is one step)
+- **split with connectors**: a `split` with `keep:"both"` may add `"joint":"pegs"|"pins"|"dovetail","jd":5,"jl":8,"jn":2,"jgap":0.15` (diameter or dovetail width, length or height, how many, gap per side). `pins` also needs `"body3":"b9"` (add it to `bodies`): the loose pins to print.
+- **fit** (cut out with a printing gap) `{"type":"fit","body":"b1","tools":["b2"],"gap":0.2,"keepPart":true}` — b2 is cut out of b1, grown by `gap` all round; b2 stays unless `keepPart:false`. Place b2 overlapping b1 first.
+- **lid** `{"type":"lid","src":"b1","body":"b7","style":"friction"|"snap"|"slide","t":2,"lip":4,"wall":1.2,"gap":0.15,"slot":1,"dx":50,"dy":0}` — new body `b7` (add it to `bodies`): a lid for the open box b1 (hollow it first with `shell` and its top face open), placed `dx,dy` beside it, printed upside down. `snap` and `slide` also cut grooves into b1.
+- **hinge** `{"type":"hinge","body":"b1","body2":"b2","style":"pin"|"living","d":5,"n":0,"pin":0,"clear":0.3,"kgap":0.4,"t":0.6,"margin":1}` — b1 and b2 must sit side by side (edges facing, a few mm apart, not overlapping), along X or Y. `pin`: print-in-place knuckles along their bottom edges (`n` 0 = automatic odd count, `pin` 0 = automatic). `living`: a strip `t` thick joins them; b2 is used up into b1.
+- **holes** (screw holes on a flat face) `{"type":"holes","body":"b1","face":{nc,d},"kind":"plain"|"countersunk"|"counterbore"|"insert"|"nut","size":"M3","d":3.4,"hd":6.72,"cb":6.5,"hk":3.3,"idepth":6,"af":5.7,"m":2.6,"depth":0,"pts":[[u,v],...]}` — `pts` are mm across/up from the face centre (like `extrude` u,v). `depth:0` goes through the wall under the face only. Give the sizes for the kind: plain `d`; countersunk `d,hd`; counterbore `d,cb,hk`; insert `d` (insert hole) and `idepth`; nut `d,af,m`.
+- **snap** `{"type":"snap","body":"b1","face":{nc,d},"mode":"hook"|"window","w":6,"len":8,"t":1.6,"barb":0.8,"gap":0.2,"u":0,"v":0,"angle":0,"depth":0}` — a snap hook standing on the face, or the window it clicks into (same w/t/barb).
+- **vents** `{"type":"vents","body":"b1","face":{nc,d},"pattern":"hex"|"round"|"slots","s":5,"bar":1.6,"margin":3,"depth":0,"dir":"across"|"up"}` — holes filling the face inside the margin, through the wall under it.
 - Any step may have `"name"` (shown in History) or `"suppressed": true`.
 
 Positioning tip: when stacking (a wall on a base), overlap by 0.01 (`"pos":[x,y,"wall - 0.01"]`) so merges fuse cleanly.
@@ -178,7 +187,7 @@ d = json.load(open(sys.argv[1])); errs = []
 # parts:kinds:start
 KINDS = {'box','cyl','sphere','cone','torus','wedge','pyramid','tube','prism','text','thread','extrusion','washer','standoff','screwhole','nuttrap','insert','sketch','screw','nut','bearing','pin','rod','magnet','hexstandoff','gfbaseplate','gfbin','boardhook','drawerdivider','lidbox','keyhole','screwtab','frenchcleat','cableclip','zipanchor','grommet','chainlink','boardposts','boardholes','fanmount','fanholes','ptfehole','filamentguide','spoolaxle','bearingmount','bearingpocket','gt2pulley','shaftcollar','vwheel','footpocket','levelfoot','hinge','dovetail','dovetailslot','peg','pegsocket','balljoint','ujoint','shafthole','boss','rib','knob','thumbscrew','drawerpull','snapfit','tolerancetest','gear','rack','worm','stock','cornerbracket','tnut','woodscrew','rivet'}
 # parts:kinds:end
-TYPES = {'shape','combine','copy','move','array','mirror','fillet','chamfer','shell','extrude','split','delete','pushpull'}
+TYPES = {'shape','combine','copy','move','array','mirror','fillet','chamfer','shell','extrude','split','delete','pushpull','fit','lid','hinge','holes','snap','vents'}
 names = [v['name'] for v in d.get('vars', [])]
 ids = [f['id'] for f in d['features']]
 if len(ids) != len(set(ids)): errs.append('duplicate feature ids')
@@ -211,17 +220,20 @@ for f in d['features']:
                 if v.get('mode') == 'sweep' and not any(l.get('type') == 'line' for l in L): errs.append(f'{w}: sweep needs a path of helper lines')
                 if v.get('mode') == 'revolve' and any(min(q[0] for q in l.get('pts', [l.get('c', [0])])) < -0.05 for l in solid if l['type'] == 'poly'): errs.append(f'{w}: revolve outline must stay at x >= 0')
         elif k in ('pos','rot','d') and isinstance(v, list): [expr(x, w) for x in v]
-        elif k in ('r','t','n','dx','dy','dz','off','roll','pitch','yaw','depth','angle','cx','cy','u','v','w','h'): expr(v, w)
-    new = [f['body']] if f['type'] in ('shape','copy') else []
+        elif k in ('r','t','n','dx','dy','dz','off','roll','pitch','yaw','depth','angle','cx','cy','u','v','w','h','gap','jd','jl','jn','jgap','lip','wall','slot','rim','clear','kgap','pin','margin','len','barb','s','bar','hd','cb','hk','idepth','af','m'): expr(v, w)
+        elif k == 'pts': [expr(x, w) for q in v for x in q]
+    new = [f['body']] if f['type'] in ('shape','copy','lid') else []
     if f['type'] == 'split' and f.get('keep') == 'both': new.append(f.get('body2'))
+    if f['type'] == 'split' and f.get('keep') == 'both' and f.get('joint') == 'pins': new.append(f.get('body3'))
     if f['type'] == 'shape' and f.get('kind') not in KINDS: errs.append(w + ': unknown kind')
-    if f['type'] == 'copy' and f['src'] not in alive: errs.append(w + f": {f['src']} not available")
-    for b in [f['body']] + f.get('tools', []):
-        if f['type'] not in ('shape','copy') and b not in alive: errs.append(w + f': {b} does not exist (yet) or was used up')
+    if f['type'] in ('copy','lid') and f['src'] not in alive: errs.append(w + f": {f['src']} not available")
+    for b in [f['body']] + f.get('tools', []) + ([f.get('body2')] if f['type'] == 'hinge' else []):
+        if f['type'] not in ('shape','copy','lid') and b not in alive: errs.append(w + f': {b} does not exist (yet) or was used up')
     for b in dict.fromkeys(new + [f['body']] + f.get('tools', [])):
         if b and b not in d['bodies']: errs.append(w + f': {b} missing from "bodies"')
     alive.update(b for b in new if b)
-    if f['type'] == 'combine': alive.difference_update(f.get('tools', []))
+    if f['type'] == 'combine' or (f['type'] == 'fit' and f.get('keepPart') is False): alive.difference_update(f.get('tools', []))
+    if f['type'] == 'hinge' and f.get('style') == 'living': alive.discard(f.get('body2'))
     if f['type'] == 'delete': alive.discard(f['body'])
 unnamed = [f['id'] for f in d['features'] if not f.get('name')]
 if unnamed: errs.append(f"{len(unnamed)} steps have no name (e.g. {', '.join(unnamed[:5])})")

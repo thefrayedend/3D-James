@@ -1,4 +1,4 @@
-import { h, modal, toast } from './dom.js';
+import { h, toast } from './dom.js';
 import { app } from '../state.js';
 
 /** Bundled projects are copied before opening; the distributed example never changes. */
@@ -20,9 +20,8 @@ export function bindExamples(body) {
       app.dirty = true; F.updateTitle();
       toast('Opened an editable copy. Save as a .3dj project to keep your changes.');
     };
-    const safelyOpen = async () => { try { await open(); } catch (err) { toast(err.message, 'err'); } };
-    if (!app.dirty) return safelyOpen();
-    modal('Open tutorial example?', h('p', {}, 'Your current project has unsaved changes. Cancel and save it first, or open the example without saving. The example opens as a new editable copy.'),
-      (done) => [h('button', { class: 'btn', onclick: done }, 'Cancel'), h('button', { class: 'btn danger', onclick: () => { done(); safelyOpen(); } }, 'Open without saving')]);
+    const F = await import('../files.js');
+    if (!(await F.askToSave())) return;
+    try { await open(); } catch (err) { toast(err.message, 'err'); }
   });
 }

@@ -40,6 +40,7 @@ const safeName = () => (store.doc.name || 'model').trim().replace(/[^\w.-]+/g, '
 // ---------------------------------------------------------------- the Open / Save windows
 // They belong to the drive: this computer's Open / Save windows, or the server's folders (see drive/).
 export async function openDialog() {
+  if (!(await askToSave())) return;
   const r = await drive.pickOpen(OPEN_TYPES, 'Open');
   if (r) await openFile(r.file, r.handle);
 }
@@ -211,6 +212,22 @@ export function newProject() {
   app.afterBuild = { fn: () => vp.view('home') };
 }
 
+/** Before the open project is replaced or closed: with unsaved changes, ask whether to save them first.
+ * Resolves true to go ahead (nothing to save, saved, or "Don't save"); false to stop (Cancel, or the save did not happen). */
+let asking = null;
+export function askToSave() {
+  if (!app.dirty) return Promise.resolve(true);
+  if (asking) return asking;
+  const name = app.file && PROJECT.includes(app.file.fmt) ? app.file.name : store.doc.name || 'Untitled';
+  asking = new Promise((resolve) => {
+    modal('Save changes?', h('p', {}, `Do you want to save the changes to ${name}?`), (done) => [
+      h('button', { class: 'btn', onclick: () => { done(); resolve(false); } }, 'Cancel'),
+      h('button', { class: 'btn', onclick: () => { done(); resolve(true); } }, "Don't save"),
+      h('button', { class: 'btn primary', onclick: async () => { done(); await saveDoc(); resolve(!app.dirty); } }, 'Save')], () => resolve(false));
+  }).finally(() => { asking = null; });
+  return asking;
+}
+
 export async function openFile(file, handle) {
   const fmt = fmtOf(file.name);
   try {
@@ -269,7 +286,7 @@ export async function insertFile(file, opts = {}) {
     else if (fmt === 'obj') await addMeshParts([{ ...parseObj(new TextDecoder().decode(bytes)), name: baseName(file.name) }], opts.stage);
     else if (fmt === '3mf') await addMeshParts(parse3mf(await readZip(bytes)).map((m) => ({ ...m, name: m.name || baseName(file.name) })), opts.stage);
     else if (fmt === 'step') return await addStep(baseName(file.name), bytes, opts.stepParts, opts.stage);
-    else if (fmt === 'json' || fmt === '3dj') return openFile(file, null);
+    else if (fmt === 'json' || fmt === '3dj') return (await askToSave()) ? openFile(file, null) : false;
     else toast('Insert works with STEP, STL, 3MF and OBJ files.', 'err');
     return true;
   } catch (err) { if (opts.throwErrors) throw err; toast(`Could not insert ${file.name}: ${err.message}`, 'err', 7000); return false; }

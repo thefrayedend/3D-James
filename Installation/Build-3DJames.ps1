@@ -358,6 +358,9 @@ class MainForm : Form
     string lastStatus = "idle";     // what the page was last told about updates
     string lastVersion;
     bool checking;
+    bool pageAsks;                  // the page answers the close button (it asks about unsaved changes)
+    bool closeOk;                   // the page said it may close
+    System.Windows.Forms.Timer closeTimer;
 
     public MainForm()
     {
@@ -375,6 +378,7 @@ class MainForm : Form
         Controls.Add(web);
 
         Load += OnLoad;
+        FormClosing += OnClosing;
     }
 
     async void OnLoad(object sender, EventArgs e)
@@ -413,6 +417,9 @@ class MainForm : Form
                 Text = string.IsNullOrEmpty(t) ? "3DJames" : t;
             };
 
+            // a page that is (re)loading has not said yet that it answers the close button
+            core.NavigationStarting += delegate { pageAsks = false; };
+
             // Links that open a new window (target=_blank, window.open) go to the default browser.
             core.NewWindowRequested += delegate (object s, CoreWebView2NewWindowRequestedEventArgs a)
             {
@@ -436,6 +443,9 @@ class MainForm : Form
                 else if (msg == "__3dj_updates_off") { Updates.Enabled = false; PostStatus(); }
                 else if (msg == "__3dj_status") PostStatus();
                 else if (msg == "__3dj_check") StartCheck();
+                else if (msg == "__3dj_close_asks") pageAsks = true;
+                else if (msg == "__3dj_close_wait") StopCloseTimer();
+                else if (msg == "__3dj_close_ok") { StopCloseTimer(); closeOk = true; try { BeginInvoke(new Action(Close)); } catch { } }
             };
             await core.AddScriptToExecuteOnDocumentCreatedAsync(
                 "window.addEventListener('keydown',function(e){if(e.key==='F11'){e.preventDefault();" +
@@ -463,6 +473,39 @@ class MainForm : Form
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
             Close();
         }
+    }
+
+    // The close button: the page asks "Save changes?" when there are unsaved changes, then says when to close.
+    // Shutting Windows down closes straight away; the page's backup brings the work back next start.
+    void OnClosing(object sender, FormClosingEventArgs e)
+    {
+        // (Task Manager's "End task" asks too, like Notepad; it offers to force it if the question is not answered)
+        if (closeOk || !pageAsks || web.CoreWebView2 == null || e.CloseReason == CloseReason.WindowsShutDown) return;
+        e.Cancel = true;
+        try { web.CoreWebView2.PostWebMessageAsJson("{\"type\":\"3dj-close\"}"); } catch { }
+        if (closeTimer != null) return;
+        // a page that does not answer (frozen) can still be closed
+        closeTimer = new System.Windows.Forms.Timer();
+        closeTimer.Interval = 4000;
+        closeTimer.Tick += delegate
+        {
+            StopCloseTimer();
+            if (MessageBox.Show(this, "3DJames is not answering, so it can't check for unsaved changes.\n\nClose it anyway?",
+                "3DJames", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            {
+                closeOk = true;
+                Close();
+            }
+        };
+        closeTimer.Start();
+    }
+
+    void StopCloseTimer()
+    {
+        if (closeTimer == null) return;
+        closeTimer.Stop();
+        closeTimer.Dispose();
+        closeTimer = null;
     }
 
     void StartCheck()

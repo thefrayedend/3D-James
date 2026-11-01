@@ -27,9 +27,9 @@ arrow-left.svg                 Cancel
 arrow-up-down.svg              Push/pull a face
 arrow-up-from-line.svg         Shape on a face
 bolt.svg                       Screws and bolts, Threaded bolt, Thread
-box.svg                        Cube
-box-select.svg                 Faces, Hollow
-check.svg                      Split, Apply
+box.svg                        Make a lid, Cube
+box-select.svg                 Faces, Hollow, Hollow out
+check.svg                      Split
 chevron-down.svg               (small buttons and lists)
 chevron-left.svg               (small buttons and lists)
 camera.svg                     From a photo…
@@ -39,7 +39,7 @@ pill.svg                       (small buttons and lists)
 chevron-right.svg              (small buttons and lists)
 circle.svg                     Washer, Round magnet, Sphere
 circle-dashed.svg              Holes and pockets, Screw hole (plain, countersunk, counterbored), Threaded hole (cutter)
-circle-dot.svg                 Bearings, Printed standoff, Heat-set insert hole, Heat-set insert pocket on a face, Tube
+circle-dot.svg                 Bearings, Printed standoff, Heat-set insert hole, Heat-set insert pocket on a face, Screw holes on a face, Tube
 clipboard-paste.svg            Paste
 cone.svg                       Cone
 copy.svg                       Mirror copy to the right, Mirror copy to the back, Mirror copy on top, Duplicate, Copy
@@ -51,7 +51,7 @@ file-plus.svg                  New
 flip-horizontal-2.svg          Flip left–right, Mirror
 flip-vertical-2.svg            Flip front–back, Flip upside down, Reflection
 folder-open.svg                Open…, Projects folder…
-grid-2x2.svg                   Aluminum extrusion, Pattern, Flat view
+grid-2x2.svg                   Aluminum extrusion, Pattern, Vents on a face, Flat view
 group.svg                      Group
 hexagon.svg                    Standoffs, Hex standoff (female-female), Hex standoff (male-female), Nut trap, Hexagon
 history.svg                    Save as new version…, Select version…, Backups…, History, Show in History
@@ -59,7 +59,7 @@ house.svg                      Home
 layers.svg                     On a surface…, Place sketch plane…, Workplane, Objects
 lock.svg                       (small buttons and lists)
 lock-open.svg                  (small buttons and lists)
-magnet.svg                     (small buttons and lists)
+magnet.svg                     Snap clip on a face
 maximize.svg                   Fit
 menu.svg                       (small buttons and lists)
 minus.svg                      Pins, rods and magnets, Dowel pin, Smooth rod, Threaded rod
@@ -69,7 +69,7 @@ move-3d.svg                    (small buttons and lists)
 nut.svg                        Nuts and washers, Threaded nut
 package.svg                    My parts, Parts, Save to My parts
 pipette.svg                    (small buttons and lists)
-plus.svg                       Save selected object, Insert a model…, Add
+plus.svg                       Save selected object, Insert a model…, Add, Click to add more
 printer.svg                    (small buttons and lists)
 pyramid.svg                    Pyramid
 settings-2.svg                 Adjust current plane…, Manage My parts…
@@ -81,12 +81,12 @@ save.svg                       Save
 save-all.svg                   Save as…, Save as
 scale-3d.svg                   (small buttons and lists)
 scan-eye.svg                   Look at face
-scissors.svg                   Split
+scissors.svg                   Split, Split to fit the printer (with connectors)
 sliders-horizontal.svg         (small buttons and lists)
 spline.svg                     Custom threads, Edges
 square-round-corner.svg        Round edges
 squares-intersect.svg          Intersect
-squares-subtract.svg           Subtract
+squares-subtract.svg           Subtract, Fit around (cut out with a gap)
 squares-unite.svg              Merge
 sun-moon.svg                   Theme
 torus.svg                      Torus
@@ -103,4 +103,5 @@ paintbrush.svg                 Paint parts
 paint-bucket.svg               (small buttons and lists)
 brush.svg                      (small buttons and lists)
 globe.svg                      (small buttons and lists)
-rows-3.svg                     (small buttons and lists)
+rows-3.svg                     Hinge between two parts
+wand-sparkles.svg              Helpers

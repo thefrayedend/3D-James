@@ -3,8 +3,10 @@
 #   - a newer version is downloaded, checked (size, SHA-256, version) and shown from the next start
 #   - a damaged download, an old version, no connection and "updates off" change nothing
 #   - the older installed copy is left alone, and a newer installed copy wins over an older download
+#   - the close button asks the page first (unsaved changes), and a page that does not answer can still be closed
 # python tests/updater_host.py          (needs Windows, the .NET Framework compiler and the WebView2 SDK that the installer script downloads)
-import hashlib, http.server, json, os, shutil, socket, subprocess, sys, tempfile, threading, time, urllib.request
+import ctypes, hashlib, http.server, json, os, shutil, socket, subprocess, sys, tempfile, threading, time, urllib.request
+from ctypes import wintypes
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,9 +31,30 @@ assert r.returncode == 0, r.stdout + r.stderr
 for f in [lib / 'Microsoft.Web.WebView2.Core.dll', lib / 'Microsoft.Web.WebView2.WinForms.dll', WV / 'runtimes/win-x64/native/WebView2Loader.dll']:
     shutil.copy(f, app)
 
-def page(version, pad=0):
-    return ('<!DOCTYPE html><html><head><meta charset="utf-8"><title>fake</title></head><body>fake 3DJames<script>window.__3DJ_VERSION="%s";</script>'
-            '<!--%s--></body></html>' % (version, 'x' * pad)).encode()
+def page(version, pad=0, script=''):
+    return ('<!DOCTYPE html><html><head><meta charset="utf-8"><title>fake</title></head><body>fake 3DJames<script>window.__3DJ_VERSION="%s";%s</script>'
+            '<!--%s--></body></html>' % (version, script, 'x' * pad)).encode()
+
+# the program's windows, found by process (never any other window)
+user32 = ctypes.windll.user32
+user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+def windows(pid, cls=None):
+    found = []
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(h, _):
+        owner = wintypes.DWORD(); user32.GetWindowThreadProcessId(h, ctypes.byref(owner))
+        name = ctypes.create_unicode_buffer(64); user32.GetClassNameW(h, name, 64)
+        if owner.value == pid and user32.IsWindowVisible(h) and (cls is None or name.value == cls): found.append(h)
+        return True
+    user32.EnumWindows(each, 0)
+    return found
+def click_close(run):
+    # what the window's X button (and Alt+F4) sends
+    for h in windows(run.p.pid):
+        user32.PostMessageW(h, 0x0112, 0xF060, 0)   # WM_SYSCOMMAND, SC_CLOSE
+def exited(run, secs):
+    try: run.p.wait(secs); return True
+    except subprocess.TimeoutExpired: return False
 
 def free_port():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
@@ -167,6 +190,40 @@ try:
     (app / '3DJames.html').write_bytes(page('0.5.0', 3000))
     r = Run(data3, url); check('a newer installed version wins', r.wait_js('window.__3DJ_VERSION') == '0.5.0'); statuses(r, 'current'); r.stop()
     check('the older download is cleaned away', not any((data3 / '3DJames/update').glob('0.*')))
+
+    # 8. the close button. The real page asks "Save changes?" (tests/unsaved.py); this stand-in records what it is told.
+    # (each start has its own data folder: one closing down may still hold its folder for a moment)
+    ASKS = ("window.__closes=0;chrome.webview.addEventListener('message',e=>{if(e.data&&e.data.type==='3dj-close'){window.__closes++;"
+            "chrome.webview.postMessage('__3dj_close_wait');}});chrome.webview.postMessage('__3dj_close_asks');")
+    (app / '3DJames.html').write_bytes(page('0.6.0', 3000, ASKS))
+    r = Run(work / 'close1', url, wait=600000); r.wait_js('window.__3DJ_VERSION'); time.sleep(0.5)
+    click_close(r)
+    check('closing asks the page first', r.wait_js('window.__closes', 10) == 1 and not exited(r, 5))
+    click_close(r)
+    check('each click asks again, and the program waits for its answer', r.wait_js('window.__closes>=2', 10) and not exited(r, 5))
+    r.js("chrome.webview.postMessage('__3dj_close_ok');1")
+    check('the page saying so closes the program', exited(r, 10))
+    # a page that does not answer (frozen): after a few seconds the program asks itself
+    (app / '3DJames.html').write_bytes(page('0.6.0', 3000, "chrome.webview.postMessage('__3dj_close_asks');"))
+    r = Run(work / 'close2', url, wait=600000); r.wait_js('window.__3DJ_VERSION'); time.sleep(0.5)
+    click_close(r)
+    check('a page that does not answer keeps the program open at first', not exited(r, 2))
+    end = time.time() + 10; box = []
+    while time.time() < end and not box: box = windows(r.p.pid, '#32770'); time.sleep(0.3)
+    check('then the program asks whether to close anyway', bool(box))
+    if box: user32.PostMessageW(box[0], 0x0111, 6, 0)   # WM_COMMAND IDYES
+    check('and Yes closes it', exited(r, 10))
+    # a page that never said it answers the close button (still loading, or older) closes straight away
+    (app / '3DJames.html').write_bytes(page('0.6.0', 3000))
+    r = Run(work / 'close3', url, wait=600000); r.wait_js('window.__3DJ_VERSION'); time.sleep(0.5)
+    click_close(r)
+    check('a page that does not ask closes straight away', exited(r, 10))
+    # a close request from another program or Task Manager (no X button) is asked about too
+    (app / '3DJames.html').write_bytes(page('0.6.0', 3000, ASKS))
+    r = Run(work / 'close4', url, wait=600000); r.wait_js('window.__3DJ_VERSION'); time.sleep(0.5)
+    for h in windows(r.p.pid): user32.PostMessageW(h, 0x0010, 0, 0)   # WM_CLOSE
+    check('a plain close request asks the page too', r.wait_js('window.__closes', 10) == 1 and not exited(r, 3))
+    r.stop()
 finally:
     srv.shutdown()
     for p in RUNS:

@@ -1,0 +1,68 @@
+<h1>Helpers: common jobs in a few clicks</h1>
+<p><b>Object</b> &gt; <b>Helpers</b> does jobs people do all the time on parts they have already made, like making a lid, joining two parts with a hinge, or cutting a part to fit the printer. Each one adds one step to History and opens it in Properties, where you can change its sizes and watch the part update. Delete the step to undo the job, or turn it off to compare.</p>
+<figure><img src="helpers-menu.jpg" alt="The Object tab with the Helpers menu open: Split to fit the printer, Hollow out, Make a lid, Hinge between two parts, Screw holes on a face, Fit around, Snap clip on a face, Vents on a face"><figcaption>Object &gt; Helpers. Pick the part (or parts) first, then the job.</figcaption></figure>
+<ul>
+<li>Most helpers need a <b>solid</b>: the ones that work on a face can't go on an imported STL or anything merged with a thread. <b>Make a lid</b>, <b>Fit around</b>, <b>Split</b> and the hinge also work on meshes.</li>
+<li>The gaps (0.15 to 0.3 mm) suit most printers. If a part comes out too tight, open its step and make the gap a little bigger.</li>
+</ul>
+
+<h2>Split to fit the printer</h2>
+<p>For a part too big for the bed, or one that prints better in two pieces. Pick it and choose <b>Split to fit the printer</b>. Move or tilt the green plane to where the cut should go, then click <b>Split</b>. Both halves are kept, with <b>pegs</b> on one and matching <b>holes</b> in the other, so they line up when you glue or press them together.</p>
+<figure><img src="helpers-split.jpg" alt="A long bar split in two; the blue half has two round pegs on the cut, the orange half has two holes; Properties shows the Connectors settings"><figcaption>Example: a 120 mm shelf split in the middle (the right half moved aside to show the pegs). Change the connector kind, size, length and number in Properties.</figcaption></figure>
+<ul>
+<li><b>Connectors</b>: <b>Pegs and holes</b>; <b>Pin holes</b> (a hole in each half, and loose pins printed as their own object beside it); or a <b>Dovetail</b> (a rail on one half that slides into a slot in the other, along the longest way across the cut).</li>
+<li>The connectors go where the cut face has room for them, so the walls around them stay strong. If they don't fit, make them smaller.</li>
+<li>You can also add connectors to any split: in the Split bar choose <b>Connectors</b>, or open a split step that keeps both halves.</li>
+</ul>
+
+<h2>Hollow out</h2>
+<p>The same as <b>Faces</b> &gt; <b>Hollow</b>: click the faces to leave open (the top of a box), set the wall thickness and click <b>Apply</b>. See <a data-help-topic="edges">Edges, faces, split and emboss</a>.</p>
+
+<h2>Make a lid</h2>
+<p>Pick an open box (for example a box hollowed out with its top left open) and choose <b>Make a lid</b>. A lid appears beside it, ready to print upside down: the plate on the bed and the lip up. Turn it over to put it on.</p>
+<figure><img src="helpers-lid.jpg" alt="An open blue box and an orange lid beside it, upside down with its lip showing; Properties shows the lid kind, thickness, lip depth, lip wall and gap"><figcaption>A push-on lid for a 50 × 36 mm box. The lip fits just inside the opening with a 0.15 mm gap.</figcaption></figure>
+<ul>
+<li><b>Kind</b>: <b>Push-on</b> (a lip inside the box), <b>Snap-on</b> (a small bead on the lip clicks into a groove that is cut inside the box), or <b>Sliding</b> (grooves are cut in the walls, open at the front, and a flat lid slides in from the front).</li>
+<li>A sliding lid needs walls thicker than the groove depth plus about 0.8 mm. 3DJames tells you if they are too thin.</li>
+<li>The lid follows the box: change the box's size and the lid changes with it. Move it with <b>Beside the box</b> X and Y.</li>
+</ul>
+
+<h2>Hinge between two parts</h2>
+<p>Put the two parts side by side on the floor, edges facing each other, a few millimetres apart. Pick both (click one, Ctrl+click the other) and choose <b>Hinge between two parts</b>.</p>
+<figure><img src="helpers-hinge.jpg" alt="Two plates joined along their facing edges by a row of knuckles that take turns between the blue and the orange plate; Properties shows the hinge settings"><figcaption>A pin hinge between two 5 mm plates. It prints in place and moves straight off the bed.</figcaption></figure>
+<ul>
+<li><b>Pin hinge</b>: knuckles along the bottom of the facing edges take turns between the parts, with a pin through them. The parts stay separate objects. Set the knuckle size, how many (0 picks for you), the pin, and the clearance.</li>
+<li><b>Living hinge</b>: a thin strip along the bottom joins the parts into one object, and the gap between them is what bends. 0.4 to 0.8 mm thick with a 2 to 4 mm gap works well in PETG; PP bends best. PLA cracks after a few bends.</li>
+<li>For a box with a flip-up lid: put the box and the lid side by side, then add the hinge.</li>
+</ul>
+
+<h2>Screw holes on a face</h2>
+<p>Pick a solid, choose <b>Screw holes on a face</b>, choose the kind and screw size, then click on a flat face where each hole goes. Click <b>Done</b> when you have them all. All the holes on one face are one step.</p>
+<figure><img src="helpers-holes.jpg" alt="A plate with four countersunk holes in the corners and a honeycomb of vent holes in the middle; Properties shows the screw hole settings and the position of each hole"><figcaption>Four countersunk M3 holes and a honeycomb of vents. Type exact positions for each hole in Properties (mm across and up from the middle of the face).</figcaption></figure>
+<ul>
+<li><b>Kind</b>: plain, <b>countersunk</b> (flat-head screws), <b>counterbored</b> (socket-head screws), <b>heat-set insert</b>, or <b>nut trap</b> (a hex pocket for a nut). Sizes M2 to M8 fill in the standard sizes; you can change any of them.</li>
+<li><b>Depth 0</b> goes through the wall under the face, and stops there. It doesn't go on through the far side of a hollow part.</li>
+<li><b>Click to add more</b> in the step adds holes on the same face. For holes on another face, start Screw holes again.</li>
+</ul>
+
+<h2>Fit around</h2>
+<p>To make a pocket that a real part fits into (a battery, a bearing, a tool, a magnet), place the part where it goes, overlapping the object. Pick the part only and choose <b>Fit around</b>. It is cut out of everything it passes through, with a gap all round, and the part itself stays.</p>
+<figure><img src="helpers-fit.jpg" alt="A blue holder with a curved channel cut in it, and a green battery lifted above it; Properties shows Fit around with a 0.2 mm gap"><figcaption>A battery holder: the battery was cut out with a 0.2 mm gap, then lifted to show the pocket.</figcaption></figure>
+<ul>
+<li>It is like <b>Subtract</b>, but it leaves room for the part after printing. Untick <b>Keep … as its own object</b> to use the part up.</li>
+<li>On an imported mesh, the gap is made by stretching the part slightly, which suits rounded and box-like parts best.</li>
+</ul>
+
+<h2>Snap clip on a face</h2>
+<p>Pick a solid, choose <b>Snap clip on a face</b> and click a flat face. A hook with a catch at its tip stands on the face. On the part it should hold, add another snap clip, set it to <b>The window it clicks into</b>, and give it the same width, thickness and catch.</p>
+<figure><img src="helpers-snap.jpg" alt="A blue plate with a snap hook standing on it and an orange plate with a rectangular window cut through it"><figcaption>A hook and the window it clicks into. Use <b>Catch faces</b> to turn which way the catch points.</figcaption></figure>
+<ul>
+<li>PETG bends better than PLA for clips. Make the hook longer for an easier click, or thicker for a firmer one.</li>
+</ul>
+
+<h2>Vents on a face</h2>
+<p>Pick a solid, choose <b>Vents on a face</b> and click a flat face. It fills with holes inside a margin, cut through the wall under it: a <b>honeycomb</b>, <b>round</b> holes or <b>slots</b>. Change the hole size, the bars between them and the margin in Properties.</p>
+<ul>
+<li>Only whole holes are cut: the pattern stays inside the margin, and around holes already in the face.</li>
+<li>Holes about 3 to 6 mm wide with bars of 1.2 mm or more print cleanly without support on a top face.</li>
+</ul>

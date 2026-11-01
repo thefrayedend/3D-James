@@ -5,11 +5,12 @@ import * as SG from './sketchgeom.js';
 import * as R from 'replicad';
 import { Matrix4, Vector3, Quaternion, Euler } from 'three';
 import { threadRodMesh } from './threadmesh.js';
-import { evalExpr, varScope, EXTRUSIONS, EXTRUSION_ALIAS, SLOT_HALF, JOIN_CAVITY } from './shared.js';
+import { evalExpr, varScope, EXTRUSIONS, EXTRUSION_ALIAS, SLOT_HALF, JOIN_CAVITY, faceXDir } from './shared.js';
 import { PART_DEFS } from './parts/defs.js';
 import { BUILDERS } from './parts/index.js';
 import { makeKit } from './parts/kit.js';
 import { tslot30Profile } from './parts/stock.js';
+import * as J from './jobs.js';
 
 let MF = null; // manifold wasm module
 export function setManifoldModule(m) { MF = m; }
@@ -83,7 +84,7 @@ function bbOf(v) {
   return solidBounds(v.shape);
 }
 function freeValue(v) {
-  try { if (v.mf) v.mf.delete(); else if (v.shape) v.shape.delete(); else if (v.parts) { freeValue(v.parts[0]); freeValue(v.parts[1]); } } catch { /* already gone */ }
+  try { if (v.mf) v.mf.delete(); else if (v.shape) v.shape.delete(); else if (v.parts) { freeValue(v.parts[0]); if (v.parts[1]) freeValue(v.parts[1]); if (v.pins) freeValue(v.pins); } } catch { /* already gone */ }
 }
 
 export function mfFromArrays(vertices, triangles) {
@@ -638,14 +639,9 @@ function matchRefs(items, refs, bb, dirKey, what) {
 
 // ---------- evaluation ----------
 export let lastState = new Map();
+// what the Helpers (src/jobs.js) use of the engine
+const E = { MF: () => MF, fail, asMf, bbOf, boolV, transformV, placeSolid, freeValue, needSolid, matchRefs, faceInfo, faceXDir };
 
-/** The across direction on a flat face with normal n (artwork and shapes on the face are drawn along it): X on a
- * face that points up or down, else level and square to n. */
-function faceXDir(n) {
-  if (Math.abs(n[2]) > 0.9) return [1, 0, 0];
-  const x = [-n[1], n[0], 0], l = len3(x);
-  return x.map((v) => v / l);
-}
 /** The artwork of an Emboss / engrave step as a solid of its own (the caller deletes it), and whether it cuts. */
 function embossPiece(shape, v, f, num, fonts) {
   const [hit] = matchRefs(faceInfo(shape), [f.face], bbOf(v), 'n', 'faces');
@@ -912,7 +908,7 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
         case 'split': {
           const b = need(f.body);
           const key = hash('P' + fj + b.key + scopeKey);
-          const val = cached(key, () => {
+          const plane = () => {
             const [mn, mx] = bbOf(b.v);
             let n, p;
             if (f.axis) {
@@ -927,6 +923,10 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
               const off = num(f.off ?? 0);
               p = [(mn[0] + mx[0]) / 2 + n[0] * off, (mn[1] + mx[1]) / 2 + n[1] * off, (mn[2] + mx[2]) / 2 + n[2] * off];
             }
+            return { n, p, mn, mx };
+          };
+          const cut = () => {
+            const { n, p, mn, mx } = plane();
             // the plane must actually pass through the object
             const corners = [];
             for (const x of [mn[0], mx[0]]) for (const y of [mn[1], mx[1]]) for (const z of [mn[2], mx[2]]) corners.push(dot(sub([x, y, z], p), n));
@@ -947,11 +947,19 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
             const up = place(R.makeBox([-big, -big, 0], [big, big, big]));
             const down = place(R.makeBox([-big, -big, -big], [big, big, 0]));
             return { parts: [{ shape: b.v.shape.clone().intersect(down) }, { shape: b.v.shape.clone().intersect(up) }] };
+          };
+          const val = cached(key, () => {
+            const halves = cut();
+            // pegs, pins or a dovetail so the two halves line up and hold together (Helpers > Split to fit the printer)
+            if ((f.keep || 'both') !== 'both' || !f.joint || f.joint === 'none') return halves;
+            const { n, p } = plane();
+            return J.splitJoints(E, b.v, b.key, halves.parts, n, p, f, num);
           });
           const keep = f.keep || 'both';
           if (keep === 'below') set(f.body, val.parts[0], key + 'b');
           else if (keep === 'above') set(f.body, val.parts[1], key + 'a');
           else { set(f.body, val.parts[0], key + 'b'); set(f.body2, val.parts[1], key + 'a'); }
+          if (val.pins && f.body3) set(f.body3, val.pins, key + 'p');
           break;
         }
         case 'emboss': {
@@ -1006,6 +1014,37 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
               fail('Push/pull could not be done at this distance. Try a smaller one.');
             }
           }), key);
+          break;
+        }
+        // ---- Helpers (src/jobs.js)
+        case 'fit': {
+          const b = need(f.body), part = need(f.tools?.[0]);
+          const key = hash('fit' + fj + b.key + part.key + scopeKey);
+          set(f.body, cached(key, () => J.fitAround(E, b.v, b.key, part.v, part.key, num(f.gap ?? 0.2))), key);
+          if (f.keepPart === false) consume(f.tools[0]);
+          break;
+        }
+        case 'lid': {
+          const b = need(f.src);
+          const key = hash('lid' + fj + b.key + scopeKey);
+          const val = cached(key, () => J.makeLid(E, b.v, b.key, f, num));
+          set(f.body, val.parts[0], key + 'l');
+          if (val.parts[1]) set(f.src, val.parts[1], key + 'b');
+          break;
+        }
+        case 'hinge': {
+          const a = need(f.body), b = need(f.body2);
+          const key = hash('hinge' + fj + a.key + b.key + scopeKey);
+          const val = cached(key, () => J.makeHinge(E, a.v, a.key, b.v, b.key, f, num));
+          set(f.body, val.parts[0], key + 'a');
+          if (val.parts[1]) set(f.body2, val.parts[1], key + 'b'); else consume(f.body2);
+          break;
+        }
+        case 'holes': case 'snap': case 'vents': {
+          const b = need(f.body);
+          const key = hash(f.type + fj + b.key + scopeKey);
+          const make = { holes: J.cutHoles, snap: J.snapPiece, vents: J.cutVents }[f.type];
+          set(f.body, cached(key, () => make(E, b.v, b.key, f, num)), key);
           break;
         }
         case 'delete': consume(f.body); break;

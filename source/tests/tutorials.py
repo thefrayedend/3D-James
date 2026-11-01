@@ -56,15 +56,15 @@ async def main():
   await topic('Tutorial: raised nameplate')
   before=await page.evaluate('JSON.stringify(window.__3dj.store.doc)')
   await page.get_by_role('button',name='Open editable example',exact=True).click()
-  await page.get_by_role('dialog',name='Open tutorial example?',exact=True).wait_for()
+  await page.get_by_role('dialog',name='Save changes?',exact=True).wait_for()
   await page.get_by_role('button',name='Cancel',exact=True).click()
   assert await page.evaluate('JSON.stringify(window.__3dj.store.doc)')==before
   await page.get_by_role('button',name='Open editable example',exact=True).click()
-  await page.get_by_role('button',name='Open without saving',exact=True).click();await built()
+  await page.get_by_role('button',name="Don't save",exact=True).click();await built()
   assert await page.evaluate('window.__3dj.store.doc.name')=='Tutorial - Raised nameplate'
   assert await page.evaluate('window.__3dj.app.file===null && window.__3dj.app.dirty')
   await page.evaluate("window.__3dj.store.commit(d=>d.features[1].text='HELLO')");await built()
-  await page.get_by_role('button',name='Open editable example',exact=True).click();await page.get_by_role('button',name='Open without saving',exact=True).click();await built()
+  await page.get_by_role('button',name='Open editable example',exact=True).click();await page.get_by_role('button',name="Don't save",exact=True).click();await built()
   assert await page.evaluate('window.__3dj.store.doc.features[1].text')=='MAKER'
   results.append({'name':'example opening protects unsaved work and always creates a fresh editable copy','ok':True})
   async with page.expect_download() as info:await page.get_by_role('button',name='Download .3dj',exact=True).click()

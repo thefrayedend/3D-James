@@ -227,8 +227,8 @@ export function askConflict(err, name) {
 }
 
 /** File menu: who is signed in, and Sign out. */
-export function signOut() {
-  if (app.dirty && !confirm('Your changes are not saved. Sign out anyway?')) return;
+export async function signOut() {
+  if (!(await (await import('../files.js')).askToSave())) return;
   app.dirty = false;
   location.href = '/logout';
 }

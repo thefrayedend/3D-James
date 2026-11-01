@@ -7,7 +7,7 @@ import os, subprocess, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)
 # quick ones first, so a broken build shows up early; stl_editable and link take the longest
-SUITES = ['help', 'run', 'features', 'ui_features', 'reliability', 'tutorials', 'planes', 'plane_ui', 'mesh_sketch', 'imports', 'sizing', 'paint', 'parts', 'updates', 'movearrows', 'dragdrop',
+SUITES = ['help', 'run', 'features', 'ui_features', 'reliability', 'unsaved', 'tutorials', 'planes', 'plane_ui', 'mesh_sketch', 'imports', 'sizing', 'paint', 'parts', 'helpers', 'updates', 'movearrows', 'dragdrop',
           'doubleclick', 'copies', 'sketch_lines', 'sketch_redraw', 'sketch_tools', 'photo', 'touch', 'updater_host', 'server', 'stl_editable', 'link']
 TIMEOUT = 20 * 60
 

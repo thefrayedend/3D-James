@@ -1,7 +1,7 @@
 // Tools that ask you to click edges, faces or a cutting plane first: fillet, chamfer, hollow,
 // shape on a face, push/pull and split.
 import { store, nextColor } from './store.js';
-import { evalExpr, HARDWARE } from './shared.js';
+import { evalExpr, HARDWARE, faceXDir, holeDims } from './shared.js';
 import { app, scope, bodyData } from './state.js';
 import { r4, toast } from './ui/dom.js';
 import { vp } from './view.js';
@@ -16,7 +16,7 @@ import { lookAtFace } from './sketchcmd.js';
 import { finishPaint } from './painttool.js';
 
 // tools that finish with a single click (no Apply button)
-export const ONE_CLICK = new Set(['extrude', 'pushpull', 'layflat', 'insertpocket', 'workplane', 'sketchplane', 'align', 'lookat', 'measure']);
+export const ONE_CLICK = new Set(['extrude', 'pushpull', 'layflat', 'insertpocket', 'workplane', 'sketchplane', 'align', 'lookat', 'measure', 'snap', 'vents']);
 
 /** Workplane (like TinkerCAD): new shapes are placed on this face, standing out from it. null = the floor. */
 export function setWorkplane(wp) {
@@ -33,7 +33,7 @@ export function solidSelected(what) {
   return id;
 }
 
-export function startTool(type) {
+export function startTool(type, opts = {}) {
   if (app.tool) endTool();
   if (type === 'fillet' || type === 'chamfer') {
     const id = solidSelected(type === 'fillet' ? 'Fillet' : 'Chamfer'); if (!id) return;
@@ -46,6 +46,11 @@ export function startTool(type) {
   } else if (['extrude', 'pushpull', 'layflat', 'insertpocket'].includes(type)) {
     const id = solidSelected({ extrude: 'Shape on face', pushpull: 'Push/pull', layflat: 'Lay flat', insertpocket: 'Insert pocket' }[type]); if (!id) return;
     app.tool = { type, body: id, items: [] };
+    vp.startPick('face', (b) => b === id, []);
+  } else if (['holes', 'snap', 'vents'].includes(type)) {
+    // Helpers that go on a face: screw holes (click spots, then Done), a snap clip or vents (one click)
+    const id = solidSelected({ holes: 'Screw holes', snap: 'Snap clip', vents: 'Vents' }[type]); if (!id) return;
+    app.tool = { type, body: id, items: [], kind: 'countersunk', size: 'M3', ...opts };
     vp.startPick('face', (b) => b === id, []);
   } else if (type === 'measure') {
     app.tool = { type, kind: 'point', unit: 'mm', items: [] };
@@ -69,7 +74,7 @@ export function startTool(type) {
     const id = app.sel[0]; const d = bodyData(id);
     const [mn, mx] = d.bbox;
     const diag = Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
-    app.tool = { type, body: id, off: 0, roll: 0, pitch: 0, yaw: 0, keep: 'above', pmode: 'move' };
+    app.tool = { type, body: id, off: 0, roll: 0, pitch: 0, yaw: 0, keep: opts.joint ? 'both' : 'above', pmode: 'move', joint: opts.joint || 'none', jd: 5, jl: 8, jn: 2, jgap: 0.15 };
     vp.startPlane({ center: [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2], size: Math.max(diag * 1.15, 10), off: 0, roll: 0, pitch: 0, yaw: 0 });
   }
   editStep(null);
@@ -164,6 +169,21 @@ export function toolPick(kind, hit) {
     endTool();
     return;
   }
+  if (t.type === 'holes') return holeClick(t, hit);
+  if (t.type === 'snap' || t.type === 'vents') {
+    const d = bodyData(hit.body);
+    if (d.flat && !d.flat[hit.index]) return toast(`${t.type === 'snap' ? 'A snap clip' : 'Vents'} go on a flat face. Click a flat face.`, 'err');
+    const face = faceRef(d, hit.index), [u, v] = faceUV(d, hit.index, hit.point);
+    let fid;
+    store.commit((doc) => {
+      fid = store.newId('f');
+      doc.features.push(t.type === 'snap'
+        ? { id: fid, type: 'snap', body: hit.body, face, mode: 'hook', w: 6, len: 8, t: 1.6, barb: 0.8, gap: 0.2, u, v, angle: 0, depth: 0 }
+        : { id: fid, type: 'vents', body: hit.body, face, pattern: 'hex', s: 5, bar: 1.6, margin: 3, depth: 0, dir: 'across' });
+    });
+    app.tool = null; vp.endPick(); editStep(fid); openPanel('props'); renderCmdBar(); renderAll();
+    return;
+  }
   if (t.type === 'extrude' || t.type === 'pushpull' || t.type === 'insertpocket') {
     // one click is enough: the step is made right away and opened, so its numbers can be typed in
     const d = bodyData(hit.body);
@@ -185,6 +205,36 @@ export function toolPick(kind, hit) {
   }
   if (i >= 0) t.items.splice(i, 1); else t.items.push(hit);
   vp.setPickItems(t.items);
+  renderProps();
+}
+
+/** Where a clicked point is on a flat face, across (u) and up (v) from the face's middle, as the engine measures it. */
+function faceUV(d, index, point, c = Array.from(d.faces.subarray(index * 6, index * 6 + 3)), n = Array.from(d.faces.subarray(index * 6 + 3, index * 6 + 6))) {
+  const x = faceXDir(n), y = [n[1] * x[2] - n[2] * x[1], n[2] * x[0] - n[0] * x[2], n[0] * x[1] - n[1] * x[0]];
+  const rel = point.map((q, i) => q - c[i]);
+  const r1 = (q) => Math.round(q * 10) / 10;
+  return [r1(rel[0] * x[0] + rel[1] * x[1] + rel[2] * x[2]), r1(rel[0] * y[0] + rel[1] * y[1] + rel[2] * y[2])];
+}
+/** Screw holes: each click on the face adds a hole there (all in one step); more holes on the same face only. */
+function holeClick(t, hit) {
+  const d = bodyData(hit.body);
+  if (d.flat && !d.flat[hit.index]) return toast('Screw holes go on a flat face. Click a flat face.', 'err');
+  const n = Array.from(d.faces.subarray(hit.index * 6 + 3, hit.index * 6 + 6));
+  const step = t.step && store.doc.features.find((x) => x.id === t.step);
+  if (step) {
+    // the same face: facing the same way, in the same plane as the first hole's face
+    const same = step.wn && n.reduce((s, q, i) => s + q * step.wn[i], 0) > 0.999 && Math.abs(hit.point.reduce((s, q, i) => s + (q - step.wc[i]) * step.wn[i], 0)) < 0.05;
+    if (!same) return toast('Click on the same face. For holes on another face, click Done and start Screw holes again.', 'err', 5000);
+    const uv = faceUV(d, hit.index, hit.point, step.wc, step.wn);
+    store.commit((doc) => { const f = doc.features.find((x) => x.id === t.step); if (f) f.pts = [...(f.pts || []), uv]; });
+  } else {
+    const c = Array.from(d.faces.subarray(hit.index * 6, hit.index * 6 + 3));
+    const face = faceRef(d, hit.index), uv = faceUV(d, hit.index, hit.point);
+    store.commit((doc) => {
+      t.step = store.newId('f');
+      doc.features.push({ id: t.step, type: 'holes', body: hit.body, face, kind: t.kind, size: t.size, ...holeDims(t.kind, t.size), depth: 0, pts: [uv], wc: c.map(r4), wn: n.map(r4) });
+    });
+  }
   renderProps();
 }
 
@@ -239,6 +289,7 @@ export function applyTool() {
     store.commit((doc) => { id = store.newId('f'); doc.features.push({ id, type, body, face, source, text, font, size, depth, angle, u, v, mode, ...(logo ? { logo } : {}) }); });
     endTool(); editStep(id); openPanel('props'); return;
   }
+  if (t.type === 'holes') { const id = t.step; endTool(); if (id) { editStep(id); openPanel('props'); } return; }
   if (t.type === 'fillet' || t.type === 'chamfer') {
     if (t.previewId) return toolPreviewDone(); // already made by dragging its size
     if (!t.items.length) return toast('Click one or more edges first.');
@@ -253,8 +304,12 @@ export function applyTool() {
   } else if (t.type === 'split') {
     store.commit((doc) => {
       const b2 = store.newId('b');
-      doc.features.push({ id: store.newId('f'), type: 'split', body: t.body, body2: b2, off: t.off, roll: t.roll, pitch: t.pitch, yaw: t.yaw, keep: t.keep });
+      const joint = t.keep === 'both' ? t.joint : 'none';
+      const step = { id: store.newId('f'), type: 'split', body: t.body, body2: b2, off: t.off, roll: t.roll, pitch: t.pitch, yaw: t.yaw, keep: t.keep };
+      if (joint && joint !== 'none') Object.assign(step, { joint, jd: t.jd, jl: t.jl, jn: t.jn, jgap: t.jgap }, joint === 'pins' ? { body3: store.newId('b') } : {});
+      doc.features.push(step);
       if (t.keep === 'both') { const pb = doc.bodies[t.body] || {}; doc.bodies[b2] = { ...pb, name: `${pb.name || 'Object'} (part 2)`, color: nextColor(doc) }; }
+      if (step.body3) doc.bodies[step.body3] = { name: `${doc.bodies[t.body]?.name || 'Object'} pins`, color: nextColor(doc) };
     });
   }
   endTool();

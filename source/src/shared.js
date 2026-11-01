@@ -96,6 +96,24 @@ export const HARDWARE = {
 export const CBORE = { M2: 4.4, 'M2.5': 5.5, M3: 6.5, M4: 8, M5: 10, M6: 11, M8: 15 };
 export const HOLE_KINDS = new Set(['screwhole', 'nuttrap', 'insert', ...PART_HOLES]);
 export function HARDWARE_DEFAULTS(kind, size) { const v = { ...HARDWARE[kind][size] }; if (kind === 'screwhole') v.cb = CBORE[size]; return v; }
+/** The sizes a Screw holes step (Helpers) starts with for a kind of hole and a screw size. */
+export function holeDims(kind, size) {
+  const s = HARDWARE.screwhole[size] || HARDWARE.screwhole.M3;
+  if (kind === 'insert') { const i = HARDWARE.insert[size] || HARDWARE.insert.M3; return { d: i.d, idepth: i.depth }; }
+  if (kind === 'nut') { const n = HARDWARE.nuttrap[size] || HARDWARE.nuttrap.M3; return { d: n.d, af: n.af, m: n.m }; }
+  if (kind === 'countersunk') return { d: s.d, hd: s.hd };
+  if (kind === 'counterbore') return { d: s.d, cb: CBORE[size] || CBORE.M3, hk: s.hk };
+  return { d: s.d };
+}
+export const HOLE_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8'];
+
+/** The across direction on a flat face with normal n (artwork and shapes on the face are drawn along it): X on a
+ * face that points up or down, else level and square to n. */
+export function faceXDir(n) {
+  if (Math.abs(n[2]) > 0.9) return [1, 0, 0];
+  const x = [-n[1], n[0], 0], l = Math.hypot(x[0], x[1]);
+  return x.map((v) => v / l);
+}
 const sizes = (k) => Object.keys(HARDWARE[k]).map((s) => [s, s]);
 
 // field: [key, label, type, extra]
