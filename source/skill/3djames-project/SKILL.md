@@ -169,12 +169,12 @@ Sizes M2–M30, #6-32, #8-32, #10-24, 1/4"-20, 5/16"-18, 3/8"-16, 1/2"-13. Alway
 - **delete** `{"type":"delete","body":"b5"}`.
 
 ### Helpers (common jobs; each is one step)
-- **split with connectors**: a `split` with `keep:"both"` may add `"joint":"pegs"|"pins"|"dovetail","jd":5,"jl":8,"jn":2,"jgap":0.15` (diameter or dovetail width, length or height, how many, gap per side). `pins` also needs `"body3":"b9"` (add it to `bodies`): the loose pins to print.
+- **split with connectors**: a `split` with `keep:"both"` may add `"joint":"pegs"|"pins"|"dovetail","jd":5,"jl":8,"jn":2,"jgap":0.15` (diameter or dovetail width, length or height, how many, gap per side). `pins` also needs `"body3":"b9"` (add it to `bodies`): the loose pins to print. Pegs and pins are shortened by themselves where a half is too thin for them.
 - **fit** (cut out with a printing gap) `{"type":"fit","body":"b1","tools":["b2"],"gap":0.2,"keepPart":true}` — b2 is cut out of b1, grown by `gap` all round; b2 stays unless `keepPart:false`. Place b2 overlapping b1 first.
 - **lid** `{"type":"lid","src":"b1","body":"b7","style":"friction"|"snap"|"slide","t":2,"lip":4,"wall":1.2,"gap":0.15,"slot":1,"dx":50,"dy":0}` — new body `b7` (add it to `bodies`): a lid for the open box b1 (hollow it first with `shell` and its top face open), placed `dx,dy` beside it, printed upside down. `snap` and `slide` also cut grooves into b1.
-- **hinge** `{"type":"hinge","body":"b1","body2":"b2","style":"pin"|"living","d":5,"n":0,"pin":0,"clear":0.3,"kgap":0.4,"t":0.6,"margin":1}` — b1 and b2 must sit side by side (edges facing, a few mm apart, not overlapping), along X or Y. `pin`: print-in-place knuckles along their bottom edges (`n` 0 = automatic odd count, `pin` 0 = automatic). `living`: a strip `t` thick joins them; b2 is used up into b1.
+- **hinge** `{"type":"hinge","body":"b1","body2":"b2","style":"pin"|"living","d":5,"n":0,"pin":0,"clear":0.3,"kgap":0.4,"t":0.6,"margin":1}` — b1 and b2 must sit side by side (edges facing, a few mm apart, not overlapping), along X or Y. `pin`: print-in-place knuckles along the top of their facing edges (they fold shut top to top, so give both parts the same height) (`n` 0 = automatic odd count, `pin` 0 = automatic). `living`: a strip `t` thick joins them; b2 is used up into b1.
 - **holes** (screw holes on a flat face) `{"type":"holes","body":"b1","face":{nc,d},"kind":"plain"|"countersunk"|"counterbore"|"insert"|"nut","size":"M3","d":3.4,"hd":6.72,"cb":6.5,"hk":3.3,"idepth":6,"af":5.7,"m":2.6,"depth":0,"pts":[[u,v],...]}` — `pts` are mm across/up from the face centre (like `extrude` u,v). `depth:0` goes through the wall under the face only. Give the sizes for the kind: plain `d`; countersunk `d,hd`; counterbore `d,cb,hk`; insert `d` (insert hole) and `idepth`; nut `d,af,m`.
-- **snap** `{"type":"snap","body":"b1","face":{nc,d},"mode":"hook"|"window","w":6,"len":8,"t":1.6,"barb":0.8,"gap":0.2,"u":0,"v":0,"angle":0,"depth":0}` — a snap hook standing on the face, or the window it clicks into (same w/t/barb).
+- **snap** `{"type":"snap","body":"b1","face":{nc,d},"mode":"hook"|"window","w":6,"len":10,"t":1.6,"barb":1,"gap":0.2,"u":0,"v":0,"angle":0,"depth":0}` — a snap hook standing on the face, or the window it clicks into (same w/t/barb). A hook may add `"body2":"b2"`: the part it clicks into, placed where the hook goes into it; its window is cut there.
 - **vents** `{"type":"vents","body":"b1","face":{nc,d},"pattern":"hex"|"round"|"slots","s":5,"bar":1.6,"margin":3,"depth":0,"dir":"across"|"up"}` — holes filling the face inside the margin, through the wall under it.
 - Any step may have `"name"` (shown in History) or `"suppressed": true`.
 
@@ -227,7 +227,7 @@ for f in d['features']:
     if f['type'] == 'split' and f.get('keep') == 'both' and f.get('joint') == 'pins': new.append(f.get('body3'))
     if f['type'] == 'shape' and f.get('kind') not in KINDS: errs.append(w + ': unknown kind')
     if f['type'] in ('copy','lid') and f['src'] not in alive: errs.append(w + f": {f['src']} not available")
-    for b in [f['body']] + f.get('tools', []) + ([f.get('body2')] if f['type'] == 'hinge' else []):
+    for b in [f['body']] + f.get('tools', []) + ([f.get('body2')] if f['type'] in ('hinge', 'snap') and f.get('body2') else []):
         if f['type'] not in ('shape','copy','lid') and b not in alive: errs.append(w + f': {b} does not exist (yet) or was used up')
     for b in dict.fromkeys(new + [f['body']] + f.get('tools', [])):
         if b and b not in d['bodies']: errs.append(w + f': {b} missing from "bodies"')

@@ -167,7 +167,8 @@ function applyResults(m) {
   app.sel = app.sel.filter((id) => map.has(id));
   vp.setSelection(app.sel);
   // tell about each new problem once
-  for (const [fid, msg] of Object.entries(m.errors)) if (shownErrors[fid] !== msg) { shownErrors[fid] = msg; toast(msg, 'err', 6500); }
+  // (a helper checking its new step shows its own message: see helpercmds.js)
+  if (!app.helperCheck) for (const [fid, msg] of Object.entries(m.errors)) if (shownErrors[fid] !== msg) { shownErrors[fid] = msg; toast(msg, 'err', 6500); }
   for (const k of Object.keys(shownErrors)) if (!m.errors[k]) delete shownErrors[k];
   if (!app.viewSet) { app.viewSet = true; vp.view('home', false); }
   if (app.toPlane?.length) {

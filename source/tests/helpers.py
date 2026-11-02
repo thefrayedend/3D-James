@@ -47,6 +47,16 @@ window.__helpers = async () => {
   const overlap = (steps) => [...steps, { id: 'fc1', type: 'copy', src: 'b1', body: 'c1', d: [0, 0, 0] }, { id: 'fc2', type: 'copy', src: 'b2', body: 'c2', d: [0, 0, 0] }, { id: 'fz', type: 'combine', op: 'intersect', body: 'c1', tools: ['c2'] }];
   R.pegs_touch = await scene(overlap([box('b1', 100, 20, 10), split('pegs')]), B('b1', 'b2', 'b3', 'c1', 'c2'));
   R.dove_touch = await scene(overlap([box('b1', 100, 20, 10), split('dovetail')]), B('b1', 'b2', 'b3', 'c1', 'c2'));
+  // the hinge turns: the second plate swung over about the pin (90 and 180 degrees) never runs into the first one
+  const swing = (deg) => { const a = (-deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a); return [c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, -4 * s, 0, 4 - 4 * c, 1]; };
+  for (const deg of [90, 180]) R['hinge_fold' + deg] = await scene([...plates, { id: 'fh', type: 'hinge', body: 'b1', body2: 'b2', style: 'pin', d: 4, n: 0, pin: 0, clear: 0.3, kgap: 0.4, margin: 1 },
+    { id: 'fc1', type: 'copy', src: 'b1', body: 'c1', d: [0, 0, 0] }, { id: 'fc2', type: 'copy', src: 'b2', body: 'c2', d: [0, 0, 0] }, { id: 'fm', type: 'move', body: 'c2', m: swing(deg) },
+    { id: 'fz', type: 'combine', op: 'intersect', body: 'c1', tools: ['c2'] }], B('b1', 'b2', 'c1', 'c2'));
+  // pegs on a cut through a thin part are made shorter so they do not come out the far side
+  R.split_thin = await scene([box('b1', 120, 30, 16), { ...split('pegs'), pitch: 0 }], B('b1', 'b2', 'b3'));
+  // a snap hook with the part it clicks into: the window is cut in that part
+  R.snap_into = await scene([box('b1', 40, 40, 10), box('b2', 40, 40, 3, [0, 0, 14]), { id: 'fn', type: 'snap', body: 'b1', body2: 'b2', face: TOP, mode: 'hook', w: 6, len: 10, t: 1.6, barb: 1, gap: 0.2, u: 0, v: 0, angle: 0, depth: 0 }], B('b1', 'b2'));
+  R.snap_miss = await scene([box('b1', 40, 40, 10), box('b2', 40, 40, 3, [60, 0, 0]), { id: 'fn', type: 'snap', body: 'b1', body2: 'b2', face: TOP, mode: 'hook', w: 6, len: 10, t: 1.6, barb: 1, gap: 0.2, u: 0, v: 0, angle: 0, depth: 0 }], B('b1', 'b2'));
   R.hinge_living = await scene([...plates, { id: 'fh', type: 'hinge', body: 'b1', body2: 'b2', style: 'living', t: 0.6, margin: 1 }], B('b1', 'b2'));
   R.hinge_front = await scene([box('b1', 40, 30, 4, [-22, 0, 0]), box('b2', 40, 30, 4, [-10, 50, 0]), { id: 'fh', type: 'hinge', body: 'b1', body2: 'b2', style: 'pin', d: 4, n: 0 }], B('b1', 'b2'));
   R.hinge_apart = await scene([box('b1', 40, 30, 4, [-22, 0, 0]), box('b2', 40, 30, 4, [30, 50, 0]), { id: 'fh', type: 'hinge', body: 'b1', body2: 'b2', style: 'pin', d: 4, n: 0 }], B('b1', 'b2'));
@@ -122,10 +132,10 @@ async def main():
         s = await steps(); U['snap'] = (s[-1]['type'] == 'snap' and s[-1]['u'] == 5 and s[-1]['v'] == 3 and not await errors(), s[-1])
         await select(box); await helper('Vents on a face'); await click_face(box, [0, 0, -1])
         s = await steps(); U['vents'] = (s[-1]['type'] == 'vents' and not await errors(), s[-1])
-        await select(box); await helper('Split to fit the printer (with connectors)')
+        [box] = await start(('box', {'w': 60, 'd': 40, 'h': 10}, None)); await select(box); await helper('Split to fit the printer (with connectors)')
         U['split_bar'] = await pg.get_by_role('button', name='Connectors: Pegs and holes').count() == 1
         await pg.get_by_role('button', name='Split', exact=True).click(); await built()
-        s = await steps(); U['split'] = (s[-1]['type'] == 'split' and s[-1]['joint'] == 'pegs' and s[-1]['keep'] == 'both' and not await errors(), s[-1])
+        s = await steps(); U['split'] = (s[-1]['type'] == 'split' and s[-1]['joint'] == 'pegs' and s[-1]['keep'] == 'both' and not await errors(), s[-1], await pg.evaluate('window.__3dj.app.results.errors'))
         [box, part] = await start(('box', {'w': 30, 'd': 30, 'h': 10}, None), ('cyl', {'d': 10, 'h': 20}, [0, 0, -5])); await select(part)
         await helper('Fit around (cut out with a gap)')
         s = await steps(); U['fit'] = (s[-1]['type'] == 'fit' and s[-1]['tools'] == [part] and not await errors(), s[-1])
@@ -136,6 +146,24 @@ async def main():
         [a, b2] = await start(('box', {'w': 40, 'd': 30, 'h': 4}, [-22, 0, 0]), ('box', {'w': 40, 'd': 30, 'h': 4}, [22, 0, 0])); await select(a, b2)
         await helper('Hinge between two parts')
         s = await steps(); U['hinge'] = (s[-1]['type'] == 'hinge' and not await errors(), s[-1], await pg.evaluate('window.__3dj.app.results.errors'))
+        # a lid for a closed box hollows it first (no broken step, no red message)
+        [box] = await start(('box', {'w': 40, 'd': 30, 'h': 20}, None)); await select(box)
+        await helper('Make a lid'); await built(); await pg.wait_for_timeout(300); await built()
+        s = await steps(); U['lid_closed_box'] = ([x['type'] for x in s] == ['shape', 'shell', 'lid'] and not await errors() and await pg.locator('.toast.err').count() == 0, s)
+        # a hinge that cannot work is taken back out, with the reason
+        [a, b2] = await start(('box', {'w': 40, 'd': 30, 'h': 4}, None), ('box', {'w': 40, 'd': 30, 'h': 4}, [10, 0, 0])); await select(a, b2)
+        await helper('Hinge between two parts'); await built(); await pg.wait_for_timeout(300); await built()
+        s = await steps(); U['hinge_overlap_undone'] = ([x['type'] for x in s] == ['shape', 'shape'] and await pg.locator('.toast.err', has_text='side by side').count() == 1, s)
+        # split to fit the printer starts across the longest side and opens the step
+        [box] = await start(('box', {'w': 120, 'd': 30, 'h': 16}, None)); await select(box)
+        await helper('Split to fit the printer (with connectors)')
+        await pg.get_by_role('button', name='Split', exact=True).click(); await built()
+        s = await pg.evaluate("window.__3dj.store.doc.features.at(-1)")
+        U['split_across'] = (s['type'] == 'split' and s['pitch'] == 90 and await pg.get_by_text('Connectors', exact=True).count() > 0, s)
+        # two parts picked: the hook goes on the face clicked, its window in the other part
+        [a, b2] = await start(('box', {'w': 40, 'd': 40, 'h': 10}, None), ('box', {'w': 40, 'd': 40, 'h': 3}, [0, 0, 14])); await select(a, b2)
+        await helper('Snap clip on a face'); await click_face(a, [0, 0, 1])
+        s = await steps(); U['snap_two_parts'] = (s[-1]['type'] == 'snap' and not await errors() and await pg.evaluate("window.__3dj.store.doc.features.at(-1).body2") == b2, s)
         await b.close()
     vol = lambda s, i: R[s]['b'].get(i, {}).get('v', 0)
     size = lambda s, i, k: (lambda bb: bb[1][k] - bb[0][k])(R[s]['b'][i]['bb'])
@@ -171,6 +199,12 @@ async def main():
     check('the hinge knuckles keep a gap of at least 0.1 mm from the other part', empty('hinge_touch'), R['hinge_touch']['errors'])
     check('the pegs do not overlap their holes', empty('pegs_touch'), (R['pegs_touch']['errors'], vol('pegs_touch', 'c1')))
     check('the dovetail rail does not overlap its slot', empty('dove_touch'), (R['dove_touch']['errors'], vol('dove_touch', 'c1')))
+    for deg in [90, 180]:
+        check(f'the pin hinge swings {deg} degrees without running into the other part', empty(f'hinge_fold{deg}'), (R[f'hinge_fold{deg}']['errors'], vol(f'hinge_fold{deg}', 'c1')))
+    check('pegs through a thin half are made shorter (no hole out the top)', clean('split_thin') and R['split_thin']['b']['b1']['bb'][1][2] < 16 - 1.2 and abs(size('split_thin', 'b2', 2) - 8) < 0.01, (R['split_thin']['errors'], R['split_thin']['b']['b1']['bb']))
+    win = 6.4 * 3.0 * 3
+    check('a snap hook cuts its window in the part it clicks into', clean('snap_into') and abs((4800 - vol('snap_into', 'b2')) - win) < 2, (R['snap_into']['errors'], 4800 - vol('snap_into', 'b2')))
+    check('a snap hook that misses the other part says so', 'fn' in R['snap_miss']['errors'] and 'reach' in R['snap_miss']['errors']['fn'], R['snap_miss']['errors'])
     check('living hinge joins them into one object', clean('hinge_living') and list(R['hinge_living']['b']) == ['b1'] and abs(size('hinge_living', 'b1', 0) - 84) < 0.05, R['hinge_living'])
     check('a hinge between parts front to back (only its defaults given)', clean('hinge_front') and len(R['hinge_front']['b']) == 2, R['hinge_front']['errors'])
     check('a hinge for parts that are not side by side explains', 'fh' in R['hinge_apart']['errors'] and 'side by side' in R['hinge_apart']['errors']['fh'], R['hinge_apart']['errors'])

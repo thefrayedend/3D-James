@@ -1,6 +1,6 @@
 // The Properties tab: the selected object, the step being edited, or the open tool.
 import { Matrix4, Vector3, Quaternion } from 'three';
-import { store, creatorOf, isSimplePrimitive, featuresOfBody, describeFeature, nextColor, stepTree } from '../store.js';
+import { store, creatorOf, isSimplePrimitive, featuresOfBody, featureRefs, describeFeature, nextColor, stepTree } from '../store.js';
 import { SHAPES, threadDefaults, evalExpr, PALETTE, HARDWARE, HARDWARE_DEFAULTS, holeDims, HOLE_SIZES } from '../shared.js';
 import { PART_SHAPES, presetFor } from '../catalog.js';
 import { editSketch, editSketches, sketchGroup } from '../sketchcmd.js';
@@ -277,26 +277,26 @@ export function renderFeaturePanel(el, f, { inline = false } = {}) {
         h('div', { class: 'muted' }, `${bodyName(f.tools?.[0])} is cut out of ${bodyName(f.body)} with this gap all round, so it fits after printing. 0.2 mm suits most printers; use more for a loose fit.`));
       el.append(card); break;
     case 'lid': {
-      card.append(h('h3', {}, 'Lid'), selectField('Kind', f.style || 'friction', [['friction', 'Push-on (a lip inside the box)'], ['snap', 'Snap-on (the lip clicks into a groove)'], ['slide', 'Sliding (slides in from the front)']], (v) => updateFeature(f.id, (x) => { x.style = v; })),
+      card.append(h('h3', {}, 'Lid'), selectField('Kind', f.style || 'friction', [['friction', 'Push-on'], ['snap', 'Snap-on'], ['slide', 'Sliding']], (v) => updateFeature(f.id, (x) => { x.style = v; })),
         num('Lid thickness', 't', { step: 0.2, min: 0.4 }));
       if (f.style === 'slide') card.append(num('Groove depth (into the walls)', 'slot', { step: 0.2, min: 0.3 }), num('Rim above the groove', 'rim', { step: 0.2, min: 0.8 }));
       else card.append(num('Lip depth', 'lip', { step: 0.5, min: 0.6 }), num('Lip wall', 'wall', { step: 0.2, min: 0.5 }));
       card.append(num('Gap (each side)', 'gap', { step: 0.05, min: 0 }), num('Beside the box: X', 'dx', { step: 5 }), num('Beside the box: Y', 'dy', { step: 5 }),
         h('div', { class: 'muted' }, f.style === 'slide'
           ? `Grooves are cut inside the walls of ${bodyName(f.src)}, open at the front, and the lid slides in from the front. The walls need to be thicker than the groove depth plus about 0.8 mm.`
-          : `The lid prints upside down, as shown: plate on the bed, lip up. Turn it over to put it on.${f.style === 'snap' ? ` A small groove is cut inside ${bodyName(f.src)} for the bead on the lip.` : ''} Make the gap bigger if it is too tight.`));
+          : `${f.style === 'snap' ? `A bead on the lip clicks into a groove cut inside ${bodyName(f.src)}, so it stays shut.` : 'A lip fits just inside the opening and holds by friction.'} The lid prints upside down, as shown: plate on the bed, lip up. Turn it over to put it on. Make the gap bigger if it is too tight.`));
       el.append(card); break;
     }
     case 'hinge':
-      card.append(h('h3', {}, 'Hinge'), selectField('Kind', f.style || 'pin', [['pin', 'Pin hinge (prints in place)'], ['living', 'Living hinge (a thin strip that bends)']], (v) => updateFeature(f.id, (x) => { x.style = v; })));
+      card.append(h('h3', {}, 'Hinge'), selectField('Kind', f.style || 'pin', [['pin', 'Pin hinge'], ['living', 'Living hinge']], (v) => updateFeature(f.id, (x) => { x.style = v; })));
       if (f.style === 'living') card.append(num('Strip thickness', 't', { step: 0.1, min: 0.2 }), h('div', { class: 'muted' }, 'A thin strip along the bottom joins the two parts into one object; the gap between them is what bends. 0.4 to 0.8 mm thick with a 2 to 4 mm gap works well in PETG; PP bends best.'));
       else card.append(num('Knuckle size', 'd', { step: 0.5, min: 2 }), num('Knuckles (0 = pick for me)', 'n', { step: 1, min: 0 }), num('Pin (0 = pick for me)', 'pin', { step: 0.2, min: 0 }),
         num('Clearance', 'clear', { step: 0.05, min: 0.1 }), num('Gap between knuckles', 'kgap', { step: 0.05, min: 0.2 }),
-        h('div', { class: 'muted' }, 'The knuckles sit along the bottom of the edges that face each other and take turns between the two parts, with a pin through them. Print it as it is: it moves straight off the bed.'));
+        h('div', { class: 'muted' }, `The knuckles run along the top of the edges that face each other and take turns between the two parts, with a pin through them. Print it as it is: it moves straight off the bed and folds shut top to top, like a book.${heightsDiffer(f) ? ' The parts are not the same height, so they will not close flat.' : ''}`));
       card.append(num('Leave at each end', 'margin', { step: 0.5, min: 0 }));
       el.append(card); break;
     case 'holes': {
-      const kinds = [['plain', 'Plain hole'], ['countersunk', 'Countersunk (flat head)'], ['counterbore', 'Counterbored (socket head)'], ['insert', 'Heat-set insert'], ['nut', 'Nut trap']];
+      const kinds = HOLE_KINDS;
       card.append(h('h3', {}, 'Screw holes'),
         selectField('Kind', f.kind, kinds, (v) => updateFeature(f.id, (x) => { x.kind = v; Object.assign(x, holeDims(v, x.size)); })),
         selectField('Screw size', f.size, HOLE_SIZES.map((s) => [s, s]), (v) => updateFeature(f.id, (x) => { x.size = v; Object.assign(x, holeDims(x.kind, v)); })),
@@ -315,13 +315,13 @@ export function renderFeaturePanel(el, f, { inline = false } = {}) {
       el.append(card); break;
     }
     case 'snap':
-      card.append(h('h3', {}, 'Snap clip'), selectField('Make', f.mode || 'hook', [['hook', 'The hook (stands on the face)'], ['window', 'The window it clicks into (cut)']], (v) => updateFeature(f.id, (x) => { x.mode = v; })),
+      card.append(h('h3', {}, 'Snap clip'), selectField('Make', f.mode || 'hook', [['hook', 'Hook'], ['window', 'Window']], (v) => updateFeature(f.id, (x) => { x.mode = v; })),
         num('Width', 'w', { step: 0.5, min: 1.1 }), num('Thickness', 't', { step: 0.1, min: 0.5 }), num('Catch', 'barb', { step: 0.1, min: 0.2 }));
       if (f.mode === 'window') card.append(num('Gap (each side)', 'gap', { step: 0.05, min: 0 }), num('Depth (0 = through the wall)', 'depth', { step: 0.5, min: 0 }));
-      else card.append(num('Length', 'len', { step: 0.5, min: 2.1 }));
+      else card.append(num('Length', 'len', { step: 0.5, min: 2.1 }), selectField('Clicks into', f.body2 || '', [['', 'Nothing yet'], ...bodiesBefore(f).filter((b) => b !== f.body).map((b) => [b, bodyName(b)])], (v) => updateFeature(f.id, (x) => { if (v) x.body2 = v; else delete x.body2; })));
       card.append(selectField('Catch faces', String(f.angle ?? 0), [['0', 'Up the face'], ['90', 'Left'], ['180', 'Down the face'], ['270', 'Right']], (v) => updateFeature(f.id, (x) => { x.angle = +v; })),
         num('Shift across', 'u'), num('Shift up', 'v'),
-        h('div', { class: 'muted' }, f.mode === 'window' ? 'Use the same width, thickness and catch as the hook: the window is that size plus the gap.' : 'On the other part, add a Snap clip with "The window it clicks into" where the hook goes in. PETG bends better than PLA for clips.'));
+        h('div', { class: 'muted' }, f.mode === 'window' ? 'Use the same width, thickness and catch as the hook: the window is that size plus the gap.' : f.body2 ? `The window is cut in ${bodyName(f.body2)} where the hook goes into it, with this gap round it. PETG bends better than PLA for clips.` : 'Place the part it clicks into where it goes, with the hook going into it, and pick that part in Clicks into: its window is cut for you. PETG bends better than PLA for clips.'));
       el.append(card); break;
     case 'vents':
       card.append(h('h3', {}, 'Vents'), selectField('Pattern', f.pattern || 'hex', [['hex', 'Honeycomb'], ['round', 'Round holes'], ['slots', 'Slots']], (v) => updateFeature(f.id, (x) => { x.pattern = v; })),
@@ -370,7 +370,7 @@ export function renderToolPanel(el) {
     if (t.keep === 'both' && t.joint !== 'none') card.append(h('div', { class: 'muted', style: 'margin-top:6px' }, 'Connectors go on the cut so the parts line up. You can change their kind and size after splitting.'));
   } else if (t.type === 'holes') {
     const step = t.step && store.doc.features.find((x) => x.id === t.step);
-    if (!step) card.append(selectField('Kind', t.kind, [['plain', 'Plain hole'], ['countersunk', 'Countersunk (flat head)'], ['counterbore', 'Counterbored (socket head)'], ['insert', 'Heat-set insert'], ['nut', 'Nut trap']], (v) => { t.kind = v; }),
+    if (!step) card.append(selectField('Kind', t.kind, HOLE_KINDS, (v) => { t.kind = v; }),
       selectField('Screw size', t.size, HOLE_SIZES.map((s) => [s, s]), (v) => { t.size = v; }));
     card.append(h('div', { class: 'muted' }, step ? 'Click more spots on the same face for more holes. Click Done when you have them all.' : 'Click on a flat face where a hole goes. Each click adds one; you can type exact positions afterwards.'),
       h('div', { class: 'stat' }, h('span', {}, 'Holes'), h('b', {}, String(step?.pts?.length || 0))));
@@ -381,6 +381,18 @@ export function renderToolPanel(el) {
   }
   el.append(card);
   el.append(h('div', { class: 'btns' }, h('button', { class: 'btn', onclick: endTool }, t.type === 'holes' && t.step ? 'Stop' : 'Cancel'), !ONE_CLICK.has(t.type) ? h('button', { class: 'btn primary', onclick: applyTool }, ic('Check'), t.type === 'holes' ? 'Done' : 'Apply') : null));
+}
+
+const HOLE_KINDS = [['plain', 'Plain'], ['countersunk', 'Countersunk'], ['counterbore', 'Counterbored'], ['insert', 'Heat-set insert'], ['nut', 'Nut trap']];
+/** Objects that exist before step f (so a step can use them). */
+function bodiesBefore(f) {
+  const fs = store.doc.features, at = fs.findIndex((x) => x.id === f.id), seen = new Set();
+  for (let i = 0; i < at; i++) for (const b of featureRefs(fs[i])) if (store.doc.bodies[b] && !store.doc.bodies[b].hidden && app.results.bodies.has(b)) seen.add(b);
+  return [...seen];
+}
+function heightsDiffer(f) {
+  const a = bodyData(f.body)?.bbox, b = bodyData(f.body2)?.bbox;
+  return !!(a && b) && Math.abs(a[1][2] - b[1][2]) > 0.5;
 }
 
 export function renderWelcome(el) {

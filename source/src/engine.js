@@ -1045,6 +1045,11 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
           const key = hash(f.type + fj + b.key + scopeKey);
           const make = { holes: J.cutHoles, snap: J.snapPiece, vents: J.cutVents }[f.type];
           set(f.body, cached(key, () => make(E, b.v, b.key, f, num)), key);
+          if (f.type === 'snap' && f.body2 && f.mode !== 'window') {
+            // the window it clicks into, cut in the other part where the hook goes into it
+            const o = need(f.body2), okey = hash('snapwin' + fj + b.key + o.key + scopeKey);
+            set(f.body2, cached(okey, () => J.snapWindowIn(E, b.v, o.v, o.key, f, num)), okey);
+          }
           break;
         }
         case 'delete': consume(f.body); break;

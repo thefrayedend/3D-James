@@ -67,11 +67,11 @@ async def main():
         im = await shot(pg)
         save(im, 'helpers-fit.jpg')
 
-        # 7. a snap hook and its window
-        await scene([cube('b1', 40, 20, 4, (-25, 0, 0)), cube('b2', 40, 20, 4, (25, 0, 0)),
-                     {'id': 'fn', 'type': 'snap', 'body': 'b1', 'face': TOP, 'mode': 'hook', 'w': 6, 'len': 8, 't': 1.6, 'barb': 0.8, 'gap': 0.2, 'u': 0, 'v': 0, 'angle': 0, 'depth': 0},
-                     {'id': 'fw', 'type': 'snap', 'body': 'b2', 'face': TOP, 'mode': 'window', 'w': 6, 'len': 8, 't': 1.6, 'barb': 0.8, 'gap': 0.2, 'u': 0, 'v': 0, 'angle': 0, 'depth': 0}],
-                    {'b1': body('Part with the hook', '#7092BE'), 'b2': body('Part with the window', '#FF7F27')}, ['b1'], 'fn', 'fit')
+        # 7. a snap hook clicking into a plate above it (the plate lifted afterwards to show the window)
+        await scene([cube('b1', 40, 30, 4), cube('b2', 40, 30, 3, (0, 0, 8)),
+                     {'id': 'fn', 'type': 'snap', 'body': 'b1', 'body2': 'b2', 'face': TOP, 'mode': 'hook', 'w': 6, 'len': 10, 't': 1.6, 'barb': 1, 'gap': 0.2, 'u': 0, 'v': 0, 'angle': 0, 'depth': 0},
+                     {'id': 'fm', 'type': 'move', 'body': 'b2', 'm': [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 14, 1]}],
+                    {'b1': body('Base', '#7092BE'), 'b2': body('Cover', '#FF7F27')}, ['b1'], 'fn', 'fit')
         im = await shot(pg)
         save(im, 'helpers-snap.jpg')
         print('page errors:', errs)

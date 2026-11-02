@@ -160,19 +160,31 @@ function longAxis(cs) {
  */
 export function splitJoints(E, v, key, parts, n, p, f, num) {
   const kind = f.joint;
-  const d = num(f.jd ?? 5), L = num(f.jl ?? 8), gap = num(f.jgap ?? 0.15), count = Math.round(num(f.jn ?? 2));
+  let L = num(f.jl ?? 8);
+  const d = num(f.jd ?? 5), gap = num(f.jgap ?? 0.15), count = Math.round(num(f.jn ?? 2));
   if (!(d > 0.5)) E.fail('Connector size must be above 0.5 mm');
   if (!(L > 0.5)) E.fail('Connector length must be above 0.5 mm');
   if (!(gap >= 0 && gap < d / 2)) E.fail('The connector gap must be from 0 to half the connector size');
   if (count < 1 || count > 20) E.fail('Connectors: 1 to 20');
   const F = frame(p, n, E.faceXDir(n));
   const cs = section(E, v, key, F, 0);
+  // how much material each half has at these points of the cut (up: the upper half), so nothing comes out the far side
+  const depthAt = (pts, up) => {
+    const G = up ? frame(p, n.map((x) => -x), F.x) : F;
+    return Math.min(...throughDepth(E, v, key, G, up ? pts.map(([u, w]) => [u, -w]) : pts, L + gap + 3).map((x) => x - 0.3));
+  };
+  const tooThin = 'A half is too thin at the cut for connectors. Move the cut, make them smaller, or turn them off.';
   try {
     if (cs.isEmpty()) E.fail('The cut face could not be found for the connectors');
     let [below, above] = parts, pins = null;
     const bk = tmpKey('below'), ak = tmpKey('above');
     if (kind === 'dovetail') {
       const { c, t } = longAxis(cs), q = [-t[1], t[0]];
+      const polys = polysOf(cs), along = [];
+      for (let k = -40; k <= 40; k++) { const s = [c[0] + t[0] * k * 2, c[1] + t[1] * k * 2]; if (inside(polys, s)) along.push(s); }
+      if (!along.length) E.fail('The cut face could not be found for the connectors');
+      L = Math.min(L, depthAt(along, true) - gap - 1);
+      if (L < 1) E.fail(tooThin);
       const big = diagOf(E, v) * 2 + 10, flare = Math.tan((15 * Math.PI) / 180) * L;
       const rail = (g) => {
         const half = d / 2 + g, top = d / 2 + flare + g;
@@ -196,6 +208,10 @@ export function splitJoints(E, v, key, parts, n, p, f, num) {
       const r = d / 2, wall = Math.max(1.2, d * 0.4);
       const pts = spreadPoints(cs, r + gap + wall, count);
       if (!pts.length) E.fail('The cut face is too small for connectors this size. Make them smaller.');
+      // pegs go into the upper half; pins go half into each
+      if (kind === 'pegs') L = Math.min(L, depthAt(pts, true) - gap - 1.4);
+      else L = 2 * Math.min(L / 2, Math.min(depthAt(pts, true), depthAt(pts, false)) - gap - 1.45);
+      if (L < 1) E.fail(tooThin);
       const cyl = (u, w, rad, h) => place(E, R.makeCylinder(rad, h, [0, 0, 0], [0, 0, 1]), at(F, u, w[0], w[1]));
       for (const [u, w] of pts) {
         if (kind === 'pegs') {
@@ -292,9 +308,11 @@ function MFrect(E, x0, y0, x1, y1) { return E.MF().CrossSection.square([x1 - x0,
 
 // ---------------------------------------------------------------- hinge
 /**
- * Join two parts that sit side by side (edges facing each other, a few mm apart) with a hinge along their bottom edge.
+ * Join two parts that sit side by side (edges facing each other, a few mm apart) with a hinge.
  * style pin: print-in-place knuckles that alternate between the parts, with a pin through them (the parts stay separate).
- * style living: a thin strip across the gap that bends (the parts become one object). Returns { parts: [a, b or null] }.
+ *   Their axis runs along the top of the facing edges, so the parts fold shut top to top, like a book closing.
+ * style living: a thin strip across the gap along the bottom, that bends (the parts become one object).
+ * Returns { parts: [a, b or null] }.
  */
 export function makeHinge(E, a, akey, b, bkey, f, num) {
   const A = E.bbOf(a), B = E.bbOf(b);
@@ -340,7 +358,8 @@ export function makeHinge(E, a, akey, b, bkey, f, num) {
     if (n < 3 || n > 15 || n % 2 === 0) E.fail('Knuckles: an odd number from 3 to 15 (0 picks one for you)');
     const kl = (len - (n - 1) * kg) / n;
     if (kl < 2) E.fail('The hinge is too short for that many knuckles');
-    const zc = zb + R0;
+    const zc = Math.min(PB[1][2], QB[1][2]);
+    if (zc - zb < R0) E.fail(`The knuckles are bigger than the parts are tall: make the knuckle size ${Math.floor((zc - zb) * 2 * 10) / 10} mm or less.`);
     const cyl = (rad, from, l) => keepPiece(R.makeCylinder(rad, l, pt(c0, from, zc), dirO));
     let p = P, q = Q;
     const pk = tmpKey('hp'), qk = tmpKey('hq');
@@ -418,7 +437,7 @@ export function cutHoles(E, v, key, f, num) {
 export function snapPiece(E, v, key, f, num) {
   const shape = E.needSolid(v, 'Snap clip');
   const F = faceFrame(E, shape, v, f.face, 'A snap clip');
-  const w = num(f.w ?? 6), len = num(f.len ?? 8), t = num(f.t ?? 1.6), barb = num(f.barb ?? 0.8), gap = num(f.gap ?? 0.2);
+  const w = num(f.w ?? 6), len = num(f.len ?? 10), t = num(f.t ?? 1.6), barb = num(f.barb ?? 1), gap = num(f.gap ?? 0.2);
   if (!(w > 1 && len > 2 && t > 0.4 && barb > 0.1)) E.fail('Width above 1, length above 2, thickness above 0.4 and catch above 0.1 mm');
   if (barb >= len / 2) E.fail('The catch is too big for the hook');
   const M = at(F, num(f.u ?? 0), num(f.v ?? 0)).multiply(new Matrix4().makeRotationZ((num(f.angle ?? 0) * Math.PI) / 180));
@@ -436,6 +455,23 @@ export function snapPiece(E, v, key, f, num) {
   const hook = place(E, beam.fuse(tri), M);
   freeShape(beam); freeShape(tri);
   try { return { shape: shape.clone().fuse(hook) }; } finally { freeShape(hook); }
+}
+
+/** The window a snap hook (step f on the part v) clicks into, cut in the other part o where the hook goes into it. */
+export function snapWindowIn(E, v, o, okey, f, num) {
+  const other = E.needSolid(o, 'The window for a snap clip');
+  const F = faceFrame(E, E.needSolid(v, 'Snap clip'), v, f.face, 'A snap clip');
+  const w = num(f.w ?? 6), len = num(f.len ?? 10), t = num(f.t ?? 1.6), barb = num(f.barb ?? 1), gap = num(f.gap ?? 0.2);
+  const M = at(F, num(f.u ?? 0), num(f.v ?? 0)).multiply(new Matrix4().makeRotationZ((num(f.angle ?? 0) * Math.PI) / 180));
+  // the room the hook needs on its way in: its width and thickness, the catch, and the gap, all the way up it
+  const win = place(E, R.makeBox([-(w / 2 + gap), -(t / 2 + gap), 0.05], [w / 2 + gap, t / 2 + barb + gap, len + 1]), M);
+  try {
+    const [a0, a1] = E.bbOf({ shape: win }), [b0, b1] = E.bbOf(o);
+    if (![0, 1, 2].every((i) => a0[i] < b1[i] && a1[i] > b0[i])) E.fail('The hook does not reach the part it clicks into. Place that part where it goes, with the hook going into it.');
+    const out = other.clone().cut(win);
+    if (Math.abs(R.measureVolume(out) - R.measureVolume(other)) < 1e-3) { freeShape(out); E.fail('The hook does not go into the part it clicks into. Place that part where it goes, with the hook going into it.'); }
+    return { shape: out };
+  } finally { freeShape(win); }
 }
 
 /** Vents: a pattern of holes over a face (inside a margin), cut through the wall under it. */

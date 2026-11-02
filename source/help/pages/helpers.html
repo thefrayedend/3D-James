@@ -7,11 +7,12 @@
 </ul>
 
 <h2>Split to fit the printer</h2>
-<p>For a part too big for the bed, or one that prints better in two pieces. Pick it and choose <b>Split to fit the printer</b>. Move or tilt the green plane to where the cut should go, then click <b>Split</b>. Both halves are kept, with <b>pegs</b> on one and matching <b>holes</b> in the other, so they line up when you glue or press them together.</p>
-<figure><img src="helpers-split.jpg" alt="A long bar split in two; the blue half has two round pegs on the cut, the orange half has two holes; Properties shows the Connectors settings"><figcaption>Example: a 120 mm shelf split in the middle (the right half moved aside to show the pegs). Change the connector kind, size, length and number in Properties.</figcaption></figure>
+<p>For a part too big for the bed, or one that prints better in two pieces. Pick it and choose <b>Split to fit the printer</b>. The green plane starts straight across the longest side, in the middle; move or tilt it to where the cut should go, then click <b>Split</b>. Both halves are kept, with <b>pegs</b> on one and matching <b>holes</b> in the other, so they line up when you glue or press them together. The split step then opens in Properties, with its connector settings.</p>
+<figure><img src="helpers-split.jpg" alt="A long bar split across the middle; the blue half has two round pegs on the cut, the orange half has two holes; Properties shows the split and its Connectors settings"><figcaption>Example: a 120 mm shelf split in the middle (the right half moved aside to show the pegs). Change the connector kind, size, length and number in Properties.</figcaption></figure>
 <ul>
 <li><b>Connectors</b>: <b>Pegs and holes</b>; <b>Pin holes</b> (a hole in each half, and loose pins printed as their own object beside it); or a <b>Dovetail</b> (a rail on one half that slides into a slot in the other, along the longest way across the cut).</li>
 <li>The connectors go where the cut face has room for them, so the walls around them stay strong. If they don't fit, make them smaller.</li>
+<li>Pegs and pins are made shorter by themselves where a half is too thin for them, so a hole never comes out the far side.</li>
 <li>You can also add connectors to any split: in the Split bar choose <b>Connectors</b>, or open a split step that keeps both halves.</li>
 </ul>
 
@@ -19,7 +20,7 @@
 <p>The same as <b>Faces</b> &gt; <b>Hollow</b>: click the faces to leave open (the top of a box), set the wall thickness and click <b>Apply</b>. See <a data-help-topic="edges">Edges, faces, split and emboss</a>.</p>
 
 <h2>Make a lid</h2>
-<p>Pick an open box (for example a box hollowed out with its top left open) and choose <b>Make a lid</b>. A lid appears beside it, ready to print upside down: the plate on the bed and the lip up. Turn it over to put it on.</p>
+<p>Pick a box and choose <b>Make a lid</b>. A lid appears beside it in a new colour, ready to print upside down: the plate on the bed and the lip up. Turn it over to put it on. If the box is still solid, it is hollowed out first (2 mm walls, top left open); change the walls in its <b>Hollow</b> step.</p>
 <figure><img src="helpers-lid.jpg" alt="An open blue box and an orange lid beside it, upside down with its lip showing; Properties shows the lid kind, thickness, lip depth, lip wall and gap"><figcaption>A push-on lid for a 50 × 36 mm box. The lip fits just inside the opening with a 0.15 mm gap.</figcaption></figure>
 <ul>
 <li><b>Kind</b>: <b>Push-on</b> (a lip inside the box), <b>Snap-on</b> (a small bead on the lip clicks into a groove that is cut inside the box), or <b>Sliding</b> (grooves are cut in the walls, open at the front, and a flat lid slides in from the front).</li>
@@ -28,12 +29,13 @@
 </ul>
 
 <h2>Hinge between two parts</h2>
-<p>Put the two parts side by side on the floor, edges facing each other, a few millimetres apart. Pick both (click one, Ctrl+click the other) and choose <b>Hinge between two parts</b>.</p>
-<figure><img src="helpers-hinge.jpg" alt="Two plates joined along their facing edges by a row of knuckles that take turns between the blue and the orange plate; Properties shows the hinge settings"><figcaption>A pin hinge between two 5 mm plates. It prints in place and moves straight off the bed.</figcaption></figure>
+<p>Put the two parts side by side on the floor, edges facing each other, a few millimetres apart. Pick both (click one, Ctrl+click the other) and choose <b>Hinge between two parts</b>. They fold shut top to top, like a book closing.</p>
+<figure><img src="helpers-hinge.jpg" alt="Two plates joined along the top of their facing edges by a row of knuckles that take turns between the blue and the orange plate; Properties shows the hinge settings"><figcaption>A pin hinge between two 5 mm plates. It prints in place, moves straight off the bed and folds right over.</figcaption></figure>
 <ul>
-<li><b>Pin hinge</b>: knuckles along the bottom of the facing edges take turns between the parts, with a pin through them. The parts stay separate objects. Set the knuckle size, how many (0 picks for you), the pin, and the clearance.</li>
+<li><b>Pin hinge</b>: knuckles along the top of the facing edges take turns between the parts, with a pin through them. The parts stay separate objects. Set the knuckle size, how many (0 picks for you), the pin, and the clearance.</li>
 <li><b>Living hinge</b>: a thin strip along the bottom joins the parts into one object, and the gap between them is what bends. 0.4 to 0.8 mm thick with a 2 to 4 mm gap works well in PETG; PP bends best. PLA cracks after a few bends.</li>
-<li>For a box with a flip-up lid: put the box and the lid side by side, then add the hinge.</li>
+<li>For a box with a flip-up lid, make the box and the lid as two open trays of the same height (the lid can be shallow, with the same walls), side by side, then add the hinge. Parts of different heights can't close flat; Properties says so.</li>
+<li>If the parts overlap or aren't side by side, nothing is added and a message says what to change.</li>
 </ul>
 
 <h2>Screw holes on a face</h2>
@@ -54,9 +56,11 @@
 </ul>
 
 <h2>Snap clip on a face</h2>
-<p>Pick a solid, choose <b>Snap clip on a face</b> and click a flat face. A hook with a catch at its tip stands on the face. On the part it should hold, add another snap clip, set it to <b>The window it clicks into</b>, and give it the same width, thickness and catch.</p>
-<figure><img src="helpers-snap.jpg" alt="A blue plate with a snap hook standing on it and an orange plate with a rectangular window cut through it"><figcaption>A hook and the window it clicks into. Use <b>Catch faces</b> to turn which way the catch points.</figcaption></figure>
+<p>Place the two parts where they go, with the hook's spot under the part it clicks into. Pick both (click one, Ctrl+click the other), choose <b>Snap clip on a face</b> and click the face where the hook stands. The hook, with a catch at its tip, stands on that face, and the window it clicks into is cut in the other part, with a gap all round.</p>
+<figure><img src="helpers-snap.jpg" alt="A blue base with a snap hook standing on it, and the orange cover it clicks into lifted above it, showing the window cut for the hook; Properties shows Clicks into: Cover"><figcaption>A hook and the window it clicks into (the top plate lifted to show them). Use <b>Catch faces</b> to turn which way the catch points.</figcaption></figure>
 <ul>
+<li>With one part picked, only the hook is made: pick the part it clicks into later in the step's <b>Clicks into</b>. Or set a snap clip to <b>Window</b> to cut a window yourself (give it the hook's width, thickness and catch).</li>
+<li>The hook needs to go into the other part: if it doesn't reach it, the step says so. Change the hook's length, or move the part.</li>
 <li>PETG bends better than PLA for clips. Make the hook longer for an easier click, or thicker for a firmer one.</li>
 </ul>
 

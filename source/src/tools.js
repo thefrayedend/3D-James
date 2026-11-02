@@ -47,6 +47,12 @@ export function startTool(type, opts = {}) {
     const id = solidSelected({ extrude: 'Shape on face', pushpull: 'Push/pull', layflat: 'Lay flat', insertpocket: 'Insert pocket' }[type]); if (!id) return;
     app.tool = { type, body: id, items: [] };
     vp.startPick('face', (b) => b === id, []);
+  } else if (type === 'snap' && app.sel.length === 2) {
+    // two parts picked: the hook goes on the face clicked, and its window is cut in the other part
+    const pair = [...app.sel];
+    if (!pair.every((b) => bodyData(b)?.solid)) return toast('A snap clip works on solid shapes, not on a mesh (an imported model or a thread).', 'err', 6000);
+    app.tool = { type, body: pair[0], pair, items: [] };
+    vp.startPick('face', (b) => pair.includes(b), []);
   } else if (['holes', 'snap', 'vents'].includes(type)) {
     // Helpers that go on a face: screw holes (click spots, then Done), a snap clip or vents (one click)
     const id = solidSelected({ holes: 'Screw holes', snap: 'Snap clip', vents: 'Vents' }[type]); if (!id) return;
@@ -74,8 +80,11 @@ export function startTool(type, opts = {}) {
     const id = app.sel[0]; const d = bodyData(id);
     const [mn, mx] = d.bbox;
     const diag = Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
-    app.tool = { type, body: id, off: 0, roll: 0, pitch: 0, yaw: 0, keep: opts.joint ? 'both' : 'above', pmode: 'move', joint: opts.joint || 'none', jd: 5, jl: 8, jn: 2, jgap: 0.15 };
-    vp.startPlane({ center: [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2], size: Math.max(diag * 1.15, 10), off: 0, roll: 0, pitch: 0, yaw: 0 });
+    // to fit the printer, start with the cut straight across the longest side
+    const ext = [0, 1, 2].map((i) => mx[i] - mn[i]), long = ext.indexOf(Math.max(...ext));
+    const roll = opts.joint && long === 1 ? -90 : 0, pitch = opts.joint && long === 0 ? 90 : 0;
+    app.tool = { type, body: id, off: 0, roll, pitch, yaw: 0, keep: opts.joint ? 'both' : 'above', pmode: 'move', joint: opts.joint || 'none', jd: 5, jl: 8, jn: 2, jgap: 0.15 };
+    vp.startPlane({ center: [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2], size: Math.max(diag * 1.15, 10), off: 0, roll, pitch, yaw: 0 });
   }
   editStep(null);
   if (app.tool && !['split', 'workplane', 'sketchplane', 'align', 'lookat'].includes(app.tool.type)) openPanel('props');
@@ -178,7 +187,7 @@ export function toolPick(kind, hit) {
     store.commit((doc) => {
       fid = store.newId('f');
       doc.features.push(t.type === 'snap'
-        ? { id: fid, type: 'snap', body: hit.body, face, mode: 'hook', w: 6, len: 8, t: 1.6, barb: 0.8, gap: 0.2, u, v, angle: 0, depth: 0 }
+        ? { id: fid, type: 'snap', body: hit.body, ...(t.pair ? { body2: t.pair.find((b) => b !== hit.body) } : {}), face, mode: 'hook', w: 6, len: 10, t: 1.6, barb: 1, gap: 0.2, u, v, angle: 0, depth: 0 }
         : { id: fid, type: 'vents', body: hit.body, face, pattern: 'hex', s: 5, bar: 1.6, margin: 3, depth: 0, dir: 'across' });
     });
     app.tool = null; vp.endPick(); editStep(fid); openPanel('props'); renderCmdBar(); renderAll();
@@ -302,6 +311,7 @@ export function applyTool() {
   } else if (t.type === 'shell') {
     store.commit((doc) => doc.features.push({ id: store.newId('f'), type: 'shell', body: t.body, faces: t.items.map((it) => faceRef(d, it.index)), t: t.t }));
   } else if (t.type === 'split') {
+    let withJoints = null;
     store.commit((doc) => {
       const b2 = store.newId('b');
       const joint = t.keep === 'both' ? t.joint : 'none';
@@ -310,7 +320,10 @@ export function applyTool() {
       doc.features.push(step);
       if (t.keep === 'both') { const pb = doc.bodies[t.body] || {}; doc.bodies[b2] = { ...pb, name: `${pb.name || 'Object'} (part 2)`, color: nextColor(doc) }; }
       if (step.body3) doc.bodies[step.body3] = { name: `${doc.bodies[t.body]?.name || 'Object'} pins`, color: nextColor(doc) };
+      if (step.joint) withJoints = step.id;
     });
+    // with connectors, open the step so their kind and size are right there to change
+    if (withJoints) { endTool(); editStep(withJoints); openPanel('props'); return; }
   }
   endTool();
 }
