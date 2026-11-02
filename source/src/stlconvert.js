@@ -1560,3 +1560,6 @@ export function convertAndCheck(mf, mesh, opts, build) {
   res.errors = check.errors;
   return res;
 }
+
+// (the STEP converter, stepconvert.js, writes its sketches the same way)
+export { sketchFeature, emitter, AXIS_FRAMES };

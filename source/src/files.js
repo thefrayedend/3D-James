@@ -33,7 +33,8 @@ const SAVE_FMTS = ['3dj', '3mf', 'stl', 'step'];
 const SAVE_TYPES = SAVE_FMTS.map((k) => TYPES[k]);
 
 const extOf = (name) => (String(name).toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || '');
-export const fmtOf = (name) => ({ '3dj': '3dj', '3mf': '3mf', json: 'json', stl: 'stl', step: 'step', stp: 'step', obj: 'obj' }[extOf(name)] || null);
+// (a project attached to a feedback report on GitHub is a .3dj.zip, since GitHub takes .zip files: the same file)
+export const fmtOf = (name) => (/\.3dj\.zip$/i.test(name) ? '3dj' : ({ '3dj': '3dj', '3mf': '3mf', json: 'json', stl: 'stl', step: 'step', stp: 'step', obj: 'obj' }[extOf(name)] || null));
 const baseName = (name) => String(name).replace(/\.[a-z0-9]+$/i, '');
 const safeName = () => (store.doc.name || 'model').trim().replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'model';
 
@@ -267,7 +268,7 @@ export async function openFile(file, handle) {
       if (ok === false) return;
       loadProject({ name: baseName(file.name) }, { name: file.name, fmt, handle });
       for (const add of stage) add();
-      if (fmt !== 'step') offerEditable();
+      offerEditable();
     } else { toast('3DJames opens 3MF, STEP, STL, OBJ and 3DJames project files.', 'err'); return; }
     app.savedModel = modelSnapshot(store.doc); app.savedAt = file.lastModified || Date.now(); rememberSavedModel();
     toast(`Opened ${file.name}`, 'info', 2200);
@@ -381,12 +382,13 @@ async function addStep(name, bytes, partsChoice, stage) {
 function offerEditable() {
   const ids = Object.keys(store.doc.bodies).filter((id) => canMakeEditable(store.doc, id));
   if (!ids.length) return;
+  const step = ids.every((id) => store.doc.features.find((x) => x.body === id && x.kind === 'import')?.p?.fmt === 'step');
   const close = modal('Make it editable?', h('div', {},
-    h('p', {}, 'This file is a mesh: a shell of triangles. 3DJames can move, size and combine it, but not change its shape.'),
-    h('p', {}, 'Make editable rebuilds it as sketches pushed up or spun around (with holes and cut-outs as steps), so you can change its sizes later in History. It works best on parts designed in a CAD app; figures and sculpted shapes stay meshes.'),
+    h('p', {}, step ? 'This STEP file holds exact solids, but not the steps they were made with. 3DJames can move, size and combine them, but not change their own sizes.' : 'This file is a mesh: a shell of triangles. 3DJames can move, size and combine it, but not change its shape.'),
+    h('p', {}, `Make editable rebuilds ${step ? 'each part' : 'it'} as sketches pushed up or spun around (with holes and cut-outs as steps), so you can change its sizes later in History. It works best on parts designed in a CAD app; ${step ? 'parts curved all over stay as they are.' : 'figures and sculpted shapes stay meshes.'}`),
     detailPicker()),
   () => [
-    h('button', { class: 'btn', onclick: () => close() }, 'Keep as a mesh'),
+    h('button', { class: 'btn', onclick: () => close() }, step ? 'Keep as it is' : 'Keep as a mesh'),
     h('button', { class: 'btn primary', onclick: async () => { close(); for (const id of ids) await makeEditable(id); } }, 'Make editable'),
   ]);
 }

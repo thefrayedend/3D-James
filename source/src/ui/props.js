@@ -141,7 +141,7 @@ export function renderObjectPanel(el, id) {
     f.body === id ? 'Edit sketch' : `Edit sketch: ${doc.bodies[f.body]?.name || f.name || 'Sketch'}`))));
   if (canMakeEditable(doc, id)) {
     el.append(h('div', { class: 'card' }, h('h3', {}, 'Make editable'),
-      h('div', { class: 'muted', style: 'margin-bottom:8px' }, 'This is a mesh: it can be moved, sized and combined, but not changed. Make editable rebuilds it as sketches pushed up or spun around, so you can change its sizes.'),
+      h('div', { class: 'muted', style: 'margin-bottom:8px' }, cf?.p?.fmt === 'step' ? 'This is an imported STEP solid: exact, but without steps, so it can be moved, sized and combined, but its own sizes cannot be changed. Make editable rebuilds it as sketches pushed up or spun around, so you can change its sizes.' : 'This is a mesh: it can be moved, sized and combined, but not changed. Make editable rebuilds it as sketches pushed up or spun around, so you can change its sizes.'),
       detailPicker(),
       h('button', { class: 'btn primary', disabled: !!app.converting, onclick: () => makeEditable(id) }, ic('PenLine'), 'Make editable')));
   }

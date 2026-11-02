@@ -51,7 +51,8 @@ async def box_pictures(p):
     data = tempfile.mkdtemp(prefix='3dj-shots-')
     ap, adp = free_port(), free_port()
     srv = subprocess.Popen([sys.executable, os.path.join(SRC, 'server', '3djames_server.py'), '--data', data, '--app-port', str(ap), '--admin-port', str(adp),
-                            '--bundled-app', os.path.join(SRC, 'local', '3DJames.html')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            '--bundled-app', os.path.join(SRC, 'local', '3DJames.html')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           env={**os.environ, 'TDJ_HOSTNAME': '3djames'})  # (never this PC's own name in a picture)
     for _ in range(100):
         try: urllib.request.urlopen(f'http://127.0.0.1:{adp}/api/state', timeout=1); break
         except Exception: time.sleep(0.2)

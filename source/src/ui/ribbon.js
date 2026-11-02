@@ -17,6 +17,7 @@ import { saveToMyParts, insertMyPart, manageMyParts, myParts, refreshMyParts } f
 import { openPanel } from './panels.js';
 import { applyTheme } from '../theme.js';
 import { showHelp } from './help.js';
+import { feedbackDialog } from '../feedback.js';
 import { planeDialog } from '../sketchplane.js';
 import { drive } from '../drive/index.js';
 import { setInputMode } from '../touch.js';
@@ -132,6 +133,8 @@ export function fileMenu(anchor) {
     h('hr'),
     ...(drive.mode === 'local' ? [mi('FolderOpen', 'Projects folder…', chooseProjectsFolder)] : []),
     mi('History', 'Backups…', () => backupsDialog((doc) => { store.load(doc); select([]); })),
+    h('hr'),
+    mi('MessageSquare', 'Send feedback…', feedbackDialog),
     // on a 3DJames server: who is signed in
     ...(drive.mode === 'server' ? [h('hr'), mi('X', `Sign out (${server.me.name || server.me.user})`, server.signOut)] : []),
   ]);

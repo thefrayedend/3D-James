@@ -3,7 +3,8 @@ import ManifoldModule from 'manifold-3d';
 import { evaluate, setManifoldModule, R, exportMeshOf, solidOf, parseSTLToMf, hasStep, registerStep, countSolids, solidBounds, surfacePlane, unionLoops, offsetLoops, outlineOf } from './engine.js';
 import { zipStore } from './zip.js';
 import { convertAndCheck } from './stlconvert.js';
-import { paintMesh, paintString } from './paint.js';
+import { paintMesh, paintString, paintedMesh } from './paint.js';
+import { stepToSketches } from './stepconvert.js';
 
 const fonts = new Set();
 let ready = false;
@@ -80,13 +81,28 @@ function threeMF(parts, project, extra = [], out = {}) {
   let mats = '', objs = '', items = '';
   groups.forEach((g, i) => { mats += `<m:colorgroup id="${parts.length + i + 2}"><m:color color="${g}"/></m:colorgroup>`; });
   parts.forEach((p, i) => {
-    const v = p.vertices, t = p.triangles, pt = painted[i];
+    const pt = painted[i];
     const fil = pt && ((s) => filament.get(hex(pt.colors[s - 1])));
+    // painted: the paint becomes triangles of its own, each with its colour (a colour group, as Bambu Studio and
+    // other programs read a standard 3MF) and its paint_color (OrcaSlicer's paint, still changeable there)
+    let v = p.vertices, t = p.triangles, states = null;
+    if (pt) { const pm = paintedMesh(p, pt); v = pm.vertices; states = pm.states; t = Uint32Array.from(states.flatMap((_, k) => [3 * k, 3 * k + 1, 3 * k + 2])); }
+    const group = (s) => parts.length + groups.indexOf(hex(pt.colors[s - 1])) + 2;
     let vs = '', ts = '';
-    for (let k = 0; k < v.length; k += 3) vs += `<vertex x="${+v[k].toFixed(5)}" y="${+v[k + 1].toFixed(5)}" z="${+v[k + 2].toFixed(5)}"/>`;
+    // corners at the same spot are written once and shared, so the slicers see one closed surface (the shape keeps a
+    // corner per face for its flat shading, which they would read as open edges between the faces)
+    const at = new Map(), idx = new Int32Array(v.length / 3);
+    for (let k = 0; k < v.length; k += 3) {
+      const key = `${+v[k].toFixed(5)}" y="${+v[k + 1].toFixed(5)}" z="${+v[k + 2].toFixed(5)}`;
+      let n = at.get(key);
+      if (n === undefined) { n = at.size; at.set(key, n); vs += `<vertex x="${key}"/>`; }
+      idx[k / 3] = n;
+    }
     for (let k = 0; k < t.length; k += 3) {
-      const s = pt?.trees[k / 3] ? paintString(pt.trees[k / 3], fil) : '';
-      ts += `<triangle v1="${t[k]}" v2="${t[k + 1]}" v3="${t[k + 2]}"${s ? ` paint_color="${s}"` : ''}/>`;
+      const a = idx[t[k]], b = idx[t[k + 1]], c = idx[t[k + 2]];
+      if (a === b || b === c || c === a) continue; // too small to keep once its corners are shared
+      const st = states ? states[k / 3] : 0, s = st ? paintString(st, fil) : '';
+      ts += `<triangle v1="${a}" v2="${b}" v3="${c}"${st ? ` pid="${group(st)}" p1="0"` : ''}${s ? ` paint_color="${s}"` : ''}/>`;
     }
     objs += `<object id="${i + 2}" name="${esc(p.name)}" type="model" pid="${parts.length + i + 2}" pindex="0"><mesh><vertices>${vs}</vertices><triangles>${ts}</triangles></mesh></object>`;
     items += `<item objectid="${i + 2}"/>`;
@@ -131,7 +147,16 @@ function convertImport({ feature, name, seq, body, detail }) {
   const trial = evaluate({ vars: [], bodies: {}, features: [{ ...feature, id: 'f0', body: 'b0' }] }, fonts, { files, scratch: true });
   const mesh = trial.meshes.get('b0');
   if (!mesh) throw new Error(Object.values(trial.errors)[0] || 'The mesh could not be read.');
-  return convertAndCheck(MFmod, mesh, { name, seq, body, detail }, (doc) => evaluate(doc, fonts, { scratch: true }));
+  const build = (doc) => evaluate(doc, fonts, { scratch: true });
+  if (feature.p?.fmt === 'step' && trial.solids?.get('b0')) {
+    // a STEP part: first from its own exact edges (sketches with its true lines, arcs and circles)
+    let res = null;
+    try { res = stepToSketches(MFmod, trial.solids.get('b0'), mesh, { name, seq, body }, build); } catch (err) { console.warn('step sketches', err); }
+    if (res) return res;
+    // otherwise as a mesh, quicker than for an STL: a STEP part that does not come out stays the exact solid
+    return convertAndCheck(MFmod, mesh, { name, seq, body, detail, maxSeconds: 25 }, build);
+  }
+  return convertAndCheck(MFmod, mesh, { name, seq, body, detail }, build);
 }
 
 async function handleMessage(e) {

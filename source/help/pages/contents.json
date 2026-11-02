@@ -5,5 +5,5 @@
   { "section": "Sketching", "pages": ["sketch", "sketchlines", "sketchtools", "sketchrules", "solid", "sketchmulti", "curved", "sketchphoto", "sketchimport"] },
   { "section": "View, measure and files", "pages": ["view", "measure", "history", "files", "editable", "ai"] },
   { "section": "Tablets and the 3DJames box", "pages": ["tablets", "box"] },
-  { "section": "Reference", "pages": ["keys"] }
+  { "section": "Reference", "pages": ["keys", "feedback"] }
 ]

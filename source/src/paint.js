@@ -9,6 +9,8 @@
 //   { t: 'brush', c, r, d: [dx,dy,dz], pts: [x,y,z, x,y,z, ...] }  a round brush looking along d (the view)
 //   { t: 'ball', c, r, pts }                          everything within r of the points (Orca's sphere)
 //   { t: 'band', c, o: [x,y,z], n: [nx,ny,nz], w }    a band w wide across n, centred on o (Orca's height range)
+//   { t: 'bucket', c, p: [x,y,z], n: [nx,ny,nz], a }  the area of one colour around the point, as far as other paint
+//                                                     goes and over edges that bend less than a° (Orca's bucket fill)
 
 const MAX_DEPTH = 12;
 
@@ -28,6 +30,7 @@ export function applyOp(ctx, paint, op) {
   let state = 0;
   if (c) { state = paint.colors.indexOf(c) + 1; if (!state) state = paint.colors.push(c); }
   if (op.t === 'fill') { for (const t of fillArea(ctx, op.p, op.n, op.a)) paint.trees[t] = state; return; }
+  if (op.t === 'bucket') { bucketFill(ctx, paint, op.p, op.n, op.a ?? 180, state); return; }
   const dabs = makeDabs(op);
   if (!dabs.length) return;
   const res2 = op.t === 'band' ? 0.01 : Math.max(0.05, op.r / 5) ** 2;
@@ -224,6 +227,163 @@ export function fillArea(ctx, p, n, a = 0, seed = -1) {
     }
   }
   return out;
+}
+
+// ---- bucket fill: the connected area of the colour under the point, up to where other paint starts (Orca's Bucket
+// fill). Paint is a tree of ever smaller triangles inside each mesh triangle, so the area is found piece by piece: two
+// pieces touch when their sides overlap along a line. A piece's corners are weights on its mesh triangle's corners, in
+// steps of 1/4096 (12 levels of splitting at most), so sides on one line compare exactly.
+const S = 4096;
+function vertexIds(ctx) {
+  if (ctx.vid) return ctx.vid;
+  const { V } = ctx, ids = new Map(), at = new Int32Array(V.length / 3);
+  for (let i = 0; i < at.length; i++) {
+    const k = `${Math.round(V[3 * i] * 1e4)},${Math.round(V[3 * i + 1] * 1e4)},${Math.round(V[3 * i + 2] * 1e4)}`;
+    let id = ids.get(k); if (id === undefined) { id = ids.size; ids.set(k, id); } at[i] = id;
+  }
+  return (ctx.vid = at);
+}
+/** p as weights on triangle a, b, c (the nearest point on it). */
+function weights(p, a, b, c) {
+  const v0 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v1 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]], v2 = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
+  const dot = (x, y) => x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
+  const d00 = dot(v0, v0), d01 = dot(v0, v1), d11 = dot(v1, v1), d20 = dot(v2, v0), d21 = dot(v2, v1), den = d00 * d11 - d01 * d01 || 1;
+  let v = (d11 * d20 - d01 * d21) / den, w = (d00 * d21 - d01 * d20) / den;
+  v = Math.max(0, Math.min(1, v)); w = Math.max(0, Math.min(1 - v, w));
+  return [1 - v - w, v, w];
+}
+const imid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+function bucketFill(ctx, paint, p, n, a0, state) {
+  const t0 = seedTriangle(ctx, p, n); if (t0 < 0) return;
+  const { V, T, N, nt, faceOf } = ctx, trees = paint.trees, vid = vertexIds(ctx);
+  const lim = Math.cos((Math.min(180, Math.max(a0, faceOf ? 0 : 1.5)) * Math.PI) / 180) - 1e-9;
+  // across a side of the mesh only where it bends less than a0 (or inside one face of a solid), like Fill
+  const bends = (t, u) => t !== u && !(faceOf && faceOf[t] === faceOf[u] && faceOf[t] >= 0) && N[3 * t] * N[3 * u] + N[3 * t + 1] * N[3 * u + 1] + N[3 * t + 2] * N[3 * u + 2] < lim;
+  // the piece under the point: down the clicked triangle's tree by where the point sits on each smaller triangle
+  let [a, b, c] = weights(p, corner(V, T[3 * t0]), corner(V, T[3 * t0 + 1]), corner(V, T[3 * t0 + 2]));
+  let node = trees[t0];
+  const seedPath = [];
+  while (Array.isArray(node)) {
+    let k;
+    if (a >= 0.5) { k = 0; [a, b, c] = [2 * a - 1, 2 * b, 2 * c]; }
+    else if (b >= 0.5) { k = 1; [a, b, c] = [2 * a, 2 * b - 1, 2 * c]; }
+    else if (c >= 0.5) { k = 2; [a, b, c] = [2 * b, 2 * c - 1, 2 * a]; }
+    else { k = 3; [a, b, c] = [a + b - c, b + c - a, a + c - b]; }
+    seedPath.push(k); node = node[k];
+  }
+  const target = node;
+  if (target === state) return;
+  // every piece of that colour, with its triangle, its way down the tree and its corners
+  const pieces = [];
+  let seed = -1;
+  const walk = (t, nd, path, A, B, C) => {
+    if (Array.isArray(nd)) {
+      const ab = imid(A, B), bc = imid(B, C), ca = imid(C, A);
+      walk(t, nd[0], [...path, 0], A, ab, ca); walk(t, nd[1], [...path, 1], ab, B, bc);
+      walk(t, nd[2], [...path, 2], bc, C, ca); walk(t, nd[3], [...path, 3], ab, bc, ca);
+    } else if (nd === target) {
+      if (t === t0 && path.length === seedPath.length && path.every((x, i) => x === seedPath[i])) seed = pieces.length;
+      pieces.push({ t, path, P: [A, B, C] });
+    }
+  };
+  for (let t = 0; t < nt; t++) walk(t, trees[t], [], [S, 0, 0], [0, S, 0], [0, 0, S]);
+  if (seed < 0) return;
+  // the sides of the pieces, by the line they lie on: inside a triangle, or a side of the mesh shared by two triangles
+  const lines = new Map();
+  pieces.forEach((pc, i) => {
+    for (let k = 0; k < 3; k++) {
+      const u = pc.P[k], w = pc.P[(k + 1) % 3];
+      const j = u[0] === w[0] ? 0 : u[1] === w[1] ? 1 : 2; // the weight that stays the same along this side
+      let key, lo, hi;
+      if (u[j] === 0) {
+        const c1 = (j + 1) % 3, c2 = (j + 2) % 3, g1 = vid[T[3 * pc.t + c1]], g2 = vid[T[3 * pc.t + c2]];
+        let s1 = u[c2], s2 = w[c2];
+        if (g1 > g2) { s1 = S - s1; s2 = S - s2; }
+        key = `e${Math.min(g1, g2)},${Math.max(g1, g2)}`; lo = Math.min(s1, s2); hi = Math.max(s1, s2);
+      } else {
+        const q = (j + 1) % 3;
+        key = `i${pc.t},${j},${u[j]}`; lo = Math.min(u[q], w[q]); hi = Math.max(u[q], w[q]);
+      }
+      if (hi <= lo) continue;
+      const l = lines.get(key); if (l) l.push([lo, hi, i]); else lines.set(key, [[lo, hi, i]]);
+    }
+  });
+  const up = Int32Array.from(pieces, (_, i) => i);
+  const root = (i) => { while (up[i] !== i) { up[i] = up[up[i]]; i = up[i]; } return i; };
+  for (const l of lines.values()) {
+    if (l.length < 2) continue;
+    l.sort((x, y) => x[0] - y[0]);
+    let open = [];
+    for (const e of l) {
+      open = open.filter((o) => o[1] > e[0]);
+      for (const o of open) if (!bends(pieces[o[2]].t, pieces[e[2]].t)) up[root(o[2])] = root(e[2]);
+      open.push(e);
+    }
+  }
+  const r0 = root(seed);
+  pieces.forEach((pc, i) => { if (root(i) === r0) trees[pc.t] = setLeaf(trees[pc.t], pc.path, 0, state); });
+}
+function setLeaf(node, path, i, state) {
+  if (i === path.length) return state;
+  const ch = node.slice();
+  ch[path[i]] = setLeaf(node[path[i]], path, i + 1, state);
+  return !Array.isArray(ch[0]) && ch.every((x) => x === ch[0]) ? ch[0] : ch;
+}
+
+// ---- the paint as real triangles (for files with one colour per triangle: a standard 3MF, as Bambu Studio reads it)
+/** Every painted piece as triangles of its own, each with its paint state (0: the object's own colour). Where smaller
+ * pieces meet a piece's side (inside a triangle, or across a side of the mesh), that side gets their corners too, so
+ * the surface stays closed. Returns { vertices: [x,y,z, ...] (three per triangle), states: [state per triangle] }. */
+export function paintedMesh(mesh, paint) {
+  const ctx = meshContext(mesh), { V, T, nt } = ctx, vid = vertexIds(ctx), trees = paint.trees;
+  // where a weight-triple point sits on each line it lies on: inside triangle t, or on a side of the mesh
+  const line = (t, j, P) => {
+    if (P[j] !== 0) return [`i${t},${j},${P[j]}`, P[(j + 1) % 3], false];
+    const c1 = (j + 1) % 3, c2 = (j + 2) % 3, g1 = vid[T[3 * t + c1]], g2 = vid[T[3 * t + c2]];
+    return [`e${Math.min(g1, g2)},${Math.max(g1, g2)}`, g1 > g2 ? S - P[c2] : P[c2], g1 > g2];
+  };
+  const leaves = [], lines = new Map();
+  const walk = (t, nd, A, B, C) => {
+    if (Array.isArray(nd)) {
+      const ab = imid(A, B), bc = imid(B, C), ca = imid(C, A);
+      walk(t, nd[0], A, ab, ca); walk(t, nd[1], ab, B, bc); walk(t, nd[2], bc, C, ca); walk(t, nd[3], ab, bc, ca);
+      return;
+    }
+    leaves.push([t, A, B, C, nd || 0]);
+    for (const P of [A, B, C]) for (let j = 0; j < 3; j++) {
+      const [k, s] = line(t, j, P);
+      let l = lines.get(k); if (!l) lines.set(k, (l = new Set())); l.add(s);
+    }
+  };
+  for (let t = 0; t < nt; t++) walk(t, trees[t] || 0, [S, 0, 0], [0, S, 0], [0, 0, S]);
+  const out = [], states = [];
+  for (const [t, ...rest] of leaves) {
+    const P = rest.slice(0, 3), state = rest[3];
+    const ca = corner(V, T[3 * t]), cb = corner(V, T[3 * t + 1]), cc = corner(V, T[3 * t + 2]);
+    const at = (w) => [0, 1, 2].map((i) => (w[0] * ca[i] + w[1] * cb[i] + w[2] * cc[i]) / S);
+    // the piece's outline: its corners, and the corners of other pieces on its sides, in order
+    const ring = [];
+    for (let k = 0; k < 3; k++) {
+      const u = P[k], w = P[(k + 1) % 3];
+      ring.push(u);
+      const j = u[0] === w[0] ? 0 : u[1] === w[1] ? 1 : 2;
+      const [key, su, flip] = line(t, j, u), [, sw] = line(t, j, w);
+      const lo = Math.min(su, sw), hi = Math.max(su, sw), mids = [...(lines.get(key) || [])].filter((s) => s > lo && s < hi);
+      mids.sort((x, y) => (su < sw ? x - y : y - x));
+      for (const s of mids) {
+        const m = [0, 0, 0];
+        if (u[j] !== 0) { m[j] = u[j]; m[(j + 1) % 3] = s; m[(j + 2) % 3] = S - u[j] - s; }
+        else { const c2 = (j + 2) % 3, c1 = (j + 1) % 3, s2 = flip ? S - s : s; m[c2] = s2; m[c1] = S - s2; }
+        ring.push(m);
+      }
+    }
+    const pts = ring.map(at);
+    if (pts.length === 3) { out.push(...pts.flat()); states.push(state); continue; }
+    // more than three corners: a fan round its middle
+    const mid = [0, 1, 2].map((i) => pts.reduce((sum, p) => sum + p[i], 0) / pts.length);
+    for (let i = 0; i < pts.length; i++) { out.push(...mid, ...pts[i], ...pts[(i + 1) % pts.length]); states.push(state); }
+  }
+  return { vertices: out, states };
 }
 
 // ---- showing it: the painted pieces as triangles with a colour each

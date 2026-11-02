@@ -201,6 +201,51 @@ async def main():
     check('3MF: the paint names the filaments of its colours', {fil['#FF0000FF'], fil['#0000FFFF'], fil['#FF00FFFF'], fil['#FFFF00FF']} <= states and states <= set(fil.values()) | {0}, [states, fil])
     tri = re.findall(r'<triangle [^>]*>', data)
     check('3MF: whole painted triangles are written the short way ("8" = filament 2)', any(re.search(r'paint_color="[48]"|paint_color="[0-9A-F]C"', t) for t in tri))
+    # the paint is also real triangles of their own colour (a standard 3MF, as Bambu Studio reads it), and every object
+    # stays one closed surface (each side of a triangle shared with exactly one other)
+    groups = {m.group(1): m.group(2) for m in re.finditer(r'<m:colorgroup id="(\d+)"><m:color color="([^"]+)"/>', data)}
+    colored = [t for t in tri if 'pid=' in t]
+    check('3MF: painted triangles carry their colour the standard way (pid / p1)', colored and all(groups.get(re.search(r'pid="(\d+)"', t).group(1)) for t in colored), len(colored))
+    closed = True
+    for mesh in re.findall(r'<mesh>.*?</mesh>', data, re.S):
+      sides = {}
+      for a1, b1, c1 in re.findall(r'<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"', mesh):
+        for p, q in ((a1, b1), (b1, c1), (c1, a1)): k = tuple(sorted((int(p), int(q)))); sides[k] = sides.get(k, 0) + 1
+      closed = closed and bool(sides) and all(n == 2 for n in sides.values())
+    check('3MF: painted objects are still closed surfaces (no open edges)', closed)
+
+    # 8. Bucket (like OrcaSlicer's Bucket fill): a red stripe across the top splits it in two; the bucket (Coverage 30°)
+    #    fills one side only, then (Coverage 180°) the rest of the unpainted object, then recolours the stripe
+    r = await ev('''async () => { const { commands: C, app, vp } = window.__3dj; C.newProject(); await __wait();
+      const id = C.addShape('box', { w: 30, d: 30, h: 20 }); await __wait(); const b = __box(id), top = b[1][2], mx = (b[0][0] + b[1][0]) / 2, my = (b[0][1] + b[1][1]) / 2;
+      C.startPaint(); const P = C.paintPrefs; const hit = (p, n, d) => ({ body: id, point: p, normal: n, dir: d, tri: -1 });
+      P.mode = 'brush'; P.color = '#ff0000'; P.size = 4;
+      C.paintPointer('down', hit([mx, b[0][1] - 1, top], [0, 0, 1], [0, 0, -1]), {});
+      for (let k = 0; k <= 32; k++) C.paintPointer('drag', hit([mx, b[0][1] - 1 + k, top], [0, 0, 1], [0, 0, -1]), {});
+      C.paintPointer('up', null, {});
+      P.mode = 'bucket'; P.color = '#0000ff'; P.coverage = 30;
+      C.paintPointer('down', hit([mx - 8, my, top], [0, 0, 1], [0, 0, -1]), {}); C.paintPointer('up', null, {});
+      const after1 = __pieces(id);
+      P.color = '#00ff00'; P.coverage = 180;
+      C.paintPointer('down', hit([b[0][0], my, top / 2], [-1, 0, 0], [1, 0, 0]), {}); C.paintPointer('up', null, {});
+      const after2 = __pieces(id);
+      P.color = '#ffff00';
+      C.paintPointer('down', hit([mx, my, top], [0, 0, 1], [0, 0, -1]), {}); C.paintPointer('up', null, {});
+      const after3 = __pieces(id); C.finishPaint(true);
+      return { b, mx, after1, after2, after3, ops: window.__3dj.store.doc.bodies[id].paint.ops.map((o) => o.t) }; }''')
+    bb, mx = r['b'], r['mx']
+    blue = lambda pcs: [x for x in pcs if x[1][2] > 0.9 and x[1][0] < 0.1]
+    on_top = lambda x: abs(x[0][2] - bb[1][2]) < 1e-3
+    b1 = blue(r['after1'])
+    check('Bucket: fills the clicked side of the stripe and stops at the stripe and the edges', b1 and all(on_top(x) and x[0][0] < mx for x in b1), b1[:3])
+    # the blue area covers the left half up to the stripe: its pieces reach near the left edge and near the stripe
+    check('Bucket: the filled side reaches the edge and the stripe', b1 and min(x[0][0] for x in b1) < bb[0][0] + 3 and max(x[0][0] for x in b1) > mx - 5, [min(x[0][0] for x in b1), max(x[0][0] for x in b1)])
+    green = [x for x in r['after2'] if x[1][1] > 0.9 and x[1][0] < 0.1]
+    check('Bucket on the unpainted side: the rest of the object, round the corner to the other half of the top', any(on_top(x) and x[0][0] > mx for x in green) and not any(on_top(x) and x[0][0] < mx - 2.5 for x in green), len(green))
+    yel = [x for x in r['after3'] if x[1][0] > 0.9 and x[1][1] > 0.9]
+    red = [x for x in r['after3'] if x[1][0] > 0.9 and x[1][1] < 0.1 and x[1][2] < 0.1]
+    check('Bucket on the stripe recolours the stripe', yel and not red and all(abs(x[0][0] - mx) < 2.6 for x in yel), (len(yel), len(red)))
+    check('Bucket strokes are kept like the others', r['ops'] == ['brush', 'bucket', 'bucket', 'bucket'], r['ops'])
 
     check('no page errors', not errors, errors)
     await b.close()

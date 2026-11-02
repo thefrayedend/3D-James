@@ -217,6 +217,13 @@
     await t('save/open 3MF with history', async () => {
       const bytes = await C.buildFileData('3mf'); const zip = await C.readZip(new Uint8Array(bytes));
       assert(zip.get('Metadata/3djames.json') && zip.get('3D/3dmodel.model'), '3mf parts');
+      // every object is one closed surface for the slicers: each side of a triangle is shared with exactly one other
+      const xml = new TextDecoder().decode(zip.get('3D/3dmodel.model'));
+      for (const mesh of xml.match(/<mesh>[\s\S]*?<\/mesh>/g)) {
+        const sides = new Map();
+        for (const [, x, y, z] of mesh.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)) for (const [p, q] of [[x, y], [y, z], [z, x]]) { const k = +p < +q ? `${p},${q}` : `${q},${p}`; sides.set(k, (sides.get(k) || 0) + 1); }
+        assert(sides.size && [...sides.values()].every((n) => n === 2), '3mf objects are closed (no open edges)');
+      }
       await C.openFile(new File([bytes], 'p.3mf'), null); await built(); noErr(); assert(bodies().length === 2 && S.doc.features.length === 2, '3mf reopen');
     });
     let stlBytes, stepBytes;

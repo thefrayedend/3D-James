@@ -1,5 +1,6 @@
-// Make editable: an imported mesh (STL, OBJ, 3MF) rebuilt as sketches and steps (src/stlconvert.js does the
-// work in the geometry engine). One undo step; Undo gives the mesh back.
+// Make editable: an imported mesh (STL, OBJ, 3MF) or STEP part rebuilt as sketches and steps (src/stlconvert.js
+// does the work in the geometry engine, on a fine mesh of the STEP's exact solid). One undo step; Undo gives the
+// import back. A STEP part that cannot be rebuilt whole stays the exact solid (never swapped for a mesh).
 import { store } from './store.js';
 import { app, saveSettings } from './state.js';
 import { h, toast, modal } from './ui/dom.js';
@@ -8,10 +9,10 @@ import { keepFile, newFileId } from './storage.js';
 import { meshToStl } from './formats.js';
 import { select } from './commands.js';
 
-/** Can this object be made editable? (an imported mesh, not changed by any later step) */
+/** Can this object be made editable? (an imported mesh or STEP part, not changed by any later step) */
 export function canMakeEditable(doc, id) {
   const f = doc.features.find((x) => x.type === 'shape' && x.body === id);
-  return !!f && f.kind === 'import' && f.p?.fmt !== 'step' && !f.suppressed;
+  return !!f && f.kind === 'import' && !f.suppressed;
 }
 
 /** What the last Make editable did, in words (read by the AI link, src/bridge.js). */
@@ -44,7 +45,8 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
   const doc = store.doc;
   const fi = doc.features.findIndex((x) => x.type === 'shape' && x.body === id);
   const f = doc.features[fi];
-  if (!f || !canMakeEditable(doc, id)) { toast('Make editable works on an imported STL, OBJ or 3MF mesh.', 'err'); return false; }
+  if (!f || !canMakeEditable(doc, id)) { toast('Make editable works on an imported STL, OBJ, 3MF or STEP model.', 'err'); return false; }
+  const step = f.p?.fmt === 'step', from = step ? 'the STEP file' : 'the STL', stays = step ? 'stays the exact STEP solid' : 'stays a mesh';
   const name = doc.bodies[id]?.name || f.p?.name || 'Part';
   const was = JSON.stringify(f); // the import step as it was when the work started
   const busy = toast(`Making ${name} editable… big or detailed models can take a minute.`, 'info', 600000);
@@ -53,18 +55,29 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
   try {
     await waitForBuild(); // the engine has the mesh file
     seq = store.doc.seq;
-    res = await workerCall({ type: 'convertImport', feature: f, name, seq, body: id, detail });
+    // a STEP part gets three minutes: then the engine starts again by itself and the part stays the exact solid
+    res = await workerCall({ type: 'convertImport', feature: f, name, seq, body: id, detail }, undefined, step ? { timeout: 180000, restart: true } : undefined);
   } catch (err) {
+    if (err.tooLong) {
+      lastReport = { done: false, summary: `${name} took too long to rebuild as sketches, so it ${stays}.` };
+      toast(`${name} took too long to rebuild as sketches, so it ${stays}.`, 'info', 9000);
+      return false;
+    }
     lastReport = { done: false, summary: `Could not make ${name} editable: ${err.message}` };
     toast(`Could not make ${name} editable: ${err.message}`, 'err', 8000);
     return false;
   } finally { app.converting = false; busy.remove(); }
-  const solidParts = res.parts.filter((p) => !p.mesh);
-  lastReport = { done: !!solidParts.length, summary: solidParts.length ? summary(res) : `${name} is curved all over, so it cannot be drawn as sketches and stays a mesh.`,
+  let solidParts = res.parts.filter((p) => !p.mesh);
+  // a STEP part is exact: rebuilt only whole and close (within a quarter of a mm), or it stays as it is (a piece of
+  // it as a mesh, or a rough copy of it, would be a step back)
+  const rough = step && solidParts.length && res.report && res.report.maxGap > 0.25;
+  const partly = step && solidParts.length && (rough || res.parts.some((p) => p.mesh));
+  if (partly) solidParts = [];
+  lastReport = { done: !!solidParts.length, summary: solidParts.length ? summary(res, from) : rough ? `${name} could only be drawn roughly as sketches (up to ${mm(res.report.maxGap)} off), so it ${stays}.` : partly ? `Part of ${name} could not be drawn as sketches, so it ${stays}.` : `${name} is curved all over, so it cannot be drawn as sketches and ${stays}.`,
     meshParts: res.parts.filter((p) => p.mesh).map((p) => p.name), stepsWithErrors: Object.keys(res.errors || {}) };
   if (!solidParts.length) {
-    if (!quiet) explain(name, res, false);
-    else toast(`${name} could not be rebuilt from sketches (it is curved all over), so it stays a mesh.`, 'info', 9000);
+    if (!quiet) explain(name, res, false, from, stays, partly, rough);
+    else toast(rough ? lastReport.summary : `${name} could not be rebuilt from sketches (${partly ? 'part of it is curved all over' : 'it is curved all over'}), so it ${stays}.`, 'info', 9000);
     return false;
   }
   // Another project opened, or the import step changed or went while the engine worked: the result is for
@@ -110,24 +123,24 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
     d.features.splice(at, 1, ...steps);
   });
   select([id, ...newIds]);
-  if (!quiet || res.parts.some((p) => p.mesh) || Object.keys(res.errors || {}).length) explain(name, res, true);
-  else toast(summary(res), 'info', 9000);
+  if (!quiet || res.parts.some((p) => p.mesh) || Object.keys(res.errors || {}).length) explain(name, res, true, from, stays);
+  else toast(summary(res, from), 'info', 9000);
   return true;
 }
 
-function summary(res) {
+function summary(res, from = 'the STL') {
   const sketches = res.features.filter((f) => f.kind === 'sketch').length;
   const r = res.report;
   return `Rebuilt as ${res.features.length} step${res.features.length === 1 ? '' : 's'} (${sketches} sketch${sketches === 1 ? '' : 'es'})`
-    + (r ? `: ${pct(r.xor)} the same as the STL, surfaces at most ${mm(r.maxGap)} apart.` : '.');
+    + (r ? `: ${pct(r.xor)} the same as ${from}, surfaces at most ${mm(r.maxGap)} apart.` : '.');
 }
 
-function explain(name, res, done) {
+function explain(name, res, done, from = 'the STL', stays = 'stays a mesh', partly = false, rough = false) {
   const meshParts = res.parts.filter((p) => p.mesh);
   const body = h('div', {},
-    done ? h('p', {}, summary(res)) : h('p', {}, `${name} is curved all over (like a figure or a sculpted shape), so it cannot be drawn as sketches. It stays a mesh: you can still move, size, paint and combine it.`),
-    done ? h('p', { class: 'muted' }, 'Each sketch is in History: select the object and click Edit sketch (or open the step in History) to change a size. Undo (Ctrl+Z) gives back the mesh.') : null,
+    done ? h('p', {}, summary(res, from)) : h('p', {}, rough ? `${name} could only be drawn roughly as sketches (up to ${mm(res.report.maxGap)} off), so it ${stays}: you can still move, size, paint and combine it.` : `${partly ? `Part of ${name} is curved all over` : `${name} is curved all over (like a figure or a sculpted shape)`}, so it cannot be drawn as sketches. It ${stays}: you can still move, size, paint and combine it.`),
+    done ? h('p', { class: 'muted' }, `Each sketch is in History: select the object and click Edit sketch (or open the step in History) to change a size. Undo (Ctrl+Z) gives back ${from === 'the STL' ? 'the mesh' : 'the STEP part'}.`) : null,
     meshParts.length && done ? h('p', {}, `${meshParts.length === 1 ? 'One part' : `${meshParts.length} parts`} could not be drawn as sketches and ${meshParts.length === 1 ? 'stays a mesh' : 'stay meshes'} (grey, named "… (mesh)"): ${meshParts.map((p) => p.name).join(', ')}.`) : null,
     Object.keys(res.errors || {}).length ? h('p', { class: 'err' }, 'Some steps could not be built; they are marked in History.') : null);
-  const close = modal(done ? `${name} is now editable` : `${name} stays a mesh`, body, () => [h('button', { class: 'btn primary', onclick: () => close() }, 'OK')]);
+  const close = modal(done ? `${name} is now editable` : `${name} ${stays}`, body, () => [h('button', { class: 'btn primary', onclick: () => close() }, 'OK')]);
 }

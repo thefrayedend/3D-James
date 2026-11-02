@@ -26,6 +26,7 @@ import { planeDialog, adjustedPlane } from './sketchplane.js';
 import { createSketch, startSketch, editSketch, editSketches, startFaceSketch, startPhotoSketch, startImportSketch } from './sketchcmd.js';
 import { setWorkplane } from './tools.js';
 import { startPaint, finishPaint, paintPointer, paintPrefs } from './painttool.js';
+import { feedbackDialog, feedbackDetails } from './feedback.js';
 import { worldPaint } from './painting.js';
 import { barCommit, setGizmo } from './ui/bars.js';
 import { applyTheme } from './theme.js';
@@ -173,6 +174,6 @@ window.__3dj = {
     startWorker, barCommit, setGizmo, openPanel, endTool, showAbout, presetFor, openSketch, renderCmdBar, workerCall, applyTheme, addShape, combine, startTool, applyTool, quickEdges, addThread, mirrorSel, turnCopySel,
     iconNames, iconFile, centerOn, alignSel, addPattern, duplicateSel, deleteSel, dropSel, rotateSel, saveDoc, saveAs, openFile, insertFile, groupSel, ungroupSel, readZip, parse3mf,
     buildFileData, makeEditable, translateSel, setBodyProp, toolPick, createSketch, startSketch, editSketch, editSketches, startFaceSketch, startPhotoSketch, startImportSketch, planeDialog, adjustedPlane, setWorkplane, newProject, loadProject, editStep, renderAll, saveToMyParts, insertMyPart, loadMyParts, usePartsFolder, idb,
-    startPaint, finishPaint, paintPointer, paintPrefs, worldPaint,
+    startPaint, finishPaint, paintPointer, paintPrefs, worldPaint, feedbackDialog, feedbackDetails,
   },
 };

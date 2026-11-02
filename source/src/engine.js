@@ -1087,7 +1087,9 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
         }
       }
     }
-    return { errors, meshes, soups };
+    // (and their exact solids, for a STEP part made editable from its own edges: src/stepconvert.js)
+    const solids = new Map([...state].filter(([, b]) => b.v.shape).map(([id, b]) => [id, b.v.shape]));
+    return { errors, meshes, soups, solids };
   }
   lastState = state;
   for (const [k, v] of shapeCache) if (!touched.has(k)) { freeValue(v); shapeCache.delete(k); }

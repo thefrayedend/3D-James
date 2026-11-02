@@ -50,7 +50,7 @@ def make_handler(ctx):
     def login_page(req, message=''):
         if not cfg.data['users']:
             # the address this page was opened with (works in the setup hotspot too), with the admin port
-            host = (req.headers.get('Host') or f'{socket.gethostname()}.local').split(':')[0]
+            host = (req.headers.get('Host') or f"{os.environ.get('TDJ_HOSTNAME') or socket.gethostname()}.local").split(':')[0]
             link = f'http://{htmlmod.escape(host)}:{ctx.admin_port}'
             return html(page('3DJames', f'<h1>3DJames</h1><p>This 3DJames box is not set up yet.</p><p class="muted">Open the admin page to create the first account:<br><a href="{link}"><b>{link}</b></a></p>'))
         err = f'<div class="err">{htmlmod.escape(message)}</div>' if message else ''

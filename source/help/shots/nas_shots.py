@@ -18,7 +18,7 @@ async def main():
     ap, adp = free_port(), free_port()
     srv = subprocess.Popen([sys.executable, str(ROOT / 'server' / '3djames_server.py'), '--data', str(data), '--app-port', str(ap), '--admin-port', str(adp),
                             '--bundled-app', str(ROOT / 'local' / '3DJames.html')], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                           env={**os.environ, 'TDJ_MOUNT_ROOT': str(data / 'mnt')})
+                           env={**os.environ, 'TDJ_MOUNT_ROOT': str(data / 'mnt'), 'TDJ_HOSTNAME': '3djames'})  # (never this PC's own name in a picture)
     ADMIN = f'http://127.0.0.1:{adp}'
     for _ in range(100):
         try: urllib.request.urlopen(ADMIN + '/api/state', timeout=1); break

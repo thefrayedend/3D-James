@@ -1,12 +1,13 @@
 <h1>Paint parts</h1>
 <p>Give parts of an object other colors: the top of a box, a stripe, a band round a cup, a logo's letters. It works like 3D Builder's <b>Color</b> tool, with the brushes of OrcaSlicer. Saved as a <b>3MF</b>, the paint goes to OrcaSlicer and Bambu Studio as their own filament paint, so each color prints with its own filament (and you can still change the paint there).</p>
-<figure><img src="paint-parts.jpg" alt="The Paint tab while painting: Cancel, Done, the colors, the Fill, Brush, Sphere, Band and Eraser tools and the Size slider across the top; a blue box with a yellow top, a red band round its bottom and a white wavy brush stroke on its front"><figcaption>Painting a box: Fill made the top yellow, Band put a red band round the bottom, and the Brush drew the white wave.</figcaption></figure>
+<figure><img src="paint-parts.jpg" alt="The Paint tab while painting: Cancel, Done, the colors, the Fill, Bucket, Brush, Sphere, Band and Eraser tools and the Size slider across the top; a blue box with a yellow top, a red band round its bottom and a white wavy brush stroke on its front"><figcaption>Painting a box: Fill made the top yellow, Band put a red band round the bottom, and the Brush drew the white wave.</figcaption></figure>
 
 <h2>Start and finish</h2>
 <ol>
 <li>On the <b>Paint</b> tab, click <b>Paint parts</b>. The row of buttons changes to the paint tools.</li>
 <li>Click a <b>color</b> (<b>More</b> for any color), then a tool.</li>
 <li>Click or drag on an object to paint it. Drag beside the object to turn the view (the right mouse button and the wheel work as always).</li>
+<li>On a tablet, paint with one finger on the object. Two fingers move and zoom the view as usual (a stroke the first finger started is taken back), and one finger beside the object turns it. A pen paints like the mouse.</li>
 <li>Click <b>Done</b> (or press <b>Esc</b> or <b>Enter</b>) to keep the paint: all of it is one step, so one <b>Undo</b> takes it off again. <b>Cancel</b> drops everything painted since you clicked Paint parts.</li>
 </ol>
 <p>While painting, <b>Ctrl+Z</b> and <b>Ctrl+Y</b> undo and redo one stroke at a time.</p>
@@ -14,10 +15,14 @@
 <h2>The tools</h2>
 <ul>
 <li><b>Fill</b>: point at a face and it lights up in the color; click to fill it, or keep the button down and drag across the object to fill every face you pass (like 3D Builder). <b>Coverage</b> says how far it spreads: over edges that bend less than that many degrees. At 0° it fills just that face; at 30° the whole round side of a cylinder; at 180° everything that touches. (Ctrl + mouse wheel changes it.)</li>
+<li><b>Bucket</b>: click an area of one color to paint all of it in the new color, up to where other paint starts (OrcaSlicer's Bucket fill). <b>Coverage</b> works as for Fill: at 30° it stays on the face you click and its smooth neighbours, at 180° it goes all the way round the object. Click a stripe to recolor the whole stripe, or the space between two stripes to fill just that.</li>
 <li><b>Brush</b>: a round brush on the surface you see (OrcaSlicer's Circle). The ring shows its size.</li>
 <li><b>Sphere</b>: paints everything within a ball around the pointer, round corners and onto every side it touches (OrcaSlicer's Sphere).</li>
 <li><b>Band</b>: click once to paint a level band all the way round the object, at that height, as tall as <b>Size</b> (OrcaSlicer's Height range). Good for stripes and color changes by height.</li>
 <li><b>Eraser</b>: rubs paint off, back to the object's own color. Holding <b>Shift</b> while you paint does the same with any tool.</li>
+</ul>
+<figure><img src="paint-bucket.jpg" alt="A grey cylinder with a red band round its middle; the Bucket filled the side above the band blue and the side below it green, stopping at the band and at the top edge; the Bucket tool (1) and the Coverage slider at 30 degrees (2) are marked"><figcaption>Bucket (1): a Band made the red stripe, then one click above it filled the side blue and one below filled it green. Each stops at the stripe, and at the top edge because Coverage (2) is 30°.</figcaption></figure>
+<ul>
 <li><b>Size</b>: how wide the brush, sphere or band is, in mm. <b>Alt + mouse wheel</b> changes it while you paint.</li>
 <li><b>Clear</b>: takes all paint off the picked objects (or off every object, when none is picked).</li>
 </ul>
@@ -31,5 +36,11 @@
 </ul>
 
 <h2>Into the slicer</h2>
-<p>Save as <b>3MF</b> (Save as, then pick 3MF). In OrcaSlicer and Bambu Studio each color is on a filament of its own: first the objects' own colors, then the paint colors. Those programs keep the filament colors you have set, so after saving 3DJames shows which filament number each color is on: set the filaments to those colors (or let the AMS fill them in). To change the paint there, pick the object and use their <b>Color painting</b> tool.</p>
+<p>Save as <b>3MF</b> (Save as, then pick 3MF). Each color goes on a filament of its own: first the objects' own colors, then the paint colors. Checked with these slicers:</p>
+<ul>
+<li><b>OrcaSlicer</b> and the slicers made from it (<b>Snapmaker Orca</b>, <b>ElegooSlicer</b>, FlashForge's <b>Orca-Flashforge</b>): the file opens straight away, and the paint is their own color painting, so you can still change it with their <b>Color painting</b> tool.</li>
+<li><b>Bambu Studio</b>: it first says the file is not from Bambu Lab (click <b>OK</b>), then shows <b>Standard 3mf Import color</b> with a picture of the colors: click <b>OK</b> and each color gets a filament. The painted areas arrive as colored areas.</li>
+<li><b>PrusaSlicer</b> and <b>Cura</b> open the shapes but not the colors.</li>
+</ul>
+<p>The slicers keep the filament colors you have set, so after saving, 3DJames shows which filament number each color is on: set the filaments to those colors (or let the AMS fill them in).</p>
 <p>STL and STEP files have no colors, so the paint is not in them. Holes cannot be painted (they are not printed).</p>

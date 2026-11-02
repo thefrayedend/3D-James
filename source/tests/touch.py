@@ -142,6 +142,38 @@ async def main():
     check('a palm touching the screen while the pen is used is ignored', await ev("()=>__k.drawing && __k.drawing.pts.length===2"), await ev("()=>JSON.stringify(__k.drawing)"))
     await ev("()=>__k.close()")
 
+    # ---------------------------------------------------------------- painting with a finger (Paint > Paint parts)
+    bx = await ev('''async () => { const { commands: C, vp, app } = window.__3dj; C.newProject();
+      while (app.building || app.pending) await new Promise((r) => setTimeout(r, 20));
+      const id = C.addShape('box', { w: 40, d: 40, h: 10 }); while (app.building || app.pending || app.builtRevision !== window.__3dj.store.revision) await new Promise((r) => setTimeout(r, 20));
+      app.sel = []; vp.setSelection([]); C.startPaint(); const P = C.paintPrefs; P.mode = 'brush'; P.color = '#ff00ff'; P.size = 4; vp.view('home', false); return id; }''')
+    await pg.wait_for_timeout(400)
+    scr = "(p) => { const v = window.__3dj.vp, s = v.toScreen(v.camera.position.clone().set(...p)); return [s.x, s.y]; }"
+    bb = await ev('(id) => window.__3dj.app.results.bodies.get(id).bbox', bx)
+    a0 = await ev(scr, [bb[0][0] + 8, (bb[0][1] + bb[1][1]) / 2, bb[1][2]]); a1 = await ev(scr, [bb[1][0] - 8, (bb[0][1] + bb[1][1]) / 2, bb[1][2]])
+    nops = '(id) => (window.__3dj.app.tool.ops[id] || []).length'
+    cam = '() => window.__3dj.vp.camera.position.toArray().map((v) => Math.round(v * 100) / 100)'
+    c0 = await ev(cam)
+    await swipe([a0], [a1])
+    check('paint: one finger on the object paints a stroke', await ev(nops, bx) == 1, await ev(nops, bx))
+    check('paint: the view stays still while painting', await ev(cam) == c0, [c0, await ev(cam)])
+    # two fingers (the second shortly after the first): the first finger's stroke is taken back, the view moves
+    await touch('touchStart', [(1, a0)]); await pg.wait_for_timeout(40)
+    await touch('touchMove', [(1, (a0[0] + 4, a0[1]))]); await pg.wait_for_timeout(16)
+    p2 = (a0[0] + 160, a0[1] + 30)
+    await touch('touchStart', [(1, (a0[0] + 4, a0[1])), (2, p2)])
+    for k in range(1, 11):
+      await touch('touchMove', [(1, (a0[0] + 4 - 6 * k, a0[1] - 3 * k)), (2, (p2[0] + 6 * k, p2[1] + 3 * k))]); await pg.wait_for_timeout(16)
+    await touch('touchEnd', []); await pg.wait_for_timeout(200)
+    check('paint: a second finger takes the stroke back', await ev(nops, bx) == 1, await ev(nops, bx))
+    check('paint: two fingers zoom the view', await ev(cam) != c0)
+    # a finger beside the object turns the view, and painting carries on after
+    c1 = await ev(cam)
+    await swipe([(80, 650)], [(200, 600)])
+    check('paint: a finger beside the object turns the view', await ev(cam) != c1)
+    await ev('() => window.__3dj.commands.finishPaint(true)')
+    check('paint: Done keeps the finger stroke', await ev('(id) => window.__3dj.store.doc.bodies[id].paint?.ops?.length', bx) == 1)
+
     # ---------------------------------------------------------------- View > Touch: off
     await ev("()=>{ __3dj.app.settings.inputMode='mouse'; }")
     await ev("async()=>{ (await import(location.href).catch(()=>null)); }")

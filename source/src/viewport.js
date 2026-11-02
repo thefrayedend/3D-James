@@ -1138,7 +1138,7 @@ export class Viewport {
   /** Paint mode: dragging on an object paints (hooks.onPaint), dragging beside it turns the view. */
   setPaintMode(on) {
     this.mode = on ? 'paint' : 'select';
-    if (!on) { this.paintPainting = false; this.showPaintCursor(null); this.showPaintPreview(null); this.renderer.domElement.style.cursor = 'default'; }
+    if (!on) { this.paintPainting = false; this.orbit.enableRotate = true; this.showPaintCursor(null); this.showPaintPreview(null); this.renderer.domElement.style.cursor = 'default'; }
     this.clearHandles();
     this.updateStyles();
     this.updateGizmo();
@@ -1204,8 +1204,18 @@ export class Viewport {
       if (e.pointerType === 'touch') {
         if (palm(e)) { e.stopImmediatePropagation(); return; } // a palm while the pen is in use
         touches.add(e.pointerId);
-        if (touches.size > 1) { clearTimeout(hold?.timer); hold = null; this.cancelDrag(); down = null; return; } // two fingers: the camera
+        if (touches.size > 1) {
+          // two fingers: the camera (a stroke the first finger started is taken back)
+          if (this.paintPainting) { this.paintPainting = false; this.orbit.enableRotate = true; this.hooks.onPaint?.('cancel', null, e); }
+          clearTimeout(hold?.timer); hold = null; this.cancelDrag(); down = null; return;
+        }
         down = { x: e.clientX, y: e.clientY, button: 0, moved: false, touch: true };
+        if (this.mode === 'paint') {
+          // one finger on an object paints (the camera still follows the finger, but does not turn); beside it, turns the view
+          const hit = this.paintHit(this.hitBody(e));
+          if (hit && this.hooks.onPaint?.('down', hit, e)) { this.paintPainting = true; this.paintTouch = e.pointerId; this.orbit.enableRotate = false; }
+          return;
+        }
         if (this.mode !== 'select') return;
         const hit = this.hitBody(e);
         if (hit) {
@@ -1240,6 +1250,10 @@ export class Viewport {
     }, { capture: true });
 
     dom.addEventListener('pointermove', (e) => {
+      if (this.mode === 'paint' && e.pointerType === 'touch' && this.paintPainting) {
+        if (e.pointerId === this.paintTouch) this.hooks.onPaint?.('drag', this.paintHit(this.hitBody(e)), e);
+        return;
+      }
       if (this.mode === 'paint' && e.pointerType !== 'touch') {
         if (this.paintPainting || !e.buttons) this.hooks.onPaint?.(this.paintPainting ? 'drag' : 'hover', this.paintHit(this.hitBody(e)), e);
         if (this.paintPainting) return;
@@ -1280,6 +1294,11 @@ export class Viewport {
     const finish = (e) => {
       if (e.pointerType === 'touch') {
         touches.delete(e.pointerId); lastTouch = Date.now();
+        if (this.paintPainting && e.pointerId === this.paintTouch) {
+          this.paintPainting = false; this.orbit.enableRotate = true; down = null;
+          this.hooks.onPaint?.('up', null, e);
+          return;
+        }
         if (hold) clearTimeout(hold.timer);
         const tapped = hold?.id ?? null; hold = null;
         if (!this.drag) {

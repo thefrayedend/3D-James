@@ -11,6 +11,11 @@ from .config import USERNAME, hash_password
 from .files import clean_parts
 from .web import Handler, Response, cookie, js
 
+
+def host_name():
+    """The box's network name (TDJ_HOSTNAME stands in for it in Help pictures, so they never show a real PC's name)."""
+    return os.environ.get('TDJ_HOSTNAME') or socket.gethostname()
+
 COOKIE = 'tdjadmin'
 WEB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'web')
 PLACE_ID = re.compile(r'^[a-z0-9][a-z0-9-]{0,23}$')
@@ -38,7 +43,7 @@ def make_handler(ctx):
 
     # ------------------------------------------------------------------ signing in
     def state(req):
-        return js({'ok': True, 'setup': not cfg.has_admin(), 'signedIn': bool(admin_of(req)), 'host': socket.gethostname(), 'appPort': ctx.app_port})
+        return js({'ok': True, 'setup': not cfg.has_admin(), 'signedIn': bool(admin_of(req)), 'host': host_name(), 'appPort': ctx.app_port})
 
     def setup(req):
         if cfg.has_admin():
@@ -92,7 +97,7 @@ def make_handler(ctx):
                 taken = {p.get('uuid'): pid for pid, p in d['places'].items() if p['type'] == 'usb'}
                 usb = [{**x, 'place': taken.get(x.get('uuid'))} for x in r.get('drives', [])]
         return js({'ok': True, 'me': me, 'config': d, 'usb': usb, 'app': ctx.app.info(), 'previousApp': ctx.app.info(ctx.app.previous),
-                   'server': ctx.version, 'host': socket.gethostname(), 'appPort': ctx.app_port, 'adminPort': ctx.admin_port,
+                   'server': ctx.version, 'host': host_name(), 'appPort': ctx.app_port, 'adminPort': ctx.admin_port,
                    'helper': system.helper_available(), 'dropFolder': ctx.drop_dir})
 
     def place_users(pid):

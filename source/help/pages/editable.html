@@ -1,9 +1,10 @@
-<h1>Make an STL editable</h1>
+<h1>Make an STL or STEP file editable</h1>
 <p>An STL (or OBJ, or a 3MF from another program) is a <b>mesh</b>: a shell of thousands of small triangles. 3DJames can move, size, paint and combine a mesh, but you can't change its shape: there is no "hole Ø5" or "10 mm tall" in it to change. <b>Make editable</b> rebuilds the mesh as normal 3DJames steps: <b>sketches pushed up</b>, <b>profiles spun around</b>, and <b>cut-outs</b> taken away, so you can open a sketch, change a size, and the model follows.</p>
+<p>A <b>STEP</b> file (from a CAD program) is different: its shapes are exact, but it has no steps either, so you can't change a hole's size in it. Make editable works on STEP parts too, and on them it can do better (see <b>STEP files</b> below).</p>
 <h2>Start</h2>
 <ul>
-<li>Open the STL: <b>≡</b> &gt; <b>Open…</b> (Ctrl+O), or drop it on the window. 3DJames asks <b>Make it editable?</b> Click <b>Make editable</b>. (<b>Keep as a mesh</b> opens it as before.)</li>
-<li>Already in your project (from Insert, or an older project)? Select the mesh object: <b>Properties</b> shows a <b>Make editable</b> box. Click <b>Make editable</b>.</li>
+<li>Open the STL or STEP file: <b>≡</b> &gt; <b>Open…</b> (Ctrl+O), or drop it on the window. 3DJames asks <b>Make it editable?</b> Click <b>Make editable</b>. (<b>Keep as a mesh</b>, or <b>Keep as it is</b> for a STEP file, opens it as before.)</li>
+<li>Already in your project (from Insert, or an older project)? Select the object: <b>Properties</b> shows a <b>Make editable</b> box. Click <b>Make editable</b>.</li>
 </ul>
 <h2>How much detail</h2>
 <p>Before you click Make editable, the <b>Detail</b> slider (2) picks between fewer steps and closer to the file. 3DJames remembers your choice for next time.</p>
@@ -34,6 +35,15 @@
 <li>The bracket is rebuilt with the bigger hole. Save it as a 3DJames project (.3dj) to keep the steps.</li>
 </ol>
 <figure><img src="editable-3.jpg" alt="The sketch board with the three hole circles of the bracket, each a true circle with its diameter in the Shapes box, with the bracket's outline in grey around them"><figcaption>A sketch made from the STL: the holes are true circles; type a new Diameter in the Shapes box, then Done. The grey is the bracket seen from above, so you can see where each hole sits.</figcaption></figure>
+<h2 id="step">STEP files</h2>
+<p>A part from a STEP file that is made of flat faces and straight round walls (plates, brackets, holders, boxes, with holes, slots and rounded corners seen from above) is rebuilt from the file's own edges, not from triangles:</p>
+<ul>
+<li>Its outlines are the STEP's exact lines, arcs and circles, so a 3.4 mm hole is a 3.4 mm circle and a 12 mm wide slot is 12 mm wide, not 11.998.</li>
+<li>It gets one sketch for each height where the outline changes (<b>outline pushed up 8 mm</b>, <b>level 2 at 8 mm, pushed up 12 mm</b>), joined into one object.</li>
+<li>Holes that go through several levels become one hole sketch, cut out of the whole part (<b>2 holes</b>, <b>cut the holes</b>): change the circles there and every level follows.</li>
+<li>It is checked against the STEP part: it is only used when it comes out exactly the same.</li>
+</ul>
+<p>Other STEP parts (rounded or bevelled top edges, cones, free-form shapes) are rebuilt the same way as an STL. A STEP part that can't be rebuilt whole, or takes longer than three minutes, <b>stays the exact STEP solid</b>: it is never swapped for a mesh, and you can still move, size, paint and combine it. A STEP file with several parts asks first whether to keep them as one object or separate ones; each part is made editable on its own.</p>
 <h2>Undo, or keep the mesh</h2>
 <ul>
 <li><b>Undo</b> (Ctrl+Z) right after gives the mesh back, exactly as it was.</li>

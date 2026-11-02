@@ -5,6 +5,7 @@ import { $, h, ic, modal } from './dom.js';
 import { app } from '../state.js';
 import { bindExamples } from './help-examples.js';
 import { showAbout } from './about.js';
+import { feedbackDialog } from '../feedback.js';
 
 let view = null, docked = false, pinned = false, currentPage = 'about'; // pinned: Keep visible was clicked
 let navPage = null; // the page the topic list was last drawn for
@@ -73,6 +74,7 @@ function render(query = '') {
   const nav = h('nav', { class: 'help-nav' }, search, ...groups,
     list.length ? null : h('div', { class: 'muted', style: 'padding:8px' }, 'Nothing found.'),
     h('div', { class: 'help-foot' },
+      h('button', { class: 'btn', onclick: feedbackDialog, title: 'Tell the people who make 3DJames about a problem or an idea' }, ic('MessageSquare'), 'Send feedback'),
       h('button', { class: 'btn', onclick: showAbout }, ic('Package'), 'Licenses and components'),
       h('div', { class: 'muted' }, `3DJames ${window.__3DJ_VERSION || ''}`)));
   const body = h('div', { class: 'help-body' }); body.innerHTML = pageHtml(pages[cur]);

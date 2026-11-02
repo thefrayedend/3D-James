@@ -105,3 +105,6 @@ brush.svg                      (small buttons and lists)
 globe.svg                      (small buttons and lists)
 rows-3.svg                     Hinge between two parts
 wand-sparkles.svg              Helpers
+droplet.svg                    (small buttons and lists)
+send.svg                       (small buttons and lists)
+message-square.svg             Send feedback…

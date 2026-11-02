@@ -1,5 +1,6 @@
 // Paint tab > Paint parts: colour parts of an object, like 3D Builder's Color mode (Cancel and Done, the colour,
-// Coverage) with the slicers' brushes (OrcaSlicer's colour painting): Fill, Brush, Sphere, Band and Eraser.
+// Coverage) with the slicers' brushes (OrcaSlicer's colour painting): Fill, Bucket, Brush, Sphere, Band and Eraser.
+// With a finger (a tablet), one finger on an object paints; a second finger takes that stroke back and moves the view.
 // While painting, the strokes are kept here (with their own Undo); Done keeps them as one step, Cancel drops them.
 import { store } from './store.js';
 import { PALETTE } from './shared.js';
@@ -13,6 +14,7 @@ import { renderAll } from './ui/panels.js';
 
 const MODES = [
   ['fill', 'PaintBucket', 'Fill', 'Click a face to fill it, or drag across faces to fill each one you pass, like 3D Builder. Coverage sets how far a fill spreads: over edges that bend less than that many degrees (0: just that face).'],
+  ['bucket', 'Droplet', 'Bucket', 'Click a colour area to paint all of it in the new colour, up to where other paint starts (like the Bucket fill in OrcaSlicer). Coverage sets how far it spreads round edges: over edges that bend less than that many degrees (180: all the way round).'],
   ['brush', 'Paintbrush', 'Brush', 'Paint with a round brush on the surface you see (like the Circle in OrcaSlicer).'],
   ['ball', 'Globe', 'Sphere', 'Paint everything within a ball around the pointer, on every side (like the Sphere in OrcaSlicer).'],
   ['band', 'Rows3', 'Band', 'Click to paint a level band all the way round the object, as tall as Size (like the Height range in OrcaSlicer).'],
@@ -77,6 +79,12 @@ export function paintPointer(kind, hit, e) {
     if (s) keep(s.id, s.ops);
     return true;
   }
+  if (kind === 'cancel') {
+    // a second finger came down: this was the start of moving the view, not painting
+    if (t.stroke) { t.stroke = null; vp.updateStyles(); } else if (t.undo.length > (t.mark ?? Infinity)) { paintUndo(false); t.redo.length = 0; }
+    t.mark = null; vp.showPaintCursor(null);
+    return true;
+  }
   if (kind === 'drag') {
     const s = t.stroke;
     if (s && hit && hit.body === s.id) {
@@ -107,7 +115,8 @@ export function paintPointer(kind, hit, e) {
       const key = [id, hit.tri, prefs.coverage, show, vp.bodies.get(id).key].join();
       if (t.preview !== key) { t.preview = key; vp.showPaintPreview(id, fillArea(meshContext(vp.bodies.get(id).data), hit.point, hit.normal, prefs.coverage, hit.tri), show); }
       vp.showPaintCursor(null);
-    } else { t.preview = null; vp.showPaintPreview(null); cursor(hit, r, show); }
+    } else if (prefs.mode === 'bucket') { t.preview = null; vp.showPaintPreview(null); vp.showPaintCursor(null); }
+    else { t.preview = null; vp.showPaintPreview(null); cursor(hit, r, show); }
     vp.renderer.domElement.style.cursor = hit ? 'crosshair' : 'default';
     return true;
   }
@@ -116,6 +125,8 @@ export function paintPointer(kind, hit, e) {
   if (props?.hole) { toast('Holes are not printed, so they cannot be painted.'); return false; }
   if (props?.hidden) return false;
   const c = color && color.toLowerCase();
+  t.mark = t.undo.length;
+  if (prefs.mode === 'bucket') { keep(id, { t: 'bucket', c, p: hit.point.map(r4), n: hit.normal.map(r4), a: prefs.coverage }); return true; }
   if (prefs.mode === 'fill') {
     // the first face now; more as the pointer is dragged over them (all of it one Undo step, kept on 'up')
     const op = { t: 'fill', c, p: hit.point.map(r4), n: hit.normal.map(r4), a: prefs.coverage };
@@ -169,7 +180,7 @@ function clearPaint() {
 // ---- the command row while painting (in place of the Paint tab's)
 export function paintBar(cb, sep) {
   const set = (k, v) => { prefs[k] = v; renderCmdBar(); };
-  const sizeMode = prefs.mode !== 'fill';
+  const sizeMode = !['fill', 'bucket'].includes(prefs.mode);
   const [label, key, min, max, step, unit] = sizeMode ? ['Size', 'size', 0.5, 60, 0.5, 'mm'] : ['Coverage', 'coverage', 0, 180, 5, '°'];
   // the colors already on the objects first (like the slicers' filament list), then the palette
   const used = [...new Set([...vp.bodies.keys()].flatMap((id) => [store.doc.bodies[id]?.color, ...opsNow(id).map((o) => o.c)]).filter(Boolean).map((c) => c.toLowerCase()))];
@@ -181,9 +192,9 @@ export function paintBar(cb, sep) {
     h('div', { class: 'swgrid' }, [...PALETTE, ...used.filter((c) => !PALETTE.some((p) => p.toLowerCase() === c))].slice(0, 30).map(sw)),
     h('label', { class: 'cb', title: 'Pick any color' }, ic('Pipette'), h('span', {}, 'More'), h('input', { type: 'color', value: prefs.color, style: 'width:0;height:0;opacity:0;position:absolute', onchange: (e) => set('color', e.target.value) })), sep(),
     ...MODES.map(([k, icon, name, tip]) => cb(`paint-${k}`, icon, name, () => set('mode', k), { on: prefs.mode === k, title: tip })), sep(),
-    h('label', { class: 'cmuted', title: sizeMode ? 'How wide the brush is (Alt + mouse wheel)' : 'How far a fill spreads: over edges that bend less than this (Ctrl + mouse wheel)' }, label,
+    h('label', { class: 'cmuted', title: sizeMode ? 'How wide the brush is (Alt + mouse wheel)' : 'How far a fill or bucket spreads: over edges that bend less than this (Ctrl + mouse wheel)' }, label,
       h('input', { type: 'range', min, max, step, value: prefs[key], style: 'width:110px;vertical-align:middle;margin:0 6px', 'aria-label': label, oninput: (e) => { prefs[key] = +e.target.value; e.target.nextSibling.textContent = `${prefs[key]} ${unit}`; } }),
       h('span', {}, `${prefs[key]} ${unit}`)), sep(),
     cb('paint-clear', 'Trash2', 'Clear', clearPaint, { title: 'Take all paint off the selected objects (or off every object, when none is selected)' }),
-  ];
+  ].filter(Boolean);
 }

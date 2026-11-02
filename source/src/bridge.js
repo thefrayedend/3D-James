@@ -317,7 +317,7 @@ const TOOLS = {
       if (!f) throw new Error(`3DJames could not read ${name} (it shows why in the window).`);
       id = f.body;
     }
-    if (!canMakeEditable(store.doc, id)) throw new Error(`Object ${id} is not an imported STL, OBJ or 3MF mesh, so it cannot be made editable.`);
+    if (!canMakeEditable(store.doc, id)) throw new Error(`Object ${id} is not an imported STL, OBJ, 3MF or STEP model, so it cannot be made editable.`);
     await makeEditable(id, { quiet: true, ...(['simple', 'balanced', 'precise'].includes(detail) ? { detail } : {}) });
     return { object: id, result: editable.lastReport, ...(await report()) };
   },

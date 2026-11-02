@@ -78,6 +78,7 @@ function failWorker(err) {
 export async function waitForBuild() {
   const deadline = Date.now() + ENGINE_TIMEOUT_MS;
   while (app.building || app.pending || app.builtRevision !== store.revision) {
+    if (starting) await starting.catch(() => {}); // (starting again after a job that took too long)
     if (app.engineError || !workerReady) throw new Error(app.engineError || 'The geometry engine is not ready.');
     if (Date.now() > deadline) throw new Error(`The model took longer than ${minutes()} minutes to build.`);
     if (!app.building) requestBuild();
@@ -102,11 +103,17 @@ function onMessage(e) {
 }
 
 /** Ask the engine something and wait for the answer (exports, reading imported files). */
-export function workerCall(msg, transfer) {
+/** A job for the engine. timeout: how long it may take; restart: when it takes longer, start the engine again by
+ * itself (for a job that may give up, like making a STEP part editable), instead of waiting for Restart. */
+export function workerCall(msg, transfer, { timeout = ENGINE_TIMEOUT_MS, restart = false } = {}) {
   const id = ++msgId;
   return new Promise((resolve, reject) => {
     if (!workerReady || !worker) { reject(new Error(app.engineError || 'The geometry engine is not ready.')); return; }
-    const timer = setTimeout(() => failWorker(new Error(`The geometry engine took longer than ${minutes()} minutes to respond. Restart it to continue.`)), ENGINE_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      if (!restart) { failWorker(new Error(`The geometry engine took longer than ${minutes()} minutes to respond. Restart it to continue.`)); return; }
+      const err = new Error('It took too long.'); err.tooLong = true;
+      failWorker(err); startWorker().catch(() => {});
+    }, timeout);
     waiters.set(id, { resolve, reject, timer });
     try { worker.postMessage({ ...msg, id }, transfer || []); }
     catch (err) { clearTimeout(timer); waiters.delete(id); reject(err); }
