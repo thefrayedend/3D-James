@@ -5,7 +5,8 @@ import { store, nextColor } from './store.js';
 import { app, bodyData, bodyName } from './state.js';
 import { toast } from './ui/dom.js';
 import { vp } from './view.js';
-import { editStep } from './commands.js';
+import { editStep, bodyMatrixFeature } from './commands.js';
+import { Matrix4 } from 'three';
 import { openPanel, renderAll } from './ui/panels.js';
 import { faceRef } from './tools.js';
 
@@ -90,9 +91,21 @@ export function addHinge() {
   const [a, b] = app.sel, da = bodyData(a), db = bodyData(b); if (!da || !db) return;
   const height = Math.min(da.bbox[1][2] - da.bbox[0][2], db.bbox[1][2] - db.bbox[0][2]);
   const d = Math.max(3, Math.min(8, Math.floor(height * 2) / 2)); // the knuckles reach down from the top edge
+  // the knuckles go in the gap between the parts: when they are closer than that, the second one moves out to make room
+  const A = da.bbox, B = db.bbox, room = d + 0.6;
+  let push = null;
+  for (const ax of [0, 1]) {
+    const o = 1 - ax, ov = Math.min(A[1][o], B[1][o]) - Math.max(A[0][o], B[0][o]);
+    const hi = B[0][ax] >= A[1][ax] - 0.01, sep = hi ? B[0][ax] - A[1][ax] : A[0][ax] - B[1][ax];
+    if (ov > 4 && sep > -0.01 && sep < room - 0.01 && (!push || sep > push.sep)) { push = { sep, by: [0, 0, 0] }; push.by[ax] = (hi ? 1 : -1) * (room - sep); }
+  }
   let fid;
   const before = new Set(Object.keys(app.results.errors));
-  store.commit((doc) => { fid = store.newId('f'); doc.features.push({ id: fid, type: 'hinge', body: a, body2: b, style: 'pin', d, n: 0, pin: 0, clear: 0.3, kgap: 0.4, t: 0.6, margin: 1 }); });
+  store.commit((doc) => {
+    if (push) bodyMatrixFeature(doc, b, new Matrix4().makeTranslation(...push.by));
+    fid = store.newId('f'); doc.features.push({ id: fid, type: 'hinge', body: a, body2: b, style: 'pin', d, n: 0, pin: 0, clear: 0.3, kgap: 0.4, t: 0.6, margin: 1 });
+  });
+  if (push) toast(`${bodyName(b)} moved ${Math.round(Math.abs(push.by[0] + push.by[1]) * 10) / 10} mm out, to make room for the knuckles between the parts.`, 'info', 5000);
   openStep(fid, [a]);
   checkAfterBuild(fid, before);
 }

@@ -208,6 +208,28 @@ def main():
         th.join(60)
         check('_error' in out['r'], 'after Stop the AI has to ask again')
 
+        # Always allow: ticked once, the AI is let in without the question, even after the window is opened again
+        page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
+        th, out = call_async(gem, 'status')
+        page.get_by_role('dialog').wait_for(timeout=30000)
+        page.get_by_label('Always allow', exact=False).check()
+        page.get_by_role('button', name='Allow', exact=True).click()
+        th.join(60)
+        check('_error' not in out['r'], f'Allow with Always allow ticked ({str(out["r"])[:100]})')
+        page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
+        page.evaluate("() => sessionStorage.clear()")
+        page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
+        th, out = call_async(gem, 'status')
+        th.join(60)
+        check('_error' not in out['r'] and page.get_by_role('dialog').count() == 0, f'Always allow: no question next time ({str(out["r"])[:100]})')
+        # and Stop turns Always allow off
+        page.get_by_role('button', name='Stop', exact=True).click()
+        page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
+        th, out = call_async(gem, 'status')
+        page.get_by_role('button', name="Don't allow").click(timeout=30000)
+        th.join(60)
+        check('_error' in out['r'], 'Stop turns Always allow off: it asks again')
+
         page.screenshot(path=str(SRC / 'dist' / 'link.png'))
         check(not errors, f'no page errors {errors[:2]}')
         cl.close(); gem.close()

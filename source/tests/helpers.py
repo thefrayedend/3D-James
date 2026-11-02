@@ -154,6 +154,14 @@ async def main():
         [a, b2] = await start(('box', {'w': 40, 'd': 30, 'h': 4}, None), ('box', {'w': 40, 'd': 30, 'h': 4}, [10, 0, 0])); await select(a, b2)
         await helper('Hinge between two parts'); await built(); await pg.wait_for_timeout(300); await built()
         s = await steps(); U['hinge_overlap_undone'] = ([x['type'] for x in s] == ['shape', 'shape'] and await pg.locator('.toast.err', has_text='side by side').count() == 1, s)
+        # Hollow on parts that already have a hinge (two cubes 1 mm apart): the parts are spaced for the knuckles, and
+        # each Hollow goes in before the hinge, open top or closed, with no problems
+        [a, b2] = await start(('box', {'w': 20, 'd': 20, 'h': 20}, [14, 0, 0]), ('box', {'w': 20, 'd': 20, 'h': 20}, [35, 0, 0])); await select(a, b2)
+        await helper('Hinge between two parts'); await built()
+        await select(a); await helper('Hollow out'); await click_face(a, [0, 0, 1], -3, 0)
+        await pg.get_by_role('button', name='Apply', exact=True).click(); await built()
+        await select(b2); await helper('Hollow out'); await pg.get_by_role('button', name='Apply', exact=True).click(); await built()
+        s = await steps(); U['hollow_after_hinge'] = ([x['type'] for x in s] == ['shape', 'shape', 'shell', 'shell', 'hinge'] and not await errors(), s, await pg.evaluate('window.__3dj.app.results.errors'))
         # split to fit the printer starts across the longest side and opens the step
         [box] = await start(('box', {'w': 120, 'd': 30, 'h': 16}, None)); await select(box)
         await helper('Split to fit the printer (with connectors)')

@@ -26,6 +26,10 @@ const windowId = Math.random().toString(36).slice(2, 10);
 let focusAt = document.hasFocus() ? Date.now() : 0;
 let allowed = false, declinedUntil = 0, connected = false, who = null, pill = null, pendingSave = null;
 try { allowed = sessionStorage.getItem('3djames.link') === 'allowed'; } catch { /* storage unavailable */ }
+// "Always allow" (ticked in the question): an AI on this computer may start working here without asking each time
+const ALWAYS = '3djames.link.always';
+const alwaysAllowed = () => { try { return localStorage.getItem(ALWAYS) === 'yes'; } catch { return false; } };
+if (alwaysAllowed()) allowed = true;
 
 /** Start listening for the link (only for files on their computer; the 3DJames box will get its own way). */
 export function startBridge() {
@@ -85,10 +89,16 @@ function ask() {
     const title = document.title;
     const flash = setInterval(() => { document.title = document.title === title ? `(!) Allow ${who}? - 3DJames` : title; }, 1000);
     try { window.focus(); } catch { /* not allowed */ }
-    const answer = (yes) => { if (done) return; done = true; clearInterval(flash); document.title = title; close(); resolve(yes); };
+    const always = h('input', { type: 'checkbox' });
+    const answer = (yes) => {
+      if (done) return; done = true; clearInterval(flash); document.title = title; close();
+      if (yes && always.checked) { try { localStorage.setItem(ALWAYS, 'yes'); } catch { /* storage unavailable */ } }
+      resolve(yes);
+    };
     const body = h('div', { style: 'display:grid;gap:8px;max-width:440px' },
       h('p', {}, `${who} (on their computer) wants to work in this 3DJames window: open and save projects in your Projects folder, add and change steps, and look at the model.`),
-      h('p', { class: 'muted' }, 'You see every change as it happens, and Ctrl+Z undoes it. You can stop it any time with Stop at the top of the window.'));
+      h('p', { class: 'muted' }, 'You see every change as it happens, and Ctrl+Z undoes it. You can stop it any time with Stop at the top of the window.'),
+      h('label', { style: 'display:flex;gap:8px;align-items:center' }, always, 'Always allow, without asking (Stop turns this off)'));
     const close = modal(`Let ${who} work in 3DJames?`, body, () => [
       h('button', { class: 'btn', onclick: () => answer(false) }, "Don't allow"),
       h('button', { class: 'btn primary', onclick: () => answer(true) }, 'Allow')], () => answer(false));
@@ -110,7 +120,7 @@ function showPill() {
 }
 function stop() {
   allowed = false;
-  try { sessionStorage.removeItem('3djames.link'); } catch { /* storage unavailable */ }
+  try { sessionStorage.removeItem('3djames.link'); localStorage.removeItem(ALWAYS); } catch { /* storage unavailable */ }
   showPill();
   toast(`${who || 'The AI'} can no longer work in this window. It will ask again if it tries.`);
 }

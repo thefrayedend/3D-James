@@ -55,6 +55,8 @@ export function hash(str) {
 }
 
 class UserError extends Error {}
+// what a step is called in History, for messages
+const STEP_NAMES = { shell: 'Hollow', fillet: 'Round edges', chamfer: 'Bevel edges', combine: 'Merge or subtract', split: 'Split', hinge: 'The hinge', lid: 'The lid', fit: 'Fit around', holes: 'Screw holes', snap: 'The snap clip', vents: 'Vents', extrude: 'Shape on face', pushpull: 'Push/pull', mirror: 'Mirror', array: 'Pattern' };
 const fail = (msg) => { throw new UserError(msg); };
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -629,7 +631,9 @@ function matchRefs(items, refs, bb, dirKey, what) {
       const dir = it[dirKey];
       const al = dot(dir, ref.d) / ((len3(dir) * len3(ref.d)) || 1);
       if ((dirKey === 't' ? Math.abs(al) : al) < 0.9) continue;
-      const dd = len3(sub(normCoord(dirKey === 't' ? it.m : it.c, bb), ref.nc));
+      let dd = len3(sub(normCoord(dirKey === 't' ? it.m : it.c, bb), ref.nc));
+      // a face that also kept where it was (picked on a bigger object) is found there too
+      if (ref.c && dirKey !== 't') dd = Math.min(dd, len3(sub(it.c, ref.c)) / (len3(sub(bb[1], bb[0])) || 1));
       if (dd < bestD) { bestD = dd; best = it; }
     }
     if (!best || bestD > 0.2) fail(`One of the picked ${what} no longer exists after an earlier change. Delete this step and pick again.`);
@@ -852,7 +856,7 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
               mk.delete();
               let solid = inner;
               try { solid = R.makeSolid([inner]); } catch { /* already a solid */ }
-              return { shape: shape.clone().cut(solid) };
+              try { return { shape: shape.clone().cut(solid) }; } catch { fail('Could not hollow this shape. Try a thinner wall, or hollow it earlier in History (before details like hinges, threads and rounded edges).'); }
             }
             const picked = matchRefs(faceInfo(shape), f.faces, bbOf(b.v), 'n', 'faces').map((x) => x.f);
             try {
@@ -1057,7 +1061,8 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
       }
       if (showIds.has(f.body) && !shown.has(f.body) && state.has(f.body)) showVals.set(f.body, state.get(f.body));
     } catch (err) {
-      errors[f.id] = err instanceof UserError ? err.message : `Failed: ${err?.message || err}`;
+      // the geometry kernel's own errors carry no words: say it plainly
+      errors[f.id] = err instanceof UserError ? err.message : err?.message && !/has not type|is null/.test(err.message) ? `Failed: ${err.message}` : `${STEP_NAMES[f.type] || 'This step'} could not be done on this shape. Try other sizes, or do it earlier in History (before details like hinges, threads and rounded edges).`;
     }
   }
 

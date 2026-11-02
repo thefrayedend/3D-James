@@ -309,7 +309,16 @@ export function applyTool() {
     // open the new step right away so its size slider shows the rounding live
     endTool(); editStep(fid); openPanel('props'); return;
   } else if (t.type === 'shell') {
-    store.commit((doc) => doc.features.push({ id: store.newId('f'), type: 'shell', body: t.body, faces: t.items.map((it) => faceRef(d, it.index)), t: t.t }));
+    // hollow the part itself, not a hinge or lid already made from it: the step goes in before those
+    // (a hinge's knuckles and pin are too thin to hollow, and a lid has to fit the hollowed box)
+    const before = store.doc.features.findIndex((x) => (x.type === 'hinge' && (x.body === t.body || x.body2 === t.body)) || (x.type === 'lid' && x.src === t.body));
+    store.commit((doc) => {
+      // (before a hinge the object is smaller, so each face also keeps where it is, to be found there)
+      const where = (i) => (before >= 0 ? { c: Array.from(d.faces.subarray(i * 6, i * 6 + 3)).map(r4) } : {});
+      const step = { id: store.newId('f'), type: 'shell', body: t.body, faces: t.items.map((it) => ({ ...faceRef(d, it.index), ...where(it.index) })), t: t.t };
+      if (before >= 0) doc.features.splice(before, 0, step); else doc.features.push(step);
+    });
+    if (before >= 0) toast(`Hollowed before its ${store.doc.features[before + 1].type === 'lid' ? 'lid' : 'hinge'} in History, so ${store.doc.features[before + 1].type === 'lid' ? 'the lid fits the hollow box' : 'the knuckles and pin stay solid'}.`, 'info', 5000);
   } else if (t.type === 'split') {
     let withJoints = null;
     store.commit((doc) => {
