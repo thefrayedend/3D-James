@@ -4,7 +4,7 @@
 import { store } from './store.js';
 import { app, saveSettings } from './state.js';
 import { h, toast, modal } from './ui/dom.js';
-import { workerCall, waitForBuild } from './build.js';
+import { workerCall, waitForBuild, restartEngine } from './build.js';
 import { keepFile, newFileId } from './storage.js';
 import { meshToStl } from './formats.js';
 import { select } from './commands.js';
@@ -63,8 +63,12 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
       toast(`${name} took too long to rebuild as sketches, so it ${stays}.`, 'info', 9000);
       return false;
     }
-    lastReport = { done: false, summary: `Could not make ${name} editable: ${err.message}` };
-    toast(`Could not make ${name} editable: ${err.message}`, 'err', 8000);
+    // the engine failed on it: it starts again fresh, so the failure cannot spoil the next job (or the next try)
+    restartEngine();
+    // (a STEP part simply stays as it is; the engine's own words are only for the AI link and Send feedback)
+    const say = step ? `${name} could not be rebuilt as sketches, so it ${stays}.` : `Could not make ${name} editable: ${err.message}`;
+    lastReport = { done: false, summary: say, reason: err.message };
+    toast(say, step ? 'info' : 'err', 9000);
     return false;
   } finally { app.converting = false; busy.remove(); }
   let solidParts = res.parts.filter((p) => !p.mesh);
@@ -73,11 +77,11 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
   const rough = step && solidParts.length && res.report && res.report.maxGap > 0.25;
   const partly = step && solidParts.length && (rough || res.parts.some((p) => p.mesh));
   if (partly) solidParts = [];
-  lastReport = { done: !!solidParts.length, summary: solidParts.length ? summary(res, from) : rough ? `${name} could only be drawn roughly as sketches (up to ${mm(res.report.maxGap)} off), so it ${stays}.` : partly ? `Part of ${name} could not be drawn as sketches, so it ${stays}.` : `${name} is curved all over, so it cannot be drawn as sketches and ${stays}.`,
+  lastReport = { done: !!solidParts.length, summary: solidParts.length ? summary(res, from) : rough ? `${name} could only be drawn roughly as sketches (up to ${mm(res.report.maxGap)} off), so it ${stays}.` : partly ? `Part of ${name} could not be drawn as sketches, so it ${stays}.` : `${name} has curves that sketches cannot match closely enough, so it ${stays}.`,
     meshParts: res.parts.filter((p) => p.mesh).map((p) => p.name), stepsWithErrors: Object.keys(res.errors || {}) };
   if (!solidParts.length) {
     if (!quiet) explain(name, res, false, from, stays, partly, rough);
-    else toast(rough ? lastReport.summary : `${name} could not be rebuilt from sketches (${partly ? 'part of it is curved all over' : 'it is curved all over'}), so it ${stays}.`, 'info', 9000);
+    else toast(rough ? lastReport.summary : `${name} could not be rebuilt from sketches (${partly ? 'part of it has' : 'it has'} curves that sketches cannot match closely enough), so it ${stays}.`, 'info', 9000);
     return false;
   }
   // Another project opened, or the import step changed or went while the engine worked: the result is for
@@ -138,7 +142,7 @@ function summary(res, from = 'the STL') {
 function explain(name, res, done, from = 'the STL', stays = 'stays a mesh', partly = false, rough = false) {
   const meshParts = res.parts.filter((p) => p.mesh);
   const body = h('div', {},
-    done ? h('p', {}, summary(res, from)) : h('p', {}, rough ? `${name} could only be drawn roughly as sketches (up to ${mm(res.report.maxGap)} off), so it ${stays}: you can still move, size, paint and combine it.` : `${partly ? `Part of ${name} is curved all over` : `${name} is curved all over (like a figure or a sculpted shape)`}, so it cannot be drawn as sketches. It ${stays}: you can still move, size, paint and combine it.`),
+    done ? h('p', {}, summary(res, from)) : h('p', {}, rough ? `${name} could only be drawn roughly as sketches (up to ${mm(res.report.maxGap)} off), so it ${stays}: you can still move, size, paint and combine it.` : `${partly ? `Part of ${name} has` : `${name} has`} curves that outlines pushed up or spun around cannot match closely enough (like rounded bumps, blended corners or a sculpted shape), so it cannot be drawn as sketches. It ${stays}: you can still move, size, paint and combine it.`),
     done ? h('p', { class: 'muted' }, `Each sketch is in History: select the object and click Edit sketch (or open the step in History) to change a size. Undo (Ctrl+Z) gives back ${from === 'the STL' ? 'the mesh' : 'the STEP part'}.`) : null,
     meshParts.length && done ? h('p', {}, `${meshParts.length === 1 ? 'One part' : `${meshParts.length} parts`} could not be drawn as sketches and ${meshParts.length === 1 ? 'stays a mesh' : 'stay meshes'} (grey, named "… (mesh)"): ${meshParts.map((p) => p.name).join(', ')}.`) : null,
     Object.keys(res.errors || {}).length ? h('p', { class: 'err' }, 'Some steps could not be built; they are marked in History.') : null);

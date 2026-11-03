@@ -1347,7 +1347,7 @@ function findPatterns(parts, tol) {
  * Parts that cannot be rebuilt closely (error above maxError) are left out (parts[i].mesh = true) so the
  * caller can keep them as an imported mesh.
  */
-export function convertMesh(mf, mesh, { name = 'Part', detail = 'precise', maxError, maxSteps = 100, maxSeconds = 60, maxDepth = 3, plain = false, meshParts = [], seq = 1, body = null, reuse = null } = {}) {
+export function convertMesh(mf, mesh, { name = 'Part', detail = 'precise', maxError, maxSteps = 100, maxSeconds = 60, stopAt = Infinity, maxDepth = 3, plain = false, meshParts = [], seq = 1, body = null, reuse = null } = {}) {
   MF = mf; trash = []; fitPlain = plain;
   const LEVELS = ['simple', 'balanced', 'precise'], first = Math.max(0, LEVELS.indexOf(detail));
   D = DETAIL[LEVELS[first]];
@@ -1381,9 +1381,10 @@ export function convertMesh(mf, mesh, { name = 'Part', detail = 'precise', maxEr
       // than left a mesh.
       let node = null, steps = 0, error = 1, ctx, limit = maxError ?? D.maxError;
       for (let lv = first; lv < LEVELS.length; lv++) {
+        if (lv > first && Date.now() > stopAt) break; // (out of time: no more detail)
         D = DETAIL[LEVELS[lv]]; limit = maxError ?? D.maxError;
         const tol = Math.min(D.tol, Math.max(0.003, size * 2e-5 * (D.tol / 0.02)));
-        ctx = { axis: pat?.step.kind === 'circular' ? [pat.step.cx, pat.step.cy] : null, tol, minVol: T.volume() * D.minVol, maxDepth, maxSteps, n: 0, deadline: Date.now() + maxSeconds * 1000 };
+        ctx = { axis: pat?.step.kind === 'circular' ? [pat.step.cx, pat.step.cy] : null, tol, minVol: T.volume() * D.minVol, maxDepth, maxSteps, n: 0, deadline: Math.min(stopAt, Date.now() + maxSeconds * 1000) };
         // curved all over (a figure, a boat): only a spun-around profile can do; anything else stays a mesh
         ctx.roundOnly = boxiness(T) < 0.5;
         node = again ? again.node : solve(T, ctx, 0);
@@ -1520,8 +1521,10 @@ export const worstAt = () => maxDistance.at;
  * convertMesh, then build the steps with the real geometry engine (build(doc) -> { errors, meshes: Map body ->
  * Manifold }) and measure the result against the mesh. When the engine cannot build a part, it is tried again
  * more simply (fewer levels of cut-outs, then straight sides only); a part that still fails stays a mesh.
+ * opts.totalSeconds: how long it may take in all (each try also has its own maxSeconds).
  */
 export function convertAndCheck(mf, mesh, opts, build) {
+  const stopAt = opts.totalSeconds ? Date.now() + opts.totalSeconds * 1000 : Infinity;
   // the simpler tries may differ a little more from the mesh, rather than leave it a mesh
   // again: the main shape only (no cut-outs and additions), then with straight sides
   // (with less detail asked for, all the detail comes first: the engine may fail on the looser drawing)
@@ -1531,7 +1534,7 @@ export function convertAndCheck(mf, mesh, opts, build) {
   const t0 = Date.now();
   let reuse = null;
   for (let t = 0; t <= tries.length; t++) {
-    res = convertMesh(mf, mesh, { ...opts, ...(tries[Math.min(t, tries.length - 1)]), meshParts, reuse });
+    res = convertMesh(mf, mesh, { ...opts, ...(tries[Math.min(t, tries.length - 1)]), meshParts, reuse, stopAt });
     check = build({ vars: [], bodies: res.bodies, features: res.features });
     // (a part the CAD kernel built far from what the plan makes failed too, without saying so: a cut that took
     // everything away, or nothing)
@@ -1543,7 +1546,7 @@ export function convertAndCheck(mf, mesh, opts, build) {
     if (!bad.length) break;
     // only the parts the engine could not build are tried again
     reuse = new Map(res.parts.filter((p) => !p.mesh && !bad.includes(p.pi)).map((p) => [p.pi, { node: p.node, error: p.error }]));
-    if (t >= tries.length - 1 || Date.now() - t0 > 150000 + 60000 * (tries.length - 3)) { meshParts = [...meshParts, ...bad]; t = tries.length - 1; } // a simpler try failed too: leave it a mesh
+    if (t >= tries.length - 1 || Date.now() - t0 > 150000 + 60000 * (tries.length - 3) || Date.now() > stopAt) { meshParts = [...meshParts, ...bad]; t = tries.length - 1; } // a simpler try failed too: leave it a mesh
   }
   if (globalThis.DEBUG_CONV) console.log('parts', JSON.stringify(res.parts.map((p) => ({ pi: p.pi, body: p.body, mesh: p.mesh, built: !!check.meshes.get(p.body), soup: !!check.soups?.get(p.body), steps: p.steps }))));
   const kept = res.parts.filter((p) => p.mesh).map((p) => new mf.Manifold(new mf.Mesh({ numProp: 3, vertProperties: p.vertices, triVerts: p.triangles })));

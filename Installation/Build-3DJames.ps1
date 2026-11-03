@@ -8,8 +8,9 @@
   Output:  dist\3DJames-Setup.exe
 
   Before it makes the installer, it checks every file going in for personal details: your Windows user name,
-  your full name, the computer's name, folder paths like C:\Users\..., and every word in "Private words.txt"
-  (one per line, next to this script; that file never goes in). If one turns up, it stops and says where.
+  your full name, the computer's name and the Microsoft accounts signed in on it (all read from Windows each time, so
+  no list of them is kept), and anything that looks like someone's folder (C:\Users\name), a PC's own name, an
+  address in a home network or a personal email address. If one turns up, it stops and says where.
 
   Everything it needs is free and downloaded automatically the first time:
     - C# compiler: already built into Windows (.NET Framework 4.x)
@@ -587,16 +588,21 @@ try {
     $full = ([adsi]"WinNT://$env:USERDOMAIN/$env:USERNAME,user").FullName
     if ($full) { $words.Add([string]$full); foreach ($part in ([string]$full -split '\s+')) { $words.Add($part) } }
 } catch { }
-$PrivateFile = Join-Path $Root 'Private words.txt'
-if (Test-Path $PrivateFile) {
-    foreach ($line in Get-Content $PrivateFile) {
-        $w = $line.Trim()
-        if ($w -and -not $w.StartsWith('#')) { $words.Add($w) }
+try {
+    # the Microsoft accounts signed in on this PC, and the names before their @ when they have digits (a plain word
+    # could be anything)
+    foreach ($k in Get-ChildItem 'HKCU:\Software\Microsoft\IdentityCRL\UserExtendedProperties' -ErrorAction Stop) {
+        $words.Add($k.PSChildName); $name = ($k.PSChildName -split '@')[0]
+        if ($name -match '\d') { $words.Add($name) }
     }
-}
+} catch { }
 $words = $words | Where-Object { $_ -and $_.Length -ge 3 } | Sort-Object -Unique
 $checks = @($words | ForEach-Object { '(?<![A-Za-z0-9])' + [regex]::Escape($_) + '(?![A-Za-z0-9])' })
+# the same rules as source\tools\privacy.py; the made-up examples the app uses (and the box's Wi-Fi setup address) are fine
 $checks += '[A-Za-z]:\\{1,2}Users\\{1,2}(?!(Public|you|name)\b)[^\\"''<>\s]+'   # someone's own folder, like C:\Users\name
+$checks += '(?-i)\b(DESKTOP|LAPTOP)-[A-Z0-9]{7}\b'                                 # a PC's own name
+$checks += '(?<![\d.])(?!192\.168\.1\.(20|50)(?![\d.]))(?!10\.42\.0\.1(?![\d.]))(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?![\d.])'   # an address in a home network
+$checks += '[\w.+-]+@(gmail|googlemail|yahoo|hotmail|outlook|live|msn|icloud|me|aol|gmx|proton(mail)?)\.\w+'   # a personal email address
 $Microsoft = @('Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll', 'WebView2Loader.dll')
 $latin1 = [Text.Encoding]::GetEncoding(28591)
 $found = @()

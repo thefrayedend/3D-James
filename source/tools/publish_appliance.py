@@ -37,6 +37,12 @@ with open(os.path.join(REPO, '.gitattributes'), 'w', newline='\n') as f:
     f.write('* text=auto eol=lf\n*.txt text eol=crlf\n')
 with open(os.path.join(REPO, '.gitignore'), 'w', newline='\n') as f:
     f.write('__pycache__/\ntestdata/\nout/\n')
+# nothing personal goes to GitHub or onto the box (tools/privacy.py: read from this PC, no list kept)
+sys.path.insert(0, os.path.join(SRC, 'tools'))
+import privacy
+found = privacy.check([os.path.join(REPO, d) for d in os.listdir(REPO) if d != '.git'])
+if found:
+    sys.exit('NOT published, personal details found:\n' + '\n'.join(found))
 git('add', '-A')
 if git('diff', '--cached', '--quiet', check=False).returncode:
     v = open(os.path.join(SRC, 'server', 'VERSION')).read().strip()

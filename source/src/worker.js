@@ -1,6 +1,6 @@
 import initOC from '../node_modules/replicad-opencascadejs/dist/replicad_single.js';
 import ManifoldModule from 'manifold-3d';
-import { evaluate, setManifoldModule, R, exportMeshOf, solidOf, parseSTLToMf, hasStep, registerStep, countSolids, solidBounds, surfacePlane, unionLoops, offsetLoops, outlineOf } from './engine.js';
+import { evaluate, setManifoldModule, R, exportMeshOf, solidOf, parseSTLToMf, hasStep, registerStep, freshStep, countSolids, solidBounds, surfacePlane, unionLoops, offsetLoops, outlineOf } from './engine.js';
 import { zipStore } from './zip.js';
 import { convertAndCheck } from './stlconvert.js';
 import { paintMesh, paintString, paintedMesh } from './paint.js';
@@ -144,17 +144,20 @@ async function doExport({ format, items, base, project, extra }) {
  * run and measure them against the mesh. msg.feature is the import step (it says where the mesh sits).
  */
 function convertImport({ feature, name, seq, body, detail }) {
+  const step = feature.p?.fmt === 'step';
+  if (step) freshStep(feature.p.file);
   const trial = evaluate({ vars: [], bodies: {}, features: [{ ...feature, id: 'f0', body: 'b0' }] }, fonts, { files, scratch: true });
   const mesh = trial.meshes.get('b0');
-  if (!mesh) throw new Error(Object.values(trial.errors)[0] || 'The mesh could not be read.');
+  if (!mesh) throw new Error(Object.values(trial.errors)[0] || (step ? 'Its surface did not close up into triangles to check against.' : 'The mesh could not be read.'));
   const build = (doc) => evaluate(doc, fonts, { scratch: true });
-  if (feature.p?.fmt === 'step' && trial.solids?.get('b0')) {
+  if (step && trial.solids?.get('b0')) {
     // a STEP part: first from its own exact edges (sketches with its true lines, arcs and circles)
     let res = null;
     try { res = stepToSketches(MFmod, trial.solids.get('b0'), mesh, { name, seq, body }, build); } catch (err) { console.warn('step sketches', err); }
     if (res) return res;
-    // otherwise as a mesh, quicker than for an STL: a STEP part that does not come out stays the exact solid
-    return convertAndCheck(MFmod, mesh, { name, seq, body, detail, maxSeconds: 25 }, build);
+    // otherwise as a mesh, quicker than for an STL (a minute in all): a STEP part that does not come out stays the
+    // exact solid
+    return convertAndCheck(MFmod, mesh, { name, seq, body, detail, maxSeconds: 25, totalSeconds: 60 }, build);
   }
   return convertAndCheck(MFmod, mesh, { name, seq, body, detail }, build);
 }

@@ -19,6 +19,8 @@ async def main():
     b = await p.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
     pg = await (await b.new_context(viewport={'width': 1300, 'height': 820})).new_page(); errors = []
     pg.on('pageerror', lambda e: errors.append(str(e)))
+    # (counts how often the engine is started)
+    await pg.add_init_script('window.__engines = 0; { const W = window.Worker; window.Worker = class extends W { constructor(...a) { super(...a); window.__engines++; } }; }')
     await pg.goto((ROOT / 'local/3DJames.html').as_uri())
     await pg.wait_for_function('window.__3dj && document.getElementById("loading").hidden', timeout=120000)
     ev = pg.evaluate
@@ -44,7 +46,7 @@ async def main():
     feats = [BOX('a', 60, 40, 8, [0, 0, 0]), BOX('b', 30, 40, 12, [-15, 0, 8]), {'id': 'fu', 'type': 'combine', 'op': 'union', 'body': 'a', 'tools': ['b']},
              CYL('h1', 6, 30, [-15, -10, -5]), CYL('h2', 6, 30, [-15, 10, -5]), CYL('h3', 4, 30, [20, 0, -5]),
              {'id': 'fs', 'type': 'combine', 'op': 'subtract', 'body': 'a', 'tools': ['h1', 'h2', 'h3']}]
-    data = await as_step(feats, B)
+    data = stepped = await as_step(feats, B)
     id, v0, ok, steps = await make_editable(data, 'stepped.step')
     v1 = await ev('(id) => window.__3dj.app.results.bodies.get(id).volume', id)
     names = [s['name'] for s in steps]
@@ -70,6 +72,23 @@ async def main():
     kinds = [(s['kind'], s.get('fmt')) for s in steps]
     check('a STEP part with rounded top edges is never swapped for a mesh', not any(k == ('import', 'stl') for k in kinds), kinds)
     check('it becomes steps or stays the exact STEP solid', ok or kinds == [('import', 'step')], (ok, kinds))
+
+    # 3. a try that fails inside the engine: it starts again fresh, and the next Make editable works
+    await ev('() => window.__3dj.commands.newProject()'); await ev(WAIT)
+    await ev("async (d) => { await window.__3dj.commands.insertFile(new File([new Uint8Array(d)], 'stepped.step'), { stepParts: 'separate' }); }", stepped); await ev(WAIT)
+    good = await ev("() => window.__3dj.store.doc.features.find((f) => f.kind === 'import').body")
+    bad = await ev("""() => { const { store } = window.__3dj; let id; store.commit((d) => { const f = d.features.find((x) => x.kind === 'import');
+      id = 'b' + (d.seq + 1); d.seq += 2; d.bodies[id] = { name: 'missing part', color: '#888888' }; d.features.push({ ...f, id: 'f' + d.seq, body: id, p: { ...f.p, part: 7 } }); }); return id; }""")
+    await ev(WAIT)
+    await ev("() => document.querySelectorAll('.toast').forEach((t) => t.remove())")
+    started = await ev('() => window.__engines')
+    ok = await ev('async (id) => await window.__3dj.commands.makeEditable(id, { quiet: true })', bad)
+    said = await ev("() => [...document.querySelectorAll('.toast')].map((t) => t.innerText)")
+    check('a failed try says the STEP part stays as it is, in plain words', not ok and any('missing part could not be rebuilt as sketches, so it stays the exact STEP solid.' in t for t in said), said)
+    await ev('async () => { const { app, store } = window.__3dj; for (let i = 0; i < 3000 && (app.engineError || app.building || app.pending || app.builtRevision !== store.revision); i++) await new Promise((r) => setTimeout(r, 50)); }')
+    check('the engine starts again by itself and builds the model', await ev('() => window.__engines') == started + 1 and await ev('() => !window.__3dj.app.engineError && window.__3dj.app.results.bodies.has(%r)' % good), (started, await ev('() => window.__engines')))
+    ok = await ev('async (id) => await window.__3dj.commands.makeEditable(id, { quiet: true })', good)
+    check('then Make editable works on the other part', ok, await ev("() => [...document.querySelectorAll('.toast')].map((t) => t.innerText)"))
 
     check('no page errors', not errors, errors)
     await b.close()

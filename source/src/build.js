@@ -119,6 +119,13 @@ export function workerCall(msg, transfer, { timeout = ENGINE_TIMEOUT_MS, restart
     catch (err) { clearTimeout(timer); waiters.delete(id); reject(err); }
   });
 }
+/** Start the engine again, fresh: after a job failed inside it (a crash there can leave its memory broken, and then
+ * every later job fails too). The model is built again by itself. */
+export function restartEngine() {
+  if (starting) return starting.catch(() => {}); // (already starting)
+  failWorker(new Error('The geometry engine is starting again.'));
+  return startWorker().catch(() => {});
+}
 /** The engine got this imported file along with a checkImport call. */
 export const markSent = (fileId) => sentFiles.add(fileId);
 

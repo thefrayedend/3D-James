@@ -42,6 +42,12 @@ export function stepParts(id) {
   stepPartCache.set(id, parts);
   return parts;
 }
+/** Forget the triangles other jobs left on a STEP file's solids (the display, a saved file: every copy of a part
+ * shares them), so the next mesh of it is made fresh and Make editable comes out the same each time. */
+export function freshStep(id) {
+  const sh = stepShapes.get(id);
+  if (sh) R.getOC().BRepTools.Clean(sh.wrapped, true);
+}
 
 export function hash(str) {
   let h1 = 0xdeadbeef ^ str.length, h2 = 0x41c6ce57 ^ str.length;

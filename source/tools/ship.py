@@ -6,13 +6,17 @@
 #      ..\Share\3DJames guide for Copilot.txt: the same guide for chat AIs without skills
 #   4. the AI link (windows-desktop\link): 3DJamesLink.exe, and the files that tell Gemini and Claude about it
 # The 3DJames folder (the one above source) is the master copy of everything that ships; nothing is kept twice.
-import os, re, shutil, subprocess, zipfile
+import os, re, shutil, subprocess, sys, zipfile
 SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.dirname(SRC)  # the 3DJames folder
 os.chdir(SRC)
+sys.path.insert(0, os.path.join(SRC, 'tools'))
+import privacy
 VERSION = open('VERSION', encoding='utf-8').read().strip()
 built = os.path.join(SRC, 'local', '3DJames.html')
 if not os.path.exists(built): raise SystemExit('Build first: python build.py')
+# nothing personal goes out (tools/privacy.py; the Help pictures are looked at by eye)
+if (found := privacy.check([built])): raise SystemExit('NOT shipped, personal details in the app:\n' + '\n'.join(found))
 
 # 0. a changed app gets a new version number: if this build differs from the one already shipped but carries the same
 #    number, the last part goes up by one (VERSION and package.json) and the app is built again with it
@@ -70,19 +74,9 @@ except (OSError, subprocess.CalledProcessError) as e:
 
 # 3. the Claude skill that writes 3DJames projects (upload it at claude.ai > Settings > Capabilities > Skills)
 skill = os.path.join(SRC, 'skill', '3djames-project')
-# nothing personal may go in it: the words in Installation\Private words.txt (the installer's list) and the Windows
-# user name, in any file of the skill
-private = [os.environ.get('USERNAME', '')]
-words_file = os.path.join(APP, 'Installation', 'Private words.txt')
-if os.path.exists(words_file):
-    private += [w.strip() for w in open(words_file, encoding='utf-8-sig') if w.strip() and not w.lstrip().startswith('#')]
-private = [w for w in private if len(w) >= 3]
+# nothing personal may go in it, in any file of the skill (tools/privacy.py: read from this PC, no list kept)
 copilot = os.path.join(SRC, 'skill', 'copilot')
-found = []
-for base, _, files in [w for d in (skill, copilot) if os.path.isdir(d) for w in os.walk(d)]:
-    for f in files:
-        text = open(os.path.join(base, f), encoding='utf-8', errors='replace').read()
-        found += [f'{f}: "{w}"' for w in private if re.search(r'(?<![A-Za-z0-9])' + re.escape(w) + r'(?![A-Za-z0-9])', text, re.I)]
+found = privacy.check([d for d in (skill, copilot) if os.path.isdir(d)])
 if found:
     print('Claude skill and Copilot guide NOT made, they have personal words in them:', ', '.join(found))
 elif os.path.isdir(skill):

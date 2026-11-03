@@ -23,7 +23,9 @@ def main():
     # the step guide built in: the skill from its modelling part on (it names no one and no folders: the link is shared)
     skill = open(os.path.join(SOURCE, 'skill', '3djames-project', 'SKILL.md'), encoding='utf-8').read()
     skill = skill[skill.index('## Make it easy to edit'):]
-    if re.search(r'you|\bJames\b|C:\\Users', skill):
+    sys.path.insert(0, os.path.join(SOURCE, 'tools'))
+    import privacy
+    if privacy.find(skill) or re.search(r'C:\\Users', skill):
         sys.exit('SKILL.md still names a person or a folder')
     guide = os.path.join(SOURCE, 'local', 'link-guide.md')
     open(guide, 'w', encoding='utf-8').write(skill)
