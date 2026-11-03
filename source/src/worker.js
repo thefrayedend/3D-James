@@ -149,7 +149,7 @@ function convertImport({ feature, name, seq, body, detail }) {
   const trial = evaluate({ vars: [], bodies: {}, features: [{ ...feature, id: 'f0', body: 'b0' }] }, fonts, { files, scratch: true });
   const mesh = trial.meshes.get('b0');
   if (!mesh) throw new Error(Object.values(trial.errors)[0] || (step ? 'Its surface did not close up into triangles to check against.' : 'The mesh could not be read.'));
-  const build = (doc) => evaluate(doc, fonts, { scratch: true });
+  const build = (doc, solidsOnly = false) => evaluate(doc, fonts, { scratch: true, solidsOnly });
   if (step && trial.solids?.get('b0')) {
     // a STEP part: first from its own exact edges (sketches with its true lines, arcs and circles)
     let res = null;

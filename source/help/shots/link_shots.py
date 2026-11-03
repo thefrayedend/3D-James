@@ -1,7 +1,7 @@
-# Pictures for the Help page "Let an AI help (Gemini or Claude)" (ai-1, ai-2): the real app with the real
+# The picture for the Help page "Let an AI help (Gemini or Claude)" (ai-2): the real app with the real
 # 3DJamesLink.exe, driven over MCP the way Gemini CLI does it (the MCP client from tests/link.py).
 # Run after build.py and windows-desktop/link/build_link.py:  python help/shots/link_shots.py
-import asyncio, os, sys, tempfile, threading
+import asyncio, os, sys, tempfile
 from playwright.async_api import async_playwright
 from markup import open_app, shot, box, ring, num, save, SRC
 sys.path.insert(0, os.path.join(SRC, 'tests'))
@@ -23,20 +23,9 @@ async def main():
     async with async_playwright() as p:
         b, pg, errs = await open_app(p, init="localStorage.setItem('3djames.link', 'test'); localStorage.setItem('3djames.linkport', '47841')")
         await pg.wait_for_timeout(1500)
-        # 1: the first job: 3DJames asks
-        th = threading.Thread(target=lambda: gem.call('new_project', {'name': 'Mounting plate', 'discard_changes': True}))
-        th.start()
-        await pg.get_by_role('button', name='Allow', exact=True).wait_for(timeout=30000)
-        im = await shot(pg)
-        tick = await box(pg, 'dialog.modal label')
-        ring(im, tick, pad=4)
-        num(im, (tick[0] - 30, tick[1] + tick[3] / 2), 1)
-        go = await box(pg, 'dialog.modal .btn.primary')
-        ring(im, go, pad=6)
-        num(im, (go[0] + go[2] + 30, go[1] + go[3] / 2), 2)
-        save(im, 'ai-1.jpg', crop=FULL)
-        await pg.get_by_role('button', name='Allow', exact=True).click()
-        await asyncio.to_thread(th.join, 60)
+        # (the first job: 3DJames lets the AI in without asking)
+        r = await asyncio.to_thread(gem.call, 'new_project', {'name': 'Mounting plate', 'discard_changes': True})
+        assert r.get('project') == 'Mounting plate', r
         # 2: Gemini made a plate: the note at the top, its message, the steps in History
         r = await asyncio.to_thread(gem.call, 'replace_project', {'project': PLATE})
         assert r.get('built'), r

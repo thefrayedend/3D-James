@@ -15,7 +15,7 @@
 </ul>
 <p>Some models can't be rebuilt with less detail (the result wouldn't hold together). Then 3DJames quietly uses Most precise for that part instead, so you still get an editable result. Not happy with what you got? Undo (Ctrl+Z) gives the mesh back: move the slider and click Make editable again.</p>
 <figure><img src="editable-1.jpg" alt="3DJames with an STL bracket just opened and the question Make it editable?, with the Detail slider set to Balanced and the buttons Keep as a mesh and Make editable"><figcaption>Opening an STL: the question comes up. Pick how much detail to keep (2), then Make editable (1) rebuilds it as steps.</figcaption></figure>
-<p>It takes a few seconds for a simple part, up to a minute or two for a big detailed one. A note at the bottom says it is working. If you open another project, or move or change the mesh before it finishes, nothing is changed (a note says so): click Make editable again when you are ready.</p>
+<p>It takes a few seconds for a simple part, up to a few minutes for a big detailed one (or a STEP part with round pieces on its sides, below). A note at the bottom says it is working. It stops after 12 minutes at most: then the model stays as it was (a mesh, or the exact STEP solid). If you open another project, or move or change the mesh before it finishes, nothing is changed (a note says so): click Make editable again when you are ready.</p>
 <h2>What you get</h2>
 <p>When it is done, a window says how many steps it made and how close the result is to the STL, for example <i>"Rebuilt as 4 steps (3 sketches): over 99.9% the same as the STL, surfaces at most 0.01 mm apart."</i> The object keeps its name and colour. Select it and open <b>History</b>: the steps read like a recipe, for example:</p>
 <ul>
@@ -43,7 +43,16 @@
 <li>Holes that go through several levels become one hole sketch, cut out of the whole part (<b>2 holes</b>, <b>cut the holes</b>): change the circles there and every level follows.</li>
 <li>It is checked against the STEP part: it is only used when it comes out exactly the same.</li>
 </ul>
-<p>Other STEP parts (rounded or bevelled top edges, cones, free-form shapes) are rebuilt the same way as an STL, for about a minute at most. A STEP part that can't be rebuilt whole and within a quarter of a millimetre (like a bracket with rounded bumps on it) <b>stays the exact STEP solid</b>: it is never swapped for a mesh, and you can still move, size, paint and combine it. A STEP file with several parts asks first whether to keep them as one object or separate ones; each part is made editable on its own.</p>
+<p>A STEP part with <b>round pieces on its sides</b> (bosses, tapered pegs, round tabs with a hole along them, a rounded front, like a collet holder or a pipe connector) is rebuilt as its main outline pushed up, with each round piece drawn as a profile spun around its own axis:</p>
+<ul>
+<li><b>outline pushed up 10 mm</b>: the part seen from above, with the round pieces left out.</li>
+<li><b>round piece 1: profile spun around</b> and <b>join the round pieces</b>: each boss or rounded part as half a cut through it, spun around its own axis (the green line), joined to the outline.</li>
+<li><b>cut off below the floor</b>, <b>cut off above the top</b> and <b>cut off what sticks out</b>: where a round piece is cut flat in the file (a boss that ends at the floor, or a part that was cut off before it was shared), a box cuts the spun piece off the same way.</li>
+<li><b>round hole 1: profile spun around</b>, <b>cut-out 1: outline pushed back</b> and <b>cut the round holes and cut-outs</b>: holes along the round pieces, and notches, taken away.</li>
+</ul>
+<p>Change a profile (<b>Edit sketch</b> on a round piece) and that boss changes all the way round. The window says how close it came out, for example <i>"surfaces at most 0.15 mm apart"</i>.</p>
+<figure><img src="editable-5.jpg" alt="A STEP plate with a tapered round boss on its front, cut off flat, after Make editable: History shows outline pushed up 10 mm, round piece 1 profile spun around, cut off below the floor and above the top, and round hole 1 profile spun around"><figcaption>A STEP plate with a tapered boss, cut off flat at the floor and the top, after Make editable: its steps in History (1).</figcaption></figure>
+<p>Other STEP parts (rounded or bevelled top edges, free-form shapes) are rebuilt the same way as an STL, for about a minute at most. A STEP part that can't be rebuilt whole and within a quarter of a millimetre <b>stays the exact STEP solid</b>: it is never swapped for a mesh, and you can still move, size, paint and combine it. A STEP file with several parts asks first whether to keep them as one object or separate ones; each part is made editable on its own.</p>
 <h2>Undo, or keep the mesh</h2>
 <ul>
 <li><b>Undo</b> (Ctrl+Z) right after gives the mesh back, exactly as it was.</li>

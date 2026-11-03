@@ -1,7 +1,7 @@
 # The AI link: 3DJamesLink.exe (an MCP server, windows-desktop/link/) driving the real app (src/bridge.js), the way
-# Gemini CLI or Claude would. Checks the "Allow?" question, every tool (steps, variables, objects, build report,
+# Gemini CLI or Claude would. Checks it works without asking, every tool (steps, variables, objects, build report,
 # picture, save / overwrite question / reopen, Make editable, Undo), a second AI handing its jobs to the first,
-# Stop, and that a web site cannot ask for jobs.
+# Stop (then it asks), and that a web site cannot ask for jobs.
 #   python windows-desktop/link/build_link.py && python build.py && python tests/link.py
 import base64, json, os, shutil, subprocess, sys, tempfile, threading, time, urllib.request, zipfile
 from pathlib import Path
@@ -97,27 +97,11 @@ def main():
         guide = gem.call('how_to_write_steps')
         check('sketch' in guide and 'add_steps' in guide and 'Units and coordinates' in guide, 'the step guide comes from the skill')
 
-        # the first job: 3DJames asks the user; say no, then yes
+        # the first job: no question, the AI is let in straight away
         page.wait_for_timeout(1500)
-        th, out = call_async(gem, 'status')
-        page.get_by_role('button', name="Don't allow").click(timeout=30000)
-        th.join(60)
-        check('_error' in out['r'] and 'said no' in out['r']['_error'], 'Don\'t allow is passed back to the AI')
-        page.evaluate("() => {}")
-        page.wait_for_timeout(200)
-        # (declined: asked again only after a minute; reload the window to be asked again now)
-        page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
         th, out = call_async(gem, 'new_project', {'name': 'Link test', 'discard_changes': True})
-        dlg = page.get_by_role('dialog')
-        dlg.wait_for(timeout=30000)
-        check('Gemini' in dlg.inner_text(), 'the question names Gemini')
-        check(page.evaluate('document.title').startswith('(!) Allow Gemini') or page.wait_for_function("document.title.startsWith('(!) Allow Gemini')", timeout=3000), 'the window title asks too (seen in the taskbar)')
-        # a window behind others is slowed down to about one check-in a minute: answer late, with no check-ins at all
-        page.evaluate("() => { const f = window.fetch; window.fetch = (u, o) => String(u).includes('/page/alive') ? new Promise(() => {}) : f(u, o); }")
-        page.wait_for_timeout(70000)
-        page.get_by_role('button', name='Allow', exact=True).click()
         th.join(60)
-        check(out['r'].get('project') == 'Link test' and out['r'].get('steps') == 0, f'new_project after a late Allow ({str(out["r"])[:120]})')
+        check(out['r'].get('project') == 'Link test' and out['r'].get('steps') == 0 and page.get_by_role('dialog').count() == 0, f'new_project without a question ({str(out["r"])[:120]})')
         check(page.get_by_text('Gemini can work here').is_visible(), 'the window shows that Gemini can work here')
 
         r = gem.call('add_steps', {
@@ -201,34 +185,34 @@ def main():
         check(r.get('built') and res.get('done') and 'the same as the STL' in res.get('summary', ''), f'make_editable: {res.get("summary")}')
         page.keyboard.press('Escape')
 
-        # Stop: the next job asks again
+        # Stop: the next job asks (the question names the AI, and so does the window's title in the taskbar)
         page.get_by_role('button', name='Stop', exact=True).click()
         th, out = call_async(gem, 'status')
+        dlg = page.get_by_role('dialog')
+        dlg.wait_for(timeout=30000)
+        check('Gemini' in dlg.inner_text(), 'after Stop it asks, naming Gemini')
+        check(page.evaluate('document.title').startswith('(!) Allow Gemini') or page.wait_for_function("document.title.startsWith('(!) Allow Gemini')", timeout=3000), 'the window title asks too (seen in the taskbar)')
         page.get_by_role('button', name="Don't allow").click(timeout=30000)
         th.join(60)
-        check('_error' in out['r'], 'after Stop the AI has to ask again')
-
-        # Always allow: ticked once, the AI is let in without the question, even after the window is opened again
+        check('_error' in out['r'] and 'said no' in out['r']['_error'], "Don't allow is passed back to the AI")
+        # (declined: asked again only after a minute; the window opened again is still stopped, so it asks now)
         page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
-        th, out = call_async(gem, 'status')
+        th, out = call_async(gem, 'new_project', {'name': 'Link test 2', 'discard_changes': True})
         page.get_by_role('dialog').wait_for(timeout=30000)
-        page.get_by_label('Always allow', exact=False).check()
+        # a window behind others is slowed down to about one check-in a minute: answer late, with no check-ins at all
+        page.evaluate("() => { const f = window.fetch; window.fetch = (u, o) => String(u).includes('/page/alive') ? new Promise(() => {}) : f(u, o); }")
+        page.wait_for_timeout(70000)
         page.get_by_role('button', name='Allow', exact=True).click()
         th.join(60)
-        check('_error' not in out['r'], f'Allow with Always allow ticked ({str(out["r"])[:100]})')
-        page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
+        check(out['r'].get('project') == 'Link test 2', f'new_project after a late Allow ({str(out["r"])[:120]})')
+        check(page.get_by_text('Gemini can work here').is_visible(), 'after Allow the window shows that Gemini can work here')
+        # a new window (or 3DJames opened again) lets the AI in without asking
+        page.get_by_role('button', name='Stop', exact=True).click()
         page.evaluate("() => sessionStorage.clear()")
         page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
         th, out = call_async(gem, 'status')
         th.join(60)
-        check('_error' not in out['r'] and page.get_by_role('dialog').count() == 0, f'Always allow: no question next time ({str(out["r"])[:100]})')
-        # and Stop turns Always allow off
-        page.get_by_role('button', name='Stop', exact=True).click()
-        page.reload(); page.wait_for_function(READY, timeout=120000); page.wait_for_timeout(1500)
-        th, out = call_async(gem, 'status')
-        page.get_by_role('button', name="Don't allow").click(timeout=30000)
-        th.join(60)
-        check('_error' in out['r'], 'Stop turns Always allow off: it asks again')
+        check('_error' not in out['r'] and page.get_by_role('dialog').count() == 0, f'a new window: no question ({str(out["r"])[:100]})')
 
         page.screenshot(path=str(SRC / 'dist' / 'link.png'))
         check(not errors, f'no page errors {errors[:2]}')

@@ -1,6 +1,7 @@
 # Make editable on STEP parts (src/stepconvert.js, then the mesh converter): a part of flat faces and straight round
 # walls comes back as sketches from its own exact edges (true circles, exact sizes, holes through several levels as one
-# hole sketch); a part with rounded top edges still becomes steps or stays the exact STEP solid, never a mesh.
+# hole sketch); a part with round bosses on it, cut off flat, comes back as an outline with the bosses spun around;
+# a part with rounded top edges still becomes steps or stays the exact STEP solid, never a mesh.
 # Run after build.py:  python tests/step_editable.py
 import asyncio, sys
 from pathlib import Path
@@ -73,7 +74,28 @@ async def main():
     check('a STEP part with rounded top edges is never swapped for a mesh', not any(k == ('import', 'stl') for k in kinds), kinds)
     check('it becomes steps or stays the exact STEP solid', ok or kinds == [('import', 'step')], (ok, kinds))
 
-    # 3. a try that fails inside the engine: it starts again fresh, and the next Make editable works
+    # 3. a plate with a tapered round boss on its front, cut off flat at the floor and the top (as a part cut off
+    #    before it was shared), a hole along the boss through it all and one down through the plate: an outline pushed
+    #    up, the boss spun round its axis and cut off where it sticks out, the holes cut
+    B = {k: {'name': k, 'color': '#22B14C'} for k in ['a', 'c', 'k', 'h1', 'h2']}
+    for k in ['k', 'h1', 'h2']: B[k]['hole'] = True
+    LYING = lambda i, d, h, pos: {**CYL(i, d, h, pos), 'rot': [90, 0, 0]}
+    feats = [BOX('a', 40, 30, 10, [0, 0, 0]), {**LYING('c', 0, 12, [0, -15, -1]), 'kind': 'cone', 'p': {'d1': 18, 'd2': 12, 'h': 12}}, {'id': 'fu', 'type': 'combine', 'op': 'union', 'body': 'a', 'tools': ['c']},
+             BOX('k', 80, 80, 10, [0, 0, 0]), {'id': 'fk', 'type': 'combine', 'op': 'intersect', 'body': 'a', 'tools': ['k']},
+             LYING('h1', 6, 50, [0, 0, -20]), CYL('h2', 4, 30, [12, 5, -5]), {'id': 'fs', 'type': 'combine', 'op': 'subtract', 'body': 'a', 'tools': ['h1', 'h2']}]
+    data = await as_step(feats, B)
+    id, v0, ok, steps = await make_editable(data, 'boss.step')
+    v1 = await ev('(id) => window.__3dj.app.results.bodies.get(id).volume', id)
+    names = [s['name'] or '' for s in steps]
+    said = await ev("() => [...document.querySelectorAll('.toast')].map((t) => t.innerText)")
+    check('a STEP plate with a cut-off tapered boss is made editable', ok and not await ev('() => Object.keys(window.__3dj.app.results.errors).length'), (said, names))
+    check('it is the same volume as the STEP part (within 0.1%)', abs(v1 - v0) < v0 * 1e-3, (v0, v1))
+    check('its steps: an outline pushed up, a round piece spun around, cut off where it sticks out, round holes',
+          any('outline pushed up 10 mm' in n for n in names) and any('round piece' in n and 'spun around' in n for n in names)
+          and any('cut off' in n for n in names) and any('round hole' in n for n in names), names)
+    check('no mesh is left', not any(s['kind'] == 'import' for s in steps))
+
+    # 4. a try that fails inside the engine: it starts again fresh, and the next Make editable works
     await ev('() => window.__3dj.commands.newProject()'); await ev(WAIT)
     await ev("async (d) => { await window.__3dj.commands.insertFile(new File([new Uint8Array(d)], 'stepped.step'), { stepParts: 'separate' }); }", stepped); await ev(WAIT)
     good = await ev("() => window.__3dj.store.doc.features.find((f) => f.kind === 'import').body")

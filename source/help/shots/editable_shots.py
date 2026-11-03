@@ -1,5 +1,5 @@
-# Pictures for the Help page "Make an STL editable" (editable-1..3), from the real app with the test bracket
-# (tests/fixtures/stl/bracket.stl, made by tests/make_stl_fixtures.mjs).
+# Pictures for the Help page "Make an STL or STEP file editable" (editable-1..5), from the real app with the test
+# bracket (tests/fixtures/stl/bracket.stl, made by tests/make_stl_fixtures.mjs) and a STEP plate with a round boss.
 # Run after build.py:  python help/shots/editable_shots.py
 import asyncio, base64, os
 from playwright.async_api import async_playwright
@@ -64,6 +64,38 @@ async def main():
         ring(im, k, pad=4)
         arrow(im, (k[0] - 330, k[1] + 40), (k[0] - 6, k[1] + k[3] / 2), 'Point at a button:\nits piece shows in orange', side='left')
         save(im, 'editable-4.jpg', crop=FULL)
+        # 5: a STEP plate with a tapered round boss on its front, cut off flat at the floor and the top (the part from
+        # tests/step_editable.py), after Make editable: its steps in History
+        BOX = lambda i, w, d, h, pos: {'id': 'f' + i, 'type': 'shape', 'body': i, 'kind': 'box', 'p': {'w': w, 'd': d, 'h': h, 'round': 0, 'roundMode': 'all'}, 'pos': pos, 'rot': [0, 0, 0]}
+        ROUND = lambda i, kind, p, pos, rot: {'id': 'f' + i, 'type': 'shape', 'body': i, 'kind': kind, 'p': p, 'pos': pos, 'rot': rot}
+        B = {k: {'name': k, 'color': '#22B14C', **({'hole': True} if k in ('k', 'h1', 'h2') else {})} for k in ['a', 'c', 'k', 'h1', 'h2']}
+        feats = [BOX('a', 40, 30, 10, [0, 0, 0]), ROUND('c', 'cone', {'d1': 18, 'd2': 12, 'h': 12}, [0, -15, -1], [90, 0, 0]), {'id': 'fu', 'type': 'combine', 'op': 'union', 'body': 'a', 'tools': ['c']},
+                 BOX('k', 80, 80, 10, [0, 0, 0]), {'id': 'fk', 'type': 'combine', 'op': 'intersect', 'body': 'a', 'tools': ['k']},
+                 ROUND('h1', 'cyl', {'d': 6, 'h': 50}, [0, 0, -20], [90, 0, 0]), ROUND('h2', 'cyl', {'d': 4, 'h': 30}, [12, 5, -5], [0, 0, 0]),
+                 {'id': 'fs', 'type': 'combine', 'op': 'subtract', 'body': 'a', 'tools': ['h1', 'h2']}]
+        await ev("([f, b]) => window.__3dj.commands.loadProject({ name: 'boss', vars: [], bodies: b, features: f, seq: 900 }, null)", [feats, B])
+        await pg.wait_for_function('!window.__3dj.app.building && !window.__3dj.app.pending', timeout=60000)
+        step = await ev("async () => [...new Uint8Array(await window.__3dj.commands.buildFileData('step'))]")
+        await ev('() => window.__3dj.commands.newProject()')
+        await pg.wait_for_function('!window.__3dj.app.building && !window.__3dj.app.pending', timeout=60000)
+        await ev("(d) => window.__3dj.commands.openFile(new File([new Uint8Array(d)], 'boss.step'), null)", step)
+        go = pg.locator('dialog.modal .btn.primary', has_text='Make editable')
+        await go.wait_for(timeout=60000)
+        await go.click()
+        await pg.wait_for_function('''() => { const { store, app } = window.__3dj; return !app.converting && store.doc.features.some((f) => f.kind === 'sketch')
+          && !app.building && app.builtRevision === store.revision; }''', timeout=300000)
+        await pg.wait_for_selector('dialog.modal .btn.primary')
+        await ev("()=>document.querySelector('dialog.modal .btn.primary').click()")
+        await pg.mouse.move(60, 500)  # (off the History rows: pointing at one shows its piece in orange)
+        await ev("()=>{ const { commands: C, vp } = window.__3dj; const id = Object.keys(window.__3dj.store.doc.bodies)[0]; C.renderAll(); vp.view('home', false); window.__3dj.app.sel = [id]; vp.setSelection([id]); window.__3dj.app.historyAll = false; C.openPanel('history'); }")
+        await pg.wait_for_function('!window.__3dj.app.building && !window.__3dj.app.pending', timeout=60000)
+        await pg.wait_for_timeout(2000)
+        im = await shot(pg)
+        hist = await box(pg, '#side .side-body')
+        if hist:
+            ring(im, hist, pad=4)
+            num(im, (hist[0] - 30, hist[1] + 40), 1)
+        save(im, 'editable-5.jpg', crop=FULL)
         assert not errs, errs
         await b.close()
 

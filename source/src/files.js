@@ -194,6 +194,7 @@ function rememberSavedModel() {
 
 // ---------------------------------------------------------------- opening
 export function loadProject(doc, file) {
+  app.showPiece = null; // (an Edit sketch button pointed at in the old project: gone without the mouse leaving it)
   app.loading = true;
   try { store.load(absorbVersions(absorbFiles(normalizeDoc(doc)))); } finally { app.loading = false; }
   if (app.tool) endTool();

@@ -40,6 +40,8 @@ export function detailPicker() {
     say);
 }
 
+const EDITABLE_MINUTES = 12; // how long Make editable may take (the AI link waits 15 minutes for an answer)
+
 /** Rebuild an imported mesh object as editable steps, in place of its import step. */
 export async function makeEditable(id, { quiet = false, detail = editDetail() } = {}) {
   const doc = store.doc;
@@ -49,14 +51,15 @@ export async function makeEditable(id, { quiet = false, detail = editDetail() } 
   const step = f.p?.fmt === 'step', from = step ? 'the STEP file' : 'the STL', stays = step ? 'stays the exact STEP solid' : 'stays a mesh';
   const name = doc.bodies[id]?.name || f.p?.name || 'Part';
   const was = JSON.stringify(f); // the import step as it was when the work started
-  const busy = toast(`Making ${name} editable… big or detailed models can take a minute.`, 'info', 600000);
+  const busy = toast(`Making ${name} editable… big or detailed models can take a few minutes.`, 'info', (EDITABLE_MINUTES + 3) * 60000);
   app.converting = true;
   let res, seq;
   try {
     await waitForBuild(); // the engine has the mesh file
     seq = store.doc.seq;
-    // a STEP part gets three minutes: then the engine starts again by itself and the part stays the exact solid
-    res = await workerCall({ type: 'convertImport', feature: f, name, seq, body: id, detail }, undefined, step ? { timeout: 180000, restart: true } : undefined);
+    // twelve minutes at most: then the engine starts again by itself, and the part stays as it was (the exact STEP
+    // solid, or the mesh)
+    res = await workerCall({ type: 'convertImport', feature: f, name, seq, body: id, detail }, undefined, { timeout: EDITABLE_MINUTES * 60000, restart: true });
   } catch (err) {
     if (err.tooLong) {
       lastReport = { done: false, summary: `${name} took too long to rebuild as sketches, so it ${stays}.` };

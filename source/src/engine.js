@@ -203,12 +203,61 @@ function rotateV(v, rot, c) {
   const R3 = new Matrix4().makeRotationFromEuler(new Euler(rot[0] * d2r, rot[1] * d2r, rot[2] * d2r, 'ZYX'));
   return transformV(v, new Matrix4().makeTranslation(c[0], c[1], c[2]).multiply(R3).multiply(new Matrix4().makeTranslation(-c[0], -c[1], -c[2])));
 }
+const vol0 = (s) => { try { return R.measureVolume(s); } catch { return 0; } };
+/** Does the CAD kernel find this solid sound? */
+function soundSolid(s) {
+  try {
+    const an = new (R.getOC().BRepCheck_Analyzer)(s.wrapped, true, false);
+    const ok = typeof an.IsValid_1 === 'function' ? an.IsValid_1() : an.IsValid();
+    an.delete();
+    return ok;
+  } catch { return false; }
+}
+/** A merge, subtract or intersect of two shapes that treats faces this close (mm) as touching (0: only touching). */
+export function fuzzyBool(op, a, b, fuzz) {
+  const oc = R.getOC();
+  const B = op === 'add' ? new oc.BRepAlgoAPI_Fuse() : op === 'sub' ? new oc.BRepAlgoAPI_Cut() : new oc.BRepAlgoAPI_Common();
+  const args = new oc.NCollection_List_TopoDS_Shape(), tools = new oc.NCollection_List_TopoDS_Shape();
+  try {
+    args.Append(a.wrapped); tools.Append(b.wrapped);
+    B.SetArguments(args); B.SetTools(tools); B.SetFuzzyValue(fuzz);
+    B.Build();
+    if (B.HasErrors()) throw new Error('fuzzy boolean failed');
+    B.SimplifyResult(true, true, 1e-3);
+    return R.cast(B.Shape());
+  } finally { for (const x of [B, args, tools]) { try { x.delete(); } catch { /* */ } } }
+}
 function boolV(op, a, akey, b, bkey) {
   if (a.shape && b.shape) {
     const s = a.shape.clone();
-    if (op === 'add') return { shape: s.fuse(b.shape.clone()) };
-    if (op === 'sub') return { shape: s.cut(b.shape.clone()) };
-    return { shape: s.intersect(b.shape.clone()) };
+    const plain = op === 'add' ? s.fuse(b.shape.clone()) : op === 'sub' ? s.cut(b.shape.clone()) : s.intersect(b.shape.clone());
+    // faces a hair apart (a spun boss meeting a wall, say) can trip the kernel: then once more, treating faces that
+    // close as touching. A result counts when it is sound and of a believable size (a merge can come out sound but
+    // missing most of both).
+    const va = vol0(a.shape), vb = vol0(b.shape), e = 1e-6 * (Math.abs(va) + Math.abs(vb)) + 1e-9;
+    const believable = (s) => {
+      if (!soundSolid(s)) return false;
+      const v = vol0(s);
+      if (op === 'add') return v >= Math.max(va, vb) - e && v <= va + vb + e;
+      if (op === 'sub') return v <= va + e && v >= va - vb - e;
+      return v <= Math.min(va, vb) + e;
+    };
+    if (believable(plain)) return { shape: plain };
+    for (const fuzz of [1e-5, 1e-4]) {
+      let f = null;
+      try { f = fuzzyBool(op, a.shape, b.shape, fuzz); } catch { continue; }
+      if (believable(f)) {
+        try { plain.delete(); } catch { /* */ }
+        return { shape: f };
+      }
+      try { f.delete(); } catch { /* */ }
+    }
+    // still not: as meshes (like a solid meeting a thread or an imported model), so the step does not fail
+    try { plain.delete(); } catch { /* */ }
+    const ma = asMf(a, akey), mb = asMf(b, bkey);
+    if (op === 'add') return { mf: ma.add(mb) };
+    if (op === 'sub') return { mf: ma.subtract(mb) };
+    return { mf: ma.intersect(mb) };
   }
   const ma = asMf(a, akey), mb = asMf(b, bkey);
   if (op === 'add') return { mf: ma.add(mb) };
@@ -704,7 +753,7 @@ function embossPiece(shape, v, f, num, fonts) {
  * show: objects to point out (hovering an Edit sketch button): each as it was before anything was merged into it or
  * cut out of it, returned among the ghosts with hover: true.
  */
-export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = false, show = [], preview = null } = {}) {
+export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = false, solidsOnly = false, show = [], preview = null } = {}) {
   const scope = varScope(doc.vars);
   const scopeKey = JSON.stringify(scope);
   const num = (v) => evalExpr(v, scope);
@@ -1074,9 +1123,10 @@ export function evaluate(doc, fonts, { files = {}, ghostOf = null, scratch = fal
 
   if (scratch) {
     for (const m of scratchMfs.splice(0)) { try { m.delete(); } catch { /* */ } }
-    // a trial build (making an STL editable): leaves the open project's results alone. Its objects as meshes:
+    // a trial build (making an STL editable): leaves the open project's results alone. Its objects as meshes
+    // (unless only the exact solids are wanted):
     const meshes = new Map(), soups = new Map();
-    for (const [id, b] of state) {
+    for (const [id, b] of solidsOnly ? [] : state) {
       try { meshes.set(id, asMf(b.v, b.key)); } catch (err) {
         // the quick mesh can come out with gaps on small details: try once more, finer, joining near points
         try { meshes.set(id, fineMf(b.v.shape)); } catch {

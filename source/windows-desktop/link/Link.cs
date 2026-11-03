@@ -206,7 +206,7 @@ internal static class Hub
     {
         string k = File.Exists(KeyFile) ? File.ReadAllText(KeyFile).Trim() : "";
         var req = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:" + Link.Port + "/agent/job");
-        req.Method = "POST"; req.Proxy = null; req.Timeout = req.ReadWriteTimeout = 12 * 60 * 1000;
+        req.Method = "POST"; req.Proxy = null; req.Timeout = req.ReadWriteTimeout = 16 * 60 * 1000;
         req.ContentType = "application/json"; req.Headers["X-Link-Key"] = k;
         byte[] body = Encoding.UTF8.GetBytes(Link.Json.Serialize(new Dictionary<string, object> { { "tool", tool }, { "args", args }, { "client", client } }));
         using (var s = req.GetRequestStream()) s.Write(body, 0, body.Length);
@@ -268,7 +268,7 @@ internal static class Hub
         }
         try
         {
-            DateTime until = DateTime.UtcNow.AddMinutes(11);
+            DateTime until = DateTime.UtcNow.AddMinutes(15); // (Make editable may take 12)
             while (!job.Done.WaitOne(3000))
             {
                 lock (L)
@@ -276,7 +276,7 @@ internal static class Hub
                     Win w;
                     if (!windows.TryGetValue(job.Window, out w) || !StillThere(w)) throw new Exception("The 3DJames window was closed or reloaded before it finished. " + TellUser);
                 }
-                if (DateTime.UtcNow > until) throw new Exception("3DJames took longer than 11 minutes to answer. " + TellUser);
+                if (DateTime.UtcNow > until) throw new Exception("3DJames took longer than 15 minutes to answer. " + TellUser);
             }
         }
         finally { lock (L) running.Remove(job.Id); }
@@ -473,7 +473,7 @@ internal static class Setup
             if (all == null) all = new Dictionary<string, object>();
             var servers = Link.Get(all, "mcpServers") as Dictionary<string, object> ?? new Dictionary<string, object>();
             servers["3djames"] = new Dictionary<string, object> {
-                { "command", Path.Combine(Link.AppDir, "3DJamesLink.exe") }, { "args", new object[0] }, { "cwd", Link.AppDir }, { "timeoutSeconds", 660 } };
+                { "command", Path.Combine(Link.AppDir, "3DJamesLink.exe") }, { "args", new object[0] }, { "cwd", Link.AppDir }, { "timeoutSeconds", 1000 } };
             all["mcpServers"] = servers;
             File.WriteAllText(file, Link.Json.Serialize(all));
             // the instructions, read by Antigravity when the user talks about 3DJames

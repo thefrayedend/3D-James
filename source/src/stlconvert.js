@@ -1565,4 +1565,4 @@ export function convertAndCheck(mf, mesh, opts, build) {
 }
 
 // (the STEP converter, stepconvert.js, writes its sketches the same way)
-export { sketchFeature, emitter, AXIS_FRAMES };
+export { sketchFeature, emitter, AXIS_FRAMES, toLocalMat };
