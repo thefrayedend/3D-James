@@ -978,7 +978,7 @@ export class Viewport {
     const fov = THREE.MathUtils.degToRad(this.camera.fov);
     const dist = (radius / Math.sin(fov / 2)) * (this.camera.aspect < 1 ? 1 / this.camera.aspect : 1) * 0.92;
     const pos = center.clone().add(dir.multiplyScalar(dist));
-    if (!animate) { this.camera.position.copy(pos); this.orbit.target.copy(center); this.orbit.update(); this.requestRender(); return; }
+    if (!animate) { this.anim = null; this.camera.position.copy(pos); this.orbit.target.copy(center); this.orbit.update(); this.requestRender(); return; } // (a flight under way stops)
     this.anim = { t0: performance.now(), dur: 320, p0: this.camera.position.clone(), p1: pos, c0: this.orbit.target.clone(), c1: center };
   }
   /** Turn the view to look straight at a face (center P, normal n), far enough back to see something `size` across. */

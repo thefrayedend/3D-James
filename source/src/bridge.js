@@ -24,10 +24,15 @@ import { toB64, bytesFromB64 } from './storage.js';
 let BASE = 'http://127.0.0.1:47831';
 const windowId = Math.random().toString(36).slice(2, 10);
 let focusAt = document.hasFocus() ? Date.now() : 0;
-// An AI on this computer (through 3DJames Link) may work here without being asked; after Stop in a window, that window
-// asks the next time it tries
-let allowed = true, declinedUntil = 0, connected = false, who = null, pill = null, pendingSave = null;
-try { allowed = sessionStorage.getItem('3djames.link') !== 'stopped'; } catch { /* storage unavailable */ }
+// Which AIs may work here: the user is asked the first time; Allow this time lets that AI work in this window, Always
+// trust lets it work in every window from then on (kept on this computer). Stop in a window makes it ask there again.
+let declinedUntil = 0, connected = false, who = null, pill = null, pendingSave = null;
+const TRUSTED = '3djames.link.trusted', HERE = '3djames.link.here', STOPPED = '3djames.link.stopped';
+const names = (store, key) => { try { return new Set(JSON.parse(store.getItem(key) || '[]')); } catch { return new Set(); } };
+const keepNames = (store, key, set) => { try { store.setItem(key, JSON.stringify([...set])); } catch { /* storage unavailable */ } };
+const trusted = () => names(localStorage, TRUSTED);
+const allowed = (ai) => !!ai && !names(sessionStorage, STOPPED).has(ai) && (trusted().has(ai) || names(sessionStorage, HERE).has(ai));
+const named = (ai) => ai && ai !== 'An AI helper'; // (only a named AI can be trusted for good)
 
 /** Start listening for the link (only for files on their computer; the 3DJames box will get its own way). */
 export function startBridge() {
@@ -64,11 +69,13 @@ async function loop() {
 
 async function handle(job) {
   who = job.client || 'An AI helper';
-  if (!allowed) {
+  if (!allowed(who)) {
     if (Date.now() < declinedUntil) return { id: job.id, ok: false, error: 'The user said no to letting an AI work in 3DJames just now. Ask them before trying again.' };
-    if (!(await ask())) { declinedUntil = Date.now() + 60000; return { id: job.id, ok: false, error: 'The user said no (or did not answer) when 3DJames asked whether to let you work in it.' }; }
-    allowed = true;
-    try { sessionStorage.removeItem('3djames.link'); } catch { /* storage unavailable */ }
+    const yes = await ask();
+    if (!yes) { declinedUntil = Date.now() + 60000; return { id: job.id, ok: false, error: 'The user said no (or did not answer) when 3DJames asked whether to let you work in it.' }; }
+    const stopped = names(sessionStorage, STOPPED); stopped.delete(who); keepNames(sessionStorage, STOPPED, stopped);
+    const here = names(sessionStorage, HERE); here.add(who); keepNames(sessionStorage, HERE, here);
+    if (yes === 'always') { const t = trusted(); t.add(who); keepNames(localStorage, TRUSTED, t); }
   }
   showPill(); // (the note names the AI)
   try {
@@ -87,37 +94,49 @@ function ask() {
     const title = document.title;
     const flash = setInterval(() => { document.title = document.title === title ? `(!) Allow ${who}? - 3DJames` : title; }, 1000);
     try { window.focus(); } catch { /* not allowed */ }
-    const answer = (yes) => {
+    const answer = (yes) => { // (false; true: this window; 'always': trusted from now on)
       if (done) return; done = true; clearInterval(flash); document.title = title; close();
       resolve(yes);
     };
     const body = h('div', { style: 'display:grid;gap:8px;max-width:440px' },
       h('p', {}, `${who} (on their computer) wants to work in this 3DJames window: open and save projects in your Projects folder, add and change steps, and look at the model.`),
-      h('p', { class: 'muted' }, 'You clicked Stop in this window earlier. You see every change as it happens, and Ctrl+Z undoes it. You can stop it again any time with Stop at the top of the window.'));
+      h('p', { class: 'muted' }, `You see every change as it happens, and Ctrl+Z undoes it. Stop at the top of the window stops it any time.${named(who) ? ` Always trust ${who}: it won't ask about ${who} again, in any window.` : ''}`));
     const close = modal(`Let ${who} work in 3DJames?`, body, () => [
       h('button', { class: 'btn', onclick: () => answer(false) }, "Don't allow"),
-      h('button', { class: 'btn primary', onclick: () => answer(true) }, 'Allow')], () => answer(false));
+      h('button', { class: named(who) ? 'btn' : 'btn primary', onclick: () => answer(true) }, named(who) ? 'Allow this time' : 'Allow'),
+      named(who) && h('button', { class: 'btn primary', onclick: () => answer('always') }, `Always trust ${who}`)].filter(Boolean), () => answer(false));
     setTimeout(() => answer(false), 180000);
   });
 }
 
 /** The note at the top of the window while an AI may work here, with Stop. */
 function showPill() {
-  const on = allowed && connected;
+  const on = connected && allowed(who);
   if (!on) { pill?.remove(); pill = null; return; }
   if (!pill) {
     pill = h('div', { class: 'card float', role: 'status', style: 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:8px;padding:4px 6px 4px 10px' },
       ic('Bot'), h('span', { class: 'who' }),
-      h('button', { class: 'btn', title: 'Stop letting the AI work in this window (it asks again next time)', onclick: stop }, 'Stop'));
+      h('button', { class: 'btn', title: 'Stop letting the AI work here', onclick: stop }, 'Stop'));
     document.getElementById('view').append(pill);
   }
-  pill.querySelector('.who').textContent = `${who || 'An AI helper'} can work here`;
+  pill.querySelector('.who').textContent = `${who} can work here${trusted().has(who) ? ' (trusted)' : ''}`;
 }
+/** Stop: in this window (it asks here next time), and for a trusted AI also, if the user says so, stop trusting it. */
 function stop() {
-  allowed = false;
-  try { sessionStorage.setItem('3djames.link', 'stopped'); } catch { /* storage unavailable */ }
-  showPill();
-  toast(`${who || 'The AI'} can no longer work in this window. It will ask again if it tries.`);
+  const ai = who, inWindow = () => {
+    const s = names(sessionStorage, STOPPED); s.add(ai); keepNames(sessionStorage, STOPPED, s);
+    const here = names(sessionStorage, HERE); here.delete(ai); keepNames(sessionStorage, HERE, here);
+    showPill();
+  };
+  if (!trusted().has(ai)) {
+    inWindow();
+    toast(`${ai} can no longer work in this window. It will ask again if it tries.`);
+    return;
+  }
+  modal(`Stop ${ai}?`, h('p', { style: 'max-width:420px' }, `${ai} is trusted: it works in 3DJames without asking. Stop it just in this window, or stop trusting it (then it asks again, in every window).`), (close) => [
+    h('button', { class: 'btn', onclick: () => close() }, 'Cancel'),
+    h('button', { class: 'btn', onclick: () => { close(); inWindow(); toast(`${ai} can no longer work in this window. It will ask again if it tries here.`); } }, 'Just this window'),
+    h('button', { class: 'btn primary', onclick: () => { close(); const t = trusted(); t.delete(ai); keepNames(localStorage, TRUSTED, t); inWindow(); toast(`${ai} is no longer trusted. It will ask again if it tries.`); } }, `Stop trusting ${ai}`)]);
 }
 
 // ---------------------------------------------------------------- helpers

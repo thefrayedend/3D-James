@@ -60,14 +60,25 @@ subprocess.run([shutil.which('node') or 'node', os.path.join('tools', 'make_icon
 LINK_FILES = {'GEMINI.md': 'GEMINI.md', 'Connect Antigravity.cmd': 'Connect Antigravity.cmd', 'mcp.json': '.mcp.json'}
 for gone in ['Ask Gemini.cmd', os.path.join('.gemini', 'settings.json')]:  # Gemini CLI: Google stopped its free sign-in (June 2026)
     if os.path.exists(os.path.join(APP, gone)): os.remove(os.path.join(APP, gone))
+link_failed = None
+def put_program(src, dest):
+    """Copy a program, also over one that is running (an AI's link): Windows lets a running program be renamed out
+    of the way (to .old.exe), not written over."""
+    try: shutil.copyfile(src, dest)
+    except PermissionError:
+        old = dest[:-4] + '.old.exe'
+        if os.path.exists(old): os.remove(old)
+        os.replace(dest, old); shutil.copyfile(src, dest)
+        print(dest, 'was running: the old one is now', os.path.basename(old))
 try:
     subprocess.run([shutil.which('python') or 'python', os.path.join('windows-desktop', 'link', 'build_link.py')], check=True)
-    shutil.copyfile(os.path.join(SRC, 'local', '3DJamesLink.exe'), os.path.join(APP, '3DJamesLink.exe'))
+    put_program(os.path.join(SRC, 'local', '3DJamesLink.exe'), os.path.join(APP, '3DJamesLink.exe'))
     for f, dest in LINK_FILES.items():
         os.makedirs(os.path.dirname(os.path.join(APP, dest)), exist_ok=True)
         shutil.copyfile(os.path.join(SRC, 'windows-desktop', 'link', 'ai', f), os.path.join(APP, dest))
     print('AI link copied to', APP)
 except (OSError, subprocess.CalledProcessError) as e:
+    link_failed = e
     print('AI link NOT updated:', e)
 
 # (no share zip any more: 3DJames is shared as the installer, Installation\Make 3DJames Installer.cmd)
@@ -95,3 +106,5 @@ elif os.path.isdir(skill):
         open(cp, 'w', encoding='utf-8', newline='\r\n').write(guide)
         print(cp)
 print('shipped version', VERSION)
+# (a release must not go out with an old AI link: the installer takes it from the 3DJames folder)
+if link_failed: sys.exit(f'BUT the AI link was NOT updated ({link_failed}): fix that before making the installer.')

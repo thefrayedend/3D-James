@@ -31,6 +31,7 @@ async def main():
       if release: await pg.mouse.up(); await W()
 
     await ev("()=>__3dj.commands.newProject()"); await W()
+    await ev("()=>{ const v=__3dj.vp; window.__cam=[v.camera.position.clone(), v.orbit.target.clone()]; }")
     await mouse_drag('Cube', await screen(30, 10, 0), release=False)
     ghost = await ev("()=>{ const g=__3dj.vp.dropGhost; return g && g.parent ? [g.position.x, g.position.y].map(v=>Math.round(v)) : null; }")
     check('while dragging, a see-through shape shows where it will land (under the pointer), and a label follows it', ghost and abs(ghost[0] - 30) <= 4 and abs(ghost[1] - 10) <= 4 and await ev("()=>!!document.querySelector('.drag-chip')"), ghost)
@@ -46,6 +47,7 @@ async def main():
     t = (await bodies())[-1]
     check('a plain click still adds the shape beside what is there', len(await bodies()) == 3 and t['min'][0] > 40, t)
     await ev("()=>__3dj.store.undo()"); await W()
+    await ev("()=>{ const v=__3dj.vp; v.anim=null; v.camera.position.copy(__cam[0]); v.orbit.target.copy(__cam[1]); v.orbit.update(); v.requestRender(); }")  # (each shape added was flown to: the view from the start)
     check('one Undo takes the added shape away again', len(await bodies()) == 2)
     # a finger works the same way
     cdp = await ctx.new_cdp_session(pg)

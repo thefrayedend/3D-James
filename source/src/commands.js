@@ -73,6 +73,7 @@ export function addShape(kind, extra = {}, label0) {
     const hole = (kind === 'thread' && p.kind === 'cutter') || HOLE_KINDS.has(kind);
     doc.bodies[id] = { name: nextName(doc, label), color: hole ? '#8b96a3' : defaultColor(kind, label0, doc), hole };
   });
+  if (kind !== 'sketch') app.focusNew = id; // (the view flies to it once it is built: build.js)
   select([id]);
   return id;
 }

@@ -1,5 +1,6 @@
 # Double-clicking an object: 1st flies in to frame it, 2nd goes twice as close, 3rd goes back to the first view (and round again).
-# A different object, or moving the view yourself, starts again at the first view. Real mouse.  python tests/doubleclick.py
+# A different object, or moving the view yourself, starts again at the first view. A shape just added is flown to as if
+# double-clicked. Real mouse.  python tests/doubleclick.py
 import asyncio, json
 from pathlib import Path
 from playwright.async_api import async_playwright
@@ -26,6 +27,16 @@ async def main():
     # moving the view yourself starts again at the first view
     await pg.mouse.move(700,430); await pg.mouse.wheel(0,-200); await pg.wait_for_timeout(300)
     d5=await dbl(); assert abs(d5-d1)<0.01*d1, (d5,d1)
+    # a shape just added: the view flies to it as if it had been double-clicked (a double-click then goes twice as close)
+    await pg.get_by_role('button',name='Cone',exact=True).click(); await built()
+    await pg.wait_for_function('!window.__3dj.vp.anim',timeout=10000)
+    near=await pg.evaluate("""()=>{const B=window.__3dj, v=B.vp, id=B.app.sel[0]; const c=v.selectionBox([id]).getCenter(new v.camera.position.constructor()); return [B.store.doc.bodies[id].name, v.orbit.target.distanceTo(c)]}""")
+    assert near[0].startswith('Cone') and near[1]<0.5, near
+    n1=await pg.evaluate(dist)
+    x,y=await pg.evaluate("""()=>{const B=window.__3dj, v=B.vp; const c=v.selectionBox(B.app.sel).getCenter(new v.camera.position.constructor()).project(v.camera); const r=v.renderer.domElement.getBoundingClientRect(); return [r.left+(c.x+1)/2*r.width, r.top+(1-c.y)/2*r.height]}""")
+    await pg.mouse.dblclick(x,y); await pg.wait_for_function('!window.__3dj.vp.anim',timeout=10000)
+    n2=await pg.evaluate(dist); assert abs(n2-n1/2)<0.01*n1, (n1,n2)
+    print(json.dumps({'new cone framed at':n1,'then double-click':n2}))
     assert not errs, errs
     print('ALL OK'); await b.close()
 asyncio.run(main())

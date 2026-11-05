@@ -185,7 +185,8 @@ function applyResults(m) {
   if (!app.helperCheck) for (const [fid, msg] of Object.entries(m.errors)) if (shownErrors[fid] !== msg) { shownErrors[fid] = msg; toast(msg, 'err', 6500); }
   for (const k of Object.keys(shownErrors)) if (!m.errors[k]) delete shownErrors[k];
   if (!app.viewSet) { app.viewSet = true; vp.view('home', false); }
-  if (app.toPlane?.length) {
+  const placing = !!app.toPlane?.length;
+  if (placing) {
     // shapes added on a workplane: put their bottom on the face (needs the height, known only now)
     const list = app.toPlane; app.toPlane = null;
     store.amend((doc) => {
@@ -197,6 +198,11 @@ function applyResults(m) {
         f.pos = [0, 1, 2].map((i) => Math.round((P[i] + (n[i] / len) * k - (i === 2 ? h / 2 : 0)) * 1e4) / 1e4);
       }
     });
+  }
+  // a shape just added: the view flies to it, as on a double-click (once it sits where it goes)
+  if (app.focusNew && !placing) {
+    const id = app.focusNew; app.focusNew = null;
+    if (map.has(id)) vp.centerOn([id], true);
   }
   if (app.keepBase?.length) {
     // a turned shape whose numbers changed (Properties): its height grew from its middle; move it so its base stays

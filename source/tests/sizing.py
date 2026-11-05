@@ -18,10 +18,11 @@ JS = '''
   window.__box = (id) => window.__3dj.app.results.bodies.get(id).bbox;
   // a fresh object of the given kind, turned and placed, picked with the Size handles
   window.__make = async (kind, rot, combined) => { const { commands: C, store: S, app, vp } = window.__3dj;
-    C.newProject(); await __wait(); const id = C.addShape(kind); await __wait();
+    C.newProject(); await __wait(); const cam = [vp.camera.position.clone(), vp.orbit.target.clone()]; const id = C.addShape(kind); await __wait();
     S.commit((d) => { const f = d.features.find((x) => x.body === id); f.rot = rot; f.pos = [5, -7, 0]; }); await __wait();
     if (combined) { const t = C.addShape('box', { w: 6, d: 6, h: 6 }); await __wait(); app.sel = [id, t]; vp.setSelection(app.sel); C.combine('union'); await __wait(); }
-    app.settings.lock = false; app.sel = [id]; vp.setSelection([id]); C.setGizmo('scale'); await __wait(); return id; };
+    app.settings.lock = false; app.sel = [id]; vp.setSelection([id]); C.setGizmo('scale'); await __wait();
+    vp.anim = null; vp.camera.position.copy(cam[0]); vp.orbit.target.copy(cam[1]); vp.orbit.update(); vp.requestRender(); return id; }; // (a shape just added is flown to: the view it had before)
 '''
 MID = lambda b, i: (b[0][i] + b[1][i]) / 2
 
